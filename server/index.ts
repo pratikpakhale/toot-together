@@ -671,7 +671,7 @@ setInterval(() => {
 }, RATE_WINDOW_MS)
 
 server.listen(PORT, HOST, () => {
-  console.log(`Hippo Toot server on http://localhost:${PORT} (ws path /ws)`)
+  console.log(`Toot Together server on http://localhost:${PORT} (ws path /ws)`)
 })
 
 function parkRooms() {

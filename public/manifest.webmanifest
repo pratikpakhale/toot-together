@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Hippo Toot",
-  "short_name": "Hippo Toot",
+  "name": "Toot Together",
+  "short_name": "Toot Together",
   "description": "A co-op hippo raft party game. Steer together, toot together, blame each other.",
   "start_url": "/",
   "scope": "/",

@@ -1,9 +1,9 @@
 ---
-name: verify-hippo-toot
-description: Launch and drive Hippo Toot (co-op hippo raft browser game, React + react-three-fiber client, Node ws room server) locally the way a player does, and capture proof. Use to verify a change in the browser UI (menu, level select, HUD, chat, pause, couch lobby, /hippocam spectator page) or online rooms, or whenever you need a disposable running copy with bot players. Local only; never production.
+name: verify-toot-together
+description: Launch and drive Toot Together (co-op hippo raft browser game, React + react-three-fiber client, Node ws room server) locally the way a player does, and capture proof. Use to verify a change in the browser UI (menu, level select, HUD, chat, pause, couch lobby, /hippocam spectator page) or online rooms, or whenever you need a disposable running copy with bot players. Local only; never production.
 ---
 
-# Verify Hippo Toot
+# Verify Toot Together
 
 Drives a disposable local copy of the game on its own ports, with a browser (the verify browser: whichever Playwright browser MCP server is set up, its tools named `mcp__<server>__browser_*`; `AGENTS.local.md` names the owner's) and headless bot players over the real websocket protocol. Read `features/README.md` and the feature file you need before driving.
 
@@ -12,7 +12,7 @@ Drives a disposable local copy of the game on its own ports, with a browser (the
 Helper (executable, no install step; uses the repo's own `node_modules`, so `pnpm install` must have been run):
 
 ```bash
-T=.agents/skills/verify-hippo-toot/scripts/hippo-verify.mjs   # from the repo root
+T=.agents/skills/verify-toot-together/scripts/toot-verify.mjs   # from the repo root
 ```
 
 | Command | What it does |
@@ -31,11 +31,11 @@ $T up          # ~5-15 s cold; prints {"ready":true,"web":"http://127.0.0.1:5273
 
 What it runs (same as `pnpm dev`, minus file watching, on other ports):
 
-- Room server: `node --import tsx server/index.ts` with `PORT=<server port>`, `NODE_ENV=development`, and `ROOMS_FILE`/`STATE_DIRECTORY`/`HOST`/`TRUST_PROXY_HEADER` unset, so rooms are never parked to disk and the rate limits key on `127.0.0.1`. Ready when its log says `Hippo Toot server on` and `/health` answers `{"ok":true,...}`.
+- Room server: `node --import tsx server/index.ts` with `PORT=<server port>`, `NODE_ENV=development`, and `ROOMS_FILE`/`STATE_DIRECTORY`/`HOST`/`TRUST_PROXY_HEADER` unset, so rooms are never parked to disk and the rate limits key on `127.0.0.1`. Ready when its log says `Toot Together server on` and `/health` answers `{"ok":true,...}`.
 - Client: vite with `scripts/vite.verify.config.ts`, which loads the repo's `vite.config.ts` unchanged and overrides only the port (strict), host (`127.0.0.1`), the `/ws` proxy target, and the dependency cache dir. **Why it exists:** the repo config hard-codes the proxy to `ws://localhost:2567`, so a plain `vite --port X` would send every websocket to the user's own `pnpm dev` server. Ready when vite logs `ready in` and serves `/src/client/main.tsx`.
-- No seed data exists or is needed: there is no database. Rooms live in server memory; progress, name and tutorial state live in the browser's `localStorage` (`hippo-toot:settings`, the progress store) and the seat token in `sessionStorage` (`hippo-toot:seat`).
+- No seed data exists or is needed: there is no database. Rooms live in server memory; progress, name and tutorial state live in the browser's `localStorage` (`toot-together:settings`, the progress store) and the seat token in `sessionStorage` (`toot-together:seat`).
 
-Isolation: two runs can coexist with the user's `pnpm dev` (5173/2567). The helper allows one verification run at a time (`/tmp/verify/hippo-toot/current.json`). Vite serves the working tree live, so uncommitted edits by other threads show up mid-run; `doctor` prints the checkout's dirty count.
+Isolation: two runs can coexist with the user's `pnpm dev` (5173/2567). The helper allows one verification run at a time (`/tmp/verify/toot-together/current.json`). Vite serves the working tree live, so uncommitted edits by other threads show up mid-run; `doctor` prints the checkout's dirty count.
 
 If `up` fails it prints both log tails. Run `$T down` before retrying, every time.
 
@@ -90,7 +90,7 @@ async (page) => {
 
 ## Evidence
 
-Everything goes to the run's evidence folder, printed by `up`/`status`: `/tmp/verify/hippo-toot/evidence/<runId>/`. It is outside the repo (no `.gitignore` entry needed) and `down` never deletes it. `down` adds `server.log`, `web.log` and `run.json` to it.
+Everything goes to the run's evidence folder, printed by `up`/`status`: `/tmp/verify/toot-together/evidence/<runId>/`. It is outside the repo (no `.gitignore` entry needed) and `down` never deletes it. `down` adds `server.log`, `web.log` and `run.json` to it.
 
 Name files `<feature>-NN-<what>.png|.aria.yml|.json|.jsonl`. A proof needs:
 
@@ -108,7 +108,7 @@ Screenshots can only be written under `/tmp/verify` or the repo.
 #   browser_run_code_unsafe: for (const c of page.context().browser().contexts()) if (c !== page.context()) await c.close()
 #   browser_navigate about:blank
 $T down
-ls /tmp/verify/hippo-toot/evidence/<runId>/   # evidence must still be there
+ls /tmp/verify/toot-together/evidence/<runId>/   # evidence must still be there
 ```
 
 `down` only signals the process groups recorded at `up` (both are started detached, so each is its own group that includes tsx's/vite's esbuild children). Never `pkill node`/`vite`/`tsx`: the user may be running `pnpm dev`. Background bots exit on their own after `--stay`. Run `down` after every failed attempt too.

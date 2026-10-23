@@ -1,13 +1,13 @@
 [Unit]
-Description=Hippo Toot game server
+Description=Toot Together game server
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=hippo-toot
-Group=hippo-toot
-WorkingDirectory=/opt/hippo-toot/current
-StateDirectory=hippo-toot
+User=toot
+Group=toot
+WorkingDirectory=/opt/toot-together/current
+StateDirectory=toot-together
 ExecStart=/usr/bin/node dist-server/index.js
 Environment=NODE_ENV=production HOST=127.0.0.1 PORT=8080 TRUST_PROXY_HEADER=x-forwarded-for
 Restart=always

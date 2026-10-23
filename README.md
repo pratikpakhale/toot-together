@@ -1,10 +1,10 @@
-# Hippo Toot
+# Toot Together
 
 A co-op physics party game for the browser, inspired by *Fart Together*. Up to four hippos share one inflatable raft, and the only way to move it is to toot. Each hippo waddles around the rim and pushes the raft away from its own butt, so everyone's toots add up into one direction and one bad toot ruins it for everyone.
 
-**Play it at https://hippotoot.fun**
+**Play it at https://toottogether.fun**
 
-<img src="trailer/preview.webp" width="800" alt="Hippo Toot trailer: four hippos toot their raft past spinners, Kabir pops it on the spikes, the crew makes the finish, and the Hippo Toot logo sends you to hippotoot.fun">
+<img src="trailer/preview.webp" width="800" alt="Trailer: four hippos toot their raft past spinners, Kabir pops it on the spikes, and the crew makes the finish">
 
 ## Run it
 
@@ -34,7 +34,7 @@ Any Node host that supports WebSockets will run it (a VPS, Render, Railway, …)
 
 ### Self-hosting
 
-The repo ships everything for a small VM: Caddy in front for HTTPS and the WebSocket proxy, and the Node server running as the `hippo-toot` systemd service.
+The repo ships everything for a small VM: Caddy in front for HTTPS and the WebSocket proxy, and the Node server running as the `toot-together` systemd service.
 
 1. Point a domain's A record at a fresh Ubuntu 24.04 VM, and open TCP 80 and 443 in your cloud provider's firewall.
 2. Copy `deploy/` to the box and run `sudo bash setup-server.sh <domain> [other domains…]` there. It opens 80/443 in the VM firewall and adds swap, then installs Node 24, pnpm and Caddy. Any other domains (say `www.<domain>`, or one the game moved from) permanently redirect to `<domain>`. It is safe to re-run.
@@ -42,10 +42,10 @@ The repo ships everything for a small VM: Caddy in front for HTTPS and the WebSo
 
 ```bash
 scripts/deploy.sh                                     # builds locally, uploads a release, restarts, checks /health
-ssh <deploy host> journalctl -u hippo-toot -f         # logs
+ssh <deploy host> journalctl -u toot-together -f         # logs
 ```
 
-Redeploying restarts the server, but rooms carry over: they're parked in `/var/lib/hippo-toot/rooms.json` on the way down and restored on the way up, and players reconnect after a few seconds. A release that changes the simulation's state can't restore old rooms, so deploy those when nobody is playing (`/health` shows the room count). See `AGENTS.md` for the full deploy checklist.
+Redeploying restarts the server, but rooms carry over: they're parked in `/var/lib/toot-together/rooms.json` on the way down and restored on the way up, and players reconnect after a few seconds. A release that changes the simulation's state can't restore old rooms, so deploy those when nobody is playing (`/health` shows the room count). See `AGENTS.md` for the full deploy checklist.
 
 ## Controls
 

@@ -1,6 +1,6 @@
-# Hippo Toot verification map
+# Toot Together verification map
 
-This directory is the maintained source for verifying what a Hippo Toot player can do. Read this index, then use the matching feature file as the recipe. `T` below is `.agents/skills/verify-hippo-toot/scripts/hippo-verify.mjs`, run from the repo root.
+This directory is the maintained source for verifying what a Toot Together player can do. Read this index, then use the matching feature file as the recipe. `T` below is `.agents/skills/verify-toot-together/scripts/toot-verify.mjs`, run from the repo root.
 
 ## Baseline preconditions
 
@@ -22,12 +22,12 @@ This directory is the maintained source for verifying what a Hippo Toot player c
 
 - Capture the action and the resulting state: a screenshot before and after, plus an ARIA snapshot of the end state.
 - Pair what one player sees with what another received: bot `--out` JSONL, or a screenshot from the second context.
-- Save everything under `/tmp/verify/hippo-toot/evidence/<runId>/` as `<feature>-NN-<what>.<ext>`.
+- Save everything under `/tmp/verify/toot-together/evidence/<runId>/` as `<feature>-NN-<what>.<ext>`.
 - Report an unreachable path with the attempted step and the unmet precondition. Do not report a skipped entry point as verified through another one.
 
 ## Feature entry contract
 
-Each feature file starts with an H1 and one paragraph on the user-visible behaviour, then exactly four H2s in this order: `Sub-features` (short IDs, one line each), `How to get to it (user POV)` (every entry point), `Driving it with hippo-verify + verify-browser` (starts with `Preconditions:`; labelled bullets pairing each action with the exact call and the observable result), `Gotchas`.
+Each feature file starts with an H1 and one paragraph on the user-visible behaviour, then exactly four H2s in this order: `Sub-features` (short IDs, one line each), `How to get to it (user POV)` (every entry point), `Driving it with toot-verify + verify-browser` (starts with `Preconditions:`; labelled bullets pairing each action with the exact call and the observable result), `Gotchas`.
 
 ## Features
 

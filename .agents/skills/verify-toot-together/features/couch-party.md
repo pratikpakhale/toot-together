@@ -14,7 +14,7 @@ Up to four hippos on one screen. In the lobby each player claims a seat by press
 
 - Main menu `Couch party (1–4)`.
 
-## Driving it with hippo-verify + verify-browser
+## Driving it with toot-verify + verify-browser
 
 Preconditions:
 

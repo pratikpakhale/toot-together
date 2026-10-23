@@ -226,7 +226,7 @@ function advanceRenderTime(current: number, target: number, dt: number) {
 
 const RECONNECT_WINDOW_MS = SEAT_HOLD_MS - 5_000
 const RECONNECT_DELAY_MS = 1000
-const SEAT_KEY = 'hippo-toot:seat'
+const SEAT_KEY = 'toot-together:seat'
 
 function loadSeat(room: string | null): string | null {
   if (!room) return null

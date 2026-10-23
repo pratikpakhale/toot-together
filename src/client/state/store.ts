@@ -34,7 +34,7 @@ export interface Toast {
 
 const FUNNY_NAMES = ['Bubbles', 'Gassy', 'Tooter', 'Pudding', 'Mudpie', 'Biscuit', 'Wobbles', 'Beans', 'Puddle', 'Snorty', 'Noodle', 'Chonk']
 
-const SETTINGS_KEY = 'hippo-toot:settings'
+const SETTINGS_KEY = 'toot-together:settings'
 
 function loadSettings(): Settings {
   const fallback: Settings = {

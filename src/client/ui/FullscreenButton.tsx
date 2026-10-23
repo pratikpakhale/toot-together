@@ -20,7 +20,7 @@ export function FullscreenButton({ className = '' }: { className?: string }) {
           setNotice({
             icon: 'share',
             title: 'Play full screen',
-            message: 'Tap Share, then "Add to Home Screen". Hippo Toot opens from there with no browser bars.',
+            message: 'Tap Share, then "Add to Home Screen". Toot Together opens from there with no browser bars.',
           })
         else if (full) exitFullscreen()
         else void enterFullscreen()

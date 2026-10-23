@@ -25,7 +25,7 @@ try {
   for (const { def, n } of courses) {
     const page = await browser.newPage({ viewport: { width: SIZE.width * 2, height: SIZE.height * 2 } })
     page.on('pageerror', (e) => console.error(`${def.id}: page error:`, e.message))
-    await page.addInitScript((p) => localStorage.setItem('hippo-toot:progress', p), progress)
+    await page.addInitScript((p) => localStorage.setItem('toot-together:progress', p), progress)
     await page.goto(url)
     await page.getByRole('button', { name: 'Play solo' }).click()
     await page.getByRole('button', { name: new RegExp(`^${n} ${def.name}`) }).click()

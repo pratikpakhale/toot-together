@@ -75,7 +75,7 @@ export const useProgress = create<ProgressState>()(
       },
     }),
     {
-      name: 'hippo-toot:progress',
+      name: 'toot-together:progress',
       version: 1,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ records: s.records, selected: s.selected, tutorialDone: s.tutorialDone }),

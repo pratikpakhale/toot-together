@@ -29,7 +29,7 @@ export function startServer(port: number, roomsFile = '') {
   return new Promise<{ proc: ChildProcess; log: string[] }>((resolve, reject) => {
     const onData = (chunk: Buffer) => {
       log.push(String(chunk))
-      if (String(chunk).includes('Hippo Toot server on')) resolve({ proc, log })
+      if (String(chunk).includes('Toot Together server on')) resolve({ proc, log })
     }
     proc.stdout!.on('data', onData)
     proc.stderr!.on('data', onData)

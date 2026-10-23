@@ -6,7 +6,7 @@ DOMAIN=${1:?usage: setup-server.sh <domain> [redirect-from-domain ...]}
 shift
 REDIRECT_FROM="$*"
 HERE=$(cd "$(dirname "$0")" && pwd)
-APP_DIR=/opt/hippo-toot
+APP_DIR=/opt/toot-together
 DEPLOY_USER=${SUDO_USER:-ubuntu}
 
 # Oracle's Ubuntu images reject everything but SSH in iptables, on top of the VCN security list.
@@ -37,20 +37,20 @@ if ! command -v caddy >/dev/null; then
 fi
 npm install -g pnpm@10.12.1
 
-id hippo-toot >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin hippo-toot
+id toot >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin toot
 install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$APP_DIR" "$APP_DIR/releases"
 
-install -m 644 "$HERE/hippo-toot.service" /etc/systemd/system/hippo-toot.service
+install -m 644 "$HERE/toot-together.service" /etc/systemd/system/toot-together.service
 {
   cat "$HERE/Caddyfile"
   if [ -n "$REDIRECT_FROM" ]; then cat "$HERE/Caddyfile.redirect"; fi
 } | sed -e "s|{\$DOMAIN}|$DOMAIN|g" -e "s|{\$REDIRECT_FROM}|$REDIRECT_FROM|g" >/etc/caddy/Caddyfile
 caddy validate --config /etc/caddy/Caddyfile
 systemctl daemon-reload
-systemctl enable hippo-toot caddy
+systemctl enable toot-together caddy
 systemctl reload-or-restart caddy
 
-echo "$DEPLOY_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart hippo-toot" >/etc/sudoers.d/hippo-toot
-chmod 440 /etc/sudoers.d/hippo-toot
+echo "$DEPLOY_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart toot-together" >/etc/sudoers.d/toot-together
+chmod 440 /etc/sudoers.d/toot-together
 
 echo "Provisioned for https://$DOMAIN${REDIRECT_FROM:+ (redirecting $REDIRECT_FROM)}"

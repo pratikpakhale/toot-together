@@ -15,7 +15,7 @@
 
 - Type `http://127.0.0.1:<web port>/hippocam` in the address bar.
 
-## Driving it with hippo-verify + verify-browser
+## Driving it with toot-verify + verify-browser
 
 Preconditions:
 

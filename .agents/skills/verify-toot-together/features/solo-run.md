@@ -16,7 +16,7 @@ One player floats a river alone with keyboard, gamepad or touch. The run starts 
 - Main menu `Play solo`, then a river card.
 - From the results screen: `Next river`, `Again`.
 
-## Driving it with hippo-verify + verify-browser
+## Driving it with toot-verify + verify-browser
 
 Preconditions:
 

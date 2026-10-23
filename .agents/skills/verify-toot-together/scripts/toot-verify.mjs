@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = resolve(HERE, '../../../..')
-const ROOT = '/tmp/verify/hippo-toot'
+const ROOT = '/tmp/verify/toot-together'
 const CURRENT = join(ROOT, 'current.json')
 const DEFAULT_WEB_PORT = 5273
 const DEFAULT_SERVER_PORT = 2667
@@ -104,7 +104,7 @@ function wsAsk(url, first, want, ms = 5000) {
 async function up(o) {
   const prev = readState()
   if (prev && (alive(prev.server.pid) || alive(prev.web.pid))) {
-    console.error(`A verification run is already up (${prev.runId}: web ${prev.web.url}). Use it, or run \`hippo-verify down\` first.`)
+    console.error(`A verification run is already up (${prev.runId}: web ${prev.web.url}). Use it, or run \`toot-verify down\` first.`)
     process.exit(1)
   }
   if (prev) rmSync(CURRENT, { force: true })
@@ -155,14 +155,14 @@ async function up(o) {
   writeFileSync(join(stateDir, 'run.json'), JSON.stringify(state, null, 2))
 
   try {
-    await waitFor(() => logHas(serverLog, 'Hippo Toot server on'), 30_000, 'room server log line')
+    await waitFor(() => logHas(serverLog, 'Toot Together server on'), 30_000, 'room server log line')
     await waitFor(async () => (await (await fetch(`${state.server.url}/health`)).json()).ok === true, 10_000, '/health')
     await waitFor(() => logHas(webLog, 'ready in'), 60_000, 'vite "ready in"')
     // First request makes vite transform the entry; the browser's first load is then quick.
     await waitFor(async () => (await fetch(`http://127.0.0.1:${webPort}/src/client/main.tsx`)).ok, 60_000, 'vite to serve the client entry')
   } catch (e) {
     console.error(`Launch failed: ${e.message}\n--- server.log\n${tail(serverLog)}\n--- web.log\n${tail(webLog)}`)
-    console.error('Run `hippo-verify down` to clean up.')
+    console.error('Run `toot-verify down` to clean up.')
     process.exit(1)
   }
   console.log(JSON.stringify({ ready: true, web: state.web.url, server: state.server.url, evidenceDir, runId }, null, 2))
@@ -177,7 +177,7 @@ function tail(file, n = 30) {
 async function doctor() {
   const s = readState()
   if (!s) {
-    console.log('FAIL no verification run is up (no /tmp/verify/hippo-toot/current.json). Run `hippo-verify up`.')
+    console.log('FAIL no verification run is up (no /tmp/verify/toot-together/current.json). Run `toot-verify up`.')
     return false
   }
   let ok = true
@@ -296,7 +296,7 @@ async function down() {
   console.log(`Evidence kept in ${s.evidenceDir}`)
 }
 
-const USAGE = `usage: hippo-verify <command>
+const USAGE = `usage: toot-verify <command>
 
   up [--web-port N] [--server-port N]   start the room server and vite on free ports (defaults ${DEFAULT_SERVER_PORT}, ${DEFAULT_WEB_PORT}), then run doctor
   doctor                                read-only health check of the current run

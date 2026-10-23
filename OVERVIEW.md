@@ -1,4 +1,4 @@
-# Hippo Toot: what's in it and how it's built
+# Toot Together: what's in it and how it's built
 
 ## What's in it
 

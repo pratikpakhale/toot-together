@@ -97,7 +97,7 @@ async function requestWakeLock() {
 /** Chrome's deferred install dialog; not in the DOM typings. */
 type InstallPromptEvent = Event & { prompt(): Promise<void> }
 
-const INSTALL_DISMISSED_KEY = 'hippo-toot:install-dismissed'
+const INSTALL_DISMISSED_KEY = 'toot-together:install-dismissed'
 
 let installEvent: InstallPromptEvent | null = null
 let installDismissed = (() => {
