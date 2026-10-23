@@ -1,7 +1,22 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { crusherInner, crusherOpen, crusherWarning, ITEM_SIZES, maceOffset, pistonState, sliderOffset, spinnerAngle } from '../../sim/obstacles'
+import {
+  crusherInner,
+  crusherOpen,
+  crusherWarning,
+  fenceGapCentre,
+  flameLength,
+  flameState,
+  ITEM_SIZES,
+  maceOffset,
+  pistonState,
+  sliderOffset,
+  spinnerAngle,
+  sweeperAngle,
+  sweeperPivot,
+  whirlpoolSwirl,
+} from '../../sim/obstacles'
 import type { BakedCourse, BakedItem, ItemDef } from '../../sim/track'
 import { audio } from '../audio/audio'
 import { frame } from '../game/frame'
@@ -65,6 +80,16 @@ function ItemView({ item, slot }: { item: BakedItem; slot: number }) {
       return <Boost def={def} />
     case 'pickup':
       return <Pickup def={def} slot={slot} />
+    case 'whirlpool':
+      return <Whirlpool def={def} />
+    case 'current':
+      return <Current def={def} hw={item.hw} />
+    case 'sweeper':
+      return <Sweeper def={def} hw={item.hw} />
+    case 'flame':
+      return <Flame def={def} item={item} />
+    case 'fence':
+      return <Fence def={def} hw={item.hw} />
   }
 }
 
@@ -148,12 +173,12 @@ function Spinner({ def }: { def: Def<'spinner'> }) {
         {Array.from({ length: arms }, (_, k) => (
           <group key={k} rotation={[0, (-k * Math.PI * 2) / arms, 0]}>
             <mesh position={[def.arm / 2 + 0.2, 0, 0]} rotation={[0, 0, Math.PI / 2]} material={toon(PALETTE.spikeTube)}>
-              <cylinderGeometry args={[0.24, 0.24, def.arm - 0.3, 10]} />
+              <cylinderGeometry args={[ITEM_SIZES.spinnerArm, ITEM_SIZES.spinnerArm, def.arm - 0.3, 10]} />
             </mesh>
             <mesh position={[def.arm, 0, 0]} material={toon(PALETTE.spikeTube)}>
               <sphereGeometry args={[0.28, 10, 8]} />
             </mesh>
-            <SpikeRow x0={0.5} x1={def.arm} radius={0.24} />
+            <SpikeRow x0={0.5} x1={def.arm} radius={ITEM_SIZES.spinnerArm} />
           </group>
         ))}
       </group>
@@ -517,5 +542,231 @@ function Pickup({ def, slot }: { def: Def<'pickup'>; slot: number }) {
         <meshBasicMaterial color={PICKUP_RING[def.item]} transparent opacity={0.7} depthWrite={false} />
       </mesh>
     </group>
+  )
+}
+
+let spiral: THREE.CanvasTexture | null = null
+
+/** Pale spiral arms on a transparent disc, drawn once and shared by every whirlpool. */
+function spiralTexture() {
+  if (spiral) return spiral
+  const size = 256
+  const c = document.createElement('canvas')
+  c.width = c.height = size
+  const ctx = c.getContext('2d')!
+  ctx.translate(size / 2, size / 2)
+  ctx.lineCap = 'round'
+  for (let arm = 0; arm < 4; arm++) {
+    ctx.beginPath()
+    for (let k = 0; k <= 60; k++) {
+      const u = k / 60
+      const a = (arm * Math.PI) / 2 + u * Math.PI * 1.6
+      const r = (size / 2) * (0.12 + u * 0.86)
+      if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
+      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r)
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'
+    ctx.lineWidth = 9
+    ctx.stroke()
+  }
+  spiral = new THREE.CanvasTexture(c)
+  spiral.colorSpace = THREE.SRGBColorSpace
+  return spiral
+}
+
+function Whirlpool({ def }: { def: Def<'whirlpool'> }) {
+  const r = def.r ?? ITEM_SIZES.whirlpool
+  const swirl = Math.sign(whirlpoolSwirl(def))
+  const outer = useRef<THREE.Mesh>(null)
+  const inner = useRef<THREE.Mesh>(null)
+  const map = spiralTexture()
+  useFrame(() => {
+    const t = simTime()
+    if (outer.current) outer.current.rotation.z = swirl * t * 1.2
+    if (inner.current) inner.current.rotation.z = swirl * t * 2.6
+  })
+  return (
+    <group position={[0, 0.05, def.d]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh>
+        <circleGeometry args={[r, 40]} />
+        <meshBasicMaterial color="#0b3d55" transparent opacity={0.35} depthWrite={false} />
+      </mesh>
+      <mesh ref={outer} position={[0, 0, 0.01]}>
+        <circleGeometry args={[r, 40]} />
+        <meshBasicMaterial map={map} transparent opacity={0.55} depthWrite={false} />
+      </mesh>
+      <mesh ref={inner} position={[0, 0, 0.02]} scale={0.5}>
+        <circleGeometry args={[r, 40]} />
+        <meshBasicMaterial map={map} transparent opacity={0.8} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, 0, 0.03]}>
+        <circleGeometry args={[ITEM_SIZES.whirlpoolCore, 28]} />
+        <meshBasicMaterial color="#04161f" transparent opacity={0.9} depthWrite={false} />
+      </mesh>
+    </group>
+  )
+}
+
+const CURRENT_SPACING = 3
+
+function Current({ def, hw }: { def: Def<'current'>; hw: number }) {
+  const len = def.len ?? ITEM_SIZES.currentLen
+  const w = def.w ?? 2 * hw
+  const dir = Math.sign(def.push)
+  const cols = Math.max(1, Math.floor(w / CURRENT_SPACING))
+  const rows = Math.max(1, Math.floor(len / CURRENT_SPACING))
+  const strip = useRef<(THREE.Group | null)[]>([])
+  const mats = useMemo(
+    () => Array.from({ length: cols + 1 }, () => new THREE.MeshBasicMaterial({ color: '#d9f6ff', transparent: true, depthWrite: false })),
+    [cols],
+  )
+  useEffect(
+    () => () => {
+      for (const m of mats) m.dispose()
+    },
+    [mats],
+  )
+  useFrame(() => {
+    const shift = (simTime() * Math.min(4, Math.abs(def.push))) % CURRENT_SPACING
+    for (let k = 0; k <= cols; k++) {
+      const v = -w / 2 + (k + (dir > 0 ? shift / CURRENT_SPACING : 1 - shift / CURRENT_SPACING)) * (w / (cols + 1))
+      strip.current[k]?.position.set(0, 0, (def.d ?? 0) + v)
+      const edge = Math.min(v + w / 2, w / 2 - v) / 1.5
+      mats[k].opacity = 0.55 * THREE.MathUtils.clamp(edge, 0, 1)
+    }
+  })
+  return (
+    <group position={[0, 0.07, 0]}>
+      {mats.map((m, k) => (
+        <group key={k} ref={(g) => void (strip.current[k] = g)}>
+          {Array.from({ length: rows }, (_, j) => (
+            <mesh
+              key={j}
+              geometry={chevronShape}
+              material={m}
+              position={[(j + 0.5) * (len / rows), 0, 0]}
+              rotation={[-Math.PI / 2, 0, -dir * (Math.PI / 2)]}
+              scale={[0.9, 0.9, 1]}
+            />
+          ))}
+        </group>
+      ))}
+    </group>
+  )
+}
+
+function Sweeper({ def, hw }: { def: Def<'sweeper'>; hw: number }) {
+  const boom = useRef<THREE.Group>(null)
+  const pivot = sweeperPivot(def, hw)
+  useFrame(() => {
+    const a = sweeperAngle(def, simTime())
+    // Point the boom's local +x along (sin a, -side cos a) in (along, across).
+    if (boom.current) boom.current.rotation.y = Math.atan2(def.side * Math.cos(a), Math.sin(a))
+  })
+  const arm = ITEM_SIZES.sweeperArm
+  return (
+    <group position={[0, 0, pivot]}>
+      <mesh position={[0, 0.6, 0]} material={toon('#7d5a8c')}>
+        <cylinderGeometry args={[0.45, 0.6, 2.2, 12]} />
+      </mesh>
+      <mesh position={[0, 1.8, 0]} material={toon('#ffcf3f')}>
+        <sphereGeometry args={[0.42, 12, 8]} />
+      </mesh>
+      <group ref={boom} position={[0, 0.45, 0]}>
+        <mesh position={[def.len / 2 + 0.2, 0, 0]} rotation={[0, 0, Math.PI / 2]} material={toon(PALETTE.spikeTube)}>
+          <cylinderGeometry args={[arm, arm, def.len - 0.4, 10]} />
+        </mesh>
+        <mesh position={[def.len, 0, 0]} material={toon('#ffcf3f')}>
+          <sphereGeometry args={[0.32, 10, 8]} />
+        </mesh>
+        <SpikeRow x0={0.7} x1={def.len} radius={arm} />
+      </group>
+    </group>
+  )
+}
+
+const flameGeo = (() => {
+  const g = new THREE.CylinderGeometry(1, 0.45, 1, 14, 1, true)
+  g.translate(0, 0.5, 0)
+  return g
+})()
+
+function Flame({ def, item }: { def: Def<'flame'>; item: BakedItem }) {
+  const hw = item.hw
+  const len = flameLength(def, hw)
+  const jet = useRef<THREE.Group>(null)
+  const sound = useRef(false)
+  const nozzle = useMemo(() => new THREE.MeshToonMaterial({ color: '#5c5866', emissive: '#000000', gradientMap: toonGradient() }), [])
+  const outer = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ff5a1f', transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }), [])
+  const core = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }), [])
+  useEffect(
+    () => () => {
+      nozzle.dispose()
+      outer.dispose()
+      core.dispose()
+    },
+    [nozzle, outer, core],
+  )
+  useFrame(() => {
+    const t = simTime()
+    const st = flameState(def, t)
+    const lit = st.reach > 0
+    const flicker = 1 + Math.sin(t * 47) * 0.08 + Math.sin(t * 31) * 0.06
+    const puff = st.warn ? 0.35 + Math.sin(t * 40) * 0.15 : 0
+    const reach = Math.max(st.reach * len, puff)
+    if (jet.current) {
+      jet.current.visible = reach > 0.05
+      jet.current.scale.set(ITEM_SIZES.flameHalf * flicker, reach, ITEM_SIZES.flameHalf * flicker)
+    }
+    nozzle.emissive.setRGB(st.warn && Math.sin(t * 30) > 0 ? 0.6 : lit ? 0.4 : 0, lit ? 0.15 : 0, 0)
+    if (lit && !sound.current && nearRaft(item)) audio.flame()
+    sound.current = lit
+  })
+  return (
+    <group position={[0, 0, def.side * hw]}>
+      <mesh position={[0, 0.85, def.side * 0.35]} material={nozzle}>
+        <boxGeometry args={[1.5, 1.1, 1.1]} />
+      </mesh>
+      <mesh position={[0, 0.85, -def.side * 0.25]} rotation={[Math.PI / 2, 0, 0]} material={toon('#3b3742')}>
+        <cylinderGeometry args={[0.5, 0.42, 0.4, 12]} />
+      </mesh>
+      <group ref={jet} position={[0, 0.85, 0]} rotation={[-def.side * (Math.PI / 2), 0, 0]}>
+        <mesh geometry={flameGeo} material={outer} />
+        <mesh geometry={flameGeo} material={core} scale={[0.55, 0.92, 0.55]} />
+      </group>
+    </group>
+  )
+}
+
+function Fence({ def, hw }: { def: Def<'fence'>; hw: number }) {
+  const gap = def.gap ?? ITEM_SIZES.fenceGap
+  // Just long enough to reach into the bank with the gap at its furthest; the rest slides under the shelf.
+  const logLen = hw + def.amp + Math.abs(def.d ?? 0) - gap / 2 + 1
+  const left = useRef<THREE.Group>(null)
+  const right = useRef<THREE.Group>(null)
+  useFrame(() => {
+    const c = fenceGapCentre(def, simTime())
+    left.current?.position.set(0, 0.35, c - gap / 2 - logLen / 2)
+    right.current?.position.set(0, 0.35, c + gap / 2 + logLen / 2)
+  })
+  return (
+    <>
+      {[-1, 1].map((s) => (
+        <group key={s} ref={s < 0 ? left : right}>
+          <group rotation={[0, -Math.PI / 2, 0]}>
+            <mesh rotation={[0, 0, Math.PI / 2]} material={toon(PALETTE.spikeTube)}>
+              <cylinderGeometry args={[ITEM_SIZES.fenceLog, ITEM_SIZES.fenceLog, logLen, 12]} />
+            </mesh>
+            <SpikeRow x0={-logLen / 2} x1={logLen / 2} radius={ITEM_SIZES.fenceLog} />
+            <mesh position={[(-s * logLen) / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]} material={toon('#ffcf3f')}>
+              <cylinderGeometry args={[0.46, 0.46, 0.24, 12]} />
+            </mesh>
+            <mesh position={[(-s * logLen) / 2, 0.75, 0]} material={toon('#ffcf3f')}>
+              <coneGeometry args={[0.22, 0.9, 8]} />
+            </mesh>
+          </group>
+        </group>
+      ))}
+    </>
   )
 }

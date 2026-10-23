@@ -1,5 +1,5 @@
 import { COURSE_LIST } from '../../sim/courses'
-import type { CourseDef } from '../../sim/track'
+import { type CourseDef, MAX_DIFFICULTY } from '../../sim/track'
 import { audio } from '../audio/audio'
 import { createRoom, startSolo } from '../game/controller'
 import { THEMES } from '../scene/themes'
@@ -18,11 +18,11 @@ function preview(def: CourseDef) {
   return `linear-gradient(180deg, ${t.skyTop} 0%, ${t.skyHorizon} 52%, ${t.mesa.top} 52%, ${t.mesa.top} 58%, ${t.mesa.side} 58%, ${t.mesa.side} 66%, ${t.water.light} 66%, ${t.water.deep} 100%)${glow}`
 }
 
-function Difficulty({ level, size = 22 }: { level: number; size?: number }) {
+function Difficulty({ level, size = 18 }: { level: number; size?: number }) {
   return (
-    <span className="inline-flex items-center gap-0.5" aria-label={`Difficulty ${level} of 3`}>
-      {[1, 2, 3].map((n) => (
-        <Icon key={n} name="chili" size={size} style={n > level ? { opacity: 0.3, filter: 'grayscale(1) brightness(0.55)' } : undefined} />
+    <span className="inline-flex items-center gap-0.5" aria-label={`Difficulty ${level} of ${MAX_DIFFICULTY}`}>
+      {Array.from({ length: MAX_DIFFICULTY }, (_, k) => (
+        <Icon key={k} name="chili" size={size} style={k >= level ? { opacity: 0.3, filter: 'grayscale(1) brightness(0.55)' } : undefined} />
       ))}
     </span>
   )
@@ -32,7 +32,7 @@ export function LevelCards({ onPick, compact = false }: { onPick: (id: string) =
   const records = useProgress((s) => s.records)
   const selected = useProgress((s) => s.selected)
   return (
-    <div className={`grid gap-3 ${compact ? 'grid-cols-3' : 'sm:grid-cols-3'}`}>
+    <div className={`grid gap-3 ${compact ? 'grid-cols-4' : 'grid-cols-2 sm:grid-cols-4'}`}>
       {COURSE_LIST.map((def, i) => {
         const open = isUnlocked(records, def.id)
         const rec = recordOf(records, def.id)
@@ -67,7 +67,7 @@ export function LevelCards({ onPick, compact = false }: { onPick: (id: string) =
                 {!compact && <Difficulty level={def.difficulty} />}
               </div>
               {compact ? (
-                <Difficulty level={def.difficulty} size={16} />
+                <Difficulty level={def.difficulty} size={13} />
               ) : (
                 <>
                   <p className="text-sm font-bold leading-snug text-ink/70 short:hidden">{open ? def.blurb : `Finish ${COURSE_LIST[i - 1].name} to unlock.`}</p>
@@ -100,7 +100,15 @@ export function LevelSelect() {
   const setOverlay = useApp((s) => s.setOverlay)
   const close = () => setOverlay(null)
   return (
-    <Modal width={900} onClose={close}>
+    <Modal
+      width={960}
+      onClose={close}
+      footer={
+        <button className="btn btn-cream w-full short:py-2" onClick={() => (audio.click(), close())}>
+          Back
+        </button>
+      }
+    >
       <div className="mb-1 text-center font-display text-4xl short:text-3xl">CHOOSE A RIVER</div>
       <p className="mb-4 text-center font-extrabold text-ink/60 short:mb-2 short:text-sm">
         {mode === 'online' ? 'Your crew will float this one together. You can switch level after the finish.' : 'Each river unlocks the next. Beat the clock for medals!'}
@@ -111,9 +119,6 @@ export function LevelSelect() {
           else startSolo(id)
         }}
       />
-      <button className="btn btn-cream mt-5 w-full short:mt-3 short:py-2" onClick={() => (audio.click(), close())}>
-        Back
-      </button>
     </Modal>
   )
 }

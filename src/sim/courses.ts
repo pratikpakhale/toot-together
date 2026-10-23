@@ -229,8 +229,270 @@ const VOLCANO_PEAK: CourseDef = {
   ],
 }
 
+const BAYOU_BENDS: CourseDef = {
+  id: 'bayou-bends',
+  name: 'Bayou Bends',
+  blurb: 'Sideways currents, hungry whirlpools and spike fences.',
+  theme: 'bayou',
+  difficulty: 3,
+  medals: [120, 165, 250],
+  startHeading: 0,
+  pieces: [
+    { len: 28, width: 20, flow: 0.25, shelf: 10 },
+    { len: 12, width: 11, flow: 1.8, shelf: 7 },
+
+    { len: 18, start: true, width: 12, flow: 2.2, items: [{ kind: 'boost', at: 8 }] },
+    { len: 28, turn: 30, width: 13, items: [{ kind: 'current', at: 6, push: 3.5, len: 14 }] },
+    { len: 18, width: 13, items: [{ kind: 'pickup', at: 9, d: -3, item: 'beans' }] },
+    { len: 30, turn: -45, width: 13, right: 'spikes', items: [{ kind: 'current', at: 8, push: -4, len: 14 }] },
+
+    { len: 26, checkpoint: true, width: 14 },
+    { len: 24, width: 15, items: [{ kind: 'whirlpool', at: 12, d: 0 }] },
+    { len: 28, turn: 40, width: 14, items: [{ kind: 'whirlpool', at: 10, d: -3.2 }, { kind: 'mine', at: 21, d: 3.2 }] },
+    { len: 24, width: 14, items: [{ kind: 'whirlpool', at: 12, d: 3.2, swirl: -5 }, { kind: 'pickup', at: 12, d: -4, item: 'chili' }] },
+
+    { len: 26, checkpoint: true, width: 12 },
+    { len: 22, width: 12, items: [{ kind: 'fence', at: 11, amp: 2.5, period: 6 }] },
+    { len: 28, turn: -45, width: 12, right: 'spikes', items: [{ kind: 'current', at: 4, push: 4, len: 18 }] },
+    { len: 24, width: 12, items: [{ kind: 'fence', at: 8, amp: 3, period: 5, phase: 0.3 }, { kind: 'rock', at: 19, d: 0 }] },
+
+    { len: 26, checkpoint: true, width: 13 },
+    { len: 20, drop: 4, flow: 3.4, width: 11 },
+    { len: 26, width: 15, flow: 1.6, items: [{ kind: 'whirlpool', at: 9, d: -3.6 }, { kind: 'whirlpool', at: 19, d: 3.6, swirl: -5 }] },
+    { len: 30, turn: 50, width: 12, left: 'spikes', items: [{ kind: 'current', at: 4, push: -4.5, len: 14 }, { kind: 'mace', at: 23, amp: 3.4, period: 4 }] },
+    { len: 22, width: 12, items: [{ kind: 'fence', at: 11, amp: 3, period: 5.5 }] },
+    { len: 18, width: 13, items: [{ kind: 'boost', at: 6 }] },
+    { len: 10, finish: true, width: 16, flow: 1.2 },
+    { len: 26, width: 20, flow: 0.15, shelf: 10 },
+  ],
+}
+
+const FROSTBITE_FALLS: CourseDef = {
+  id: 'frostbite-falls',
+  name: 'Frostbite Falls',
+  blurb: 'Slippery ice, swinging booms and two frozen falls.',
+  theme: 'glacier',
+  difficulty: 4,
+  medals: [180, 250, 375],
+  startHeading: 0,
+  pieces: [
+    { len: 28, width: 20, flow: 0.25, shelf: 10 },
+    { len: 12, width: 11, flow: 1.8, shelf: 7 },
+
+    { len: 18, start: true, width: 11, flow: 2.4, items: [{ kind: 'boost', at: 8 }] },
+    { len: 30, turn: 40, width: 12, ice: true, items: [{ kind: 'rock', at: 15, d: 2.4 }] },
+    { len: 26, turn: -50, width: 12, ice: true, left: 'spikes', items: [{ kind: 'mine', at: 13, d: 2.2 }] },
+    { len: 16, width: 12, items: [{ kind: 'pickup', at: 8, d: 0, item: 'beans' }] },
+
+    { len: 26, checkpoint: true, width: 12 },
+    { len: 26, width: 12, items: [{ kind: 'sweeper', at: 13, side: 1, len: 7.5, period: 4.4 }] },
+    { len: 26, turn: 35, width: 12 },
+    { len: 30, width: 12, items: [{ kind: 'sweeper', at: 8, side: -1, len: 7.5, period: 4 }, { kind: 'sweeper', at: 22, side: 1, len: 7.5, period: 4 }] },
+
+    { len: 26, checkpoint: true, width: 12 },
+    { len: 28, ice: true, left: 'open', right: 'open', width: 12, flow: 1.2, items: [{ kind: 'fence', at: 14, amp: 2.6, period: 5.5 }] },
+    { len: 30, turn: -55, ice: true, left: 'open', right: 'open', width: 11, items: [{ kind: 'mine', at: 10, d: 2 }, { kind: 'mine', at: 22, d: -2 }] },
+    { len: 26, turn: 40, ice: true, left: 'open', width: 11, items: [{ kind: 'fence', at: 13, amp: 2.4, period: 5.5, phase: 0.2 }] },
+    { len: 14, flow: 2.2, width: 11 },
+
+    { len: 26, checkpoint: true, width: 11 },
+    { len: 24, drop: 7, flow: 4.4, width: 9 },
+    { len: 26, width: 14, flow: 1.6, items: [{ kind: 'whirlpool', at: 13, d: 0, r: 5 }] },
+    { len: 22, drop: 5, flow: 4, width: 9.5 },
+    {
+      len: 20,
+      width: 13,
+      flow: 1.8,
+      items: [
+        { kind: 'pickup', at: 10, d: -3, item: 'chili' },
+        { kind: 'pickup', at: 10, d: 3, item: 'prune' },
+      ],
+    },
+
+    { len: 26, checkpoint: true, width: 12 },
+    { len: 30, ice: true, width: 12, items: [{ kind: 'sweeper', at: 8, side: 1, len: 7.5, period: 4.2 }, { kind: 'sweeper', at: 22, side: -1, len: 7.5, period: 4.2 }] },
+    { len: 30, turn: 50, ice: true, left: 'spikes', width: 12, items: [{ kind: 'rock', at: 15, d: 0, r: 1 }] },
+    { len: 24, width: 12, items: [{ kind: 'fence', at: 12, amp: 3, period: 5.5 }] },
+    { len: 22, width: 13, items: [{ kind: 'mace', at: 11, amp: 4, period: 3 }] },
+    { len: 10, finish: true, width: 16, flow: 1.2 },
+    { len: 26, width: 20, flow: 0.15, shelf: 10 },
+  ],
+}
+
+const SUNKEN_TEMPLE: CourseDef = {
+  id: 'sunken-temple',
+  name: 'Sunken Temple',
+  blurb: 'Fire traps, crushers and booms in the old ruins.',
+  theme: 'temple',
+  difficulty: 4,
+  medals: [150, 210, 315],
+  startHeading: 0,
+  pieces: [
+    { len: 28, width: 20, flow: 0.25, shelf: 10 },
+    { len: 12, width: 10, flow: 1.8, shelf: 7 },
+
+    { len: 18, start: true, width: 10, flow: 2.4, items: [{ kind: 'boost', at: 8 }] },
+    { len: 28, turn: 35, width: 11, items: [{ kind: 'flame', at: 14, side: 1, period: 4, len: 6 }] },
+    { len: 28, turn: -45, width: 11, items: [{ kind: 'flame', at: 14, side: -1, period: 4, len: 6, phase: 0.5 }] },
+    { len: 16, width: 11, items: [{ kind: 'pickup', at: 8, d: 0, item: 'beans' }] },
+
+    { len: 26, checkpoint: true, width: 11 },
+    { len: 26, width: 11, items: [{ kind: 'flame', at: 8, side: 1, period: 3.6 }, { kind: 'flame', at: 18, side: -1, period: 3.6, phase: 0.5 }] },
+    { len: 28, turn: 40, width: 12, left: 'spikes', items: [{ kind: 'current', at: 4, push: -4, len: 18 }] },
+    { len: 22, width: 11, items: [{ kind: 'crusher', at: 11, period: 3.8 }] },
+
+    { len: 26, checkpoint: true, width: 12 },
+    { len: 26, width: 13, items: [{ kind: 'sweeper', at: 13, side: -1, len: 8.5, period: 4.2 }] },
+    {
+      len: 28,
+      turn: -50,
+      width: 12,
+      items: [
+        { kind: 'piston', at: 9, d: -2.4, period: 3.2 },
+        { kind: 'piston', at: 19, d: 2.4, period: 3.2, phase: 0.5 },
+      ],
+    },
+    { len: 26, width: 12, items: [{ kind: 'flame', at: 6, side: 1, period: 3.2, on: 0.4 }, { kind: 'sweeper', at: 17, side: 1, len: 7.5, period: 3.2, phase: 0.25 }] },
+
+    { len: 26, checkpoint: true, width: 11 },
+    { len: 22, drop: 6, flow: 4, width: 9 },
+    { len: 24, width: 12, flow: 1.8, items: [{ kind: 'fence', at: 12, amp: 3, period: 5.5 }] },
+    { len: 28, turn: 45, width: 11, items: [{ kind: 'flame', at: 9, side: -1, period: 3 }, { kind: 'flame', at: 19, side: 1, period: 3, phase: 0.5 }] },
+    { len: 20, width: 12, items: [{ kind: 'pickup', at: 10, d: 0, item: 'chili' }] },
+
+    { len: 26, checkpoint: true, width: 10 },
+    { len: 20, width: 10, items: [{ kind: 'crusher', at: 10, period: 3.4 }] },
+    { len: 22, width: 10, items: [{ kind: 'flame', at: 11, side: 1, period: 3.4, phase: 0.3 }] },
+    { len: 20, width: 10, items: [{ kind: 'crusher', at: 10, period: 3.4, phase: 0.5 }] },
+    { len: 26, turn: -40, width: 12, items: [{ kind: 'sweeper', at: 13, side: 1, len: 7.5, period: 3.4 }] },
+    { len: 20, width: 12, items: [{ kind: 'fence', at: 10, amp: 3.2, period: 5 }] },
+    { len: 10, finish: true, width: 16, flow: 1.2 },
+    { len: 26, width: 20, flow: 0.15, shelf: 10 },
+  ],
+}
+
+const DRAGONS_GULLET: CourseDef = {
+  id: 'dragons-gullet',
+  name: "Dragon's Gullet",
+  blurb: 'Fire, whirlpools and sheer drops into the lava.',
+  theme: 'volcano',
+  difficulty: 5,
+  medals: [210, 290, 435],
+  startHeading: 0,
+  pieces: [
+    { len: 28, width: 20, flow: 0.25, shelf: 10 },
+    { len: 12, width: 10, flow: 1.8, shelf: 7 },
+
+    { len: 18, start: true, width: 10, flow: 2.6, items: [{ kind: 'boost', at: 8 }] },
+    { len: 30, turn: 45, width: 11, left: 'spikes', items: [{ kind: 'flame', at: 15, side: 1, period: 3.4, len: 5.5 }] },
+    { len: 22, width: 13, items: [{ kind: 'whirlpool', at: 11, d: -2.6 }, { kind: 'mine', at: 11, d: 4.4 }] },
+    { len: 30, turn: -50, width: 11, right: 'spikes', items: [{ kind: 'current', at: 6, push: 4.5, len: 16 }] },
+    { len: 16, width: 11, items: [{ kind: 'pickup', at: 8, d: 0, item: 'beans' }] },
+
+    { len: 26, checkpoint: true, width: 12 },
+    {
+      len: 30,
+      width: 12,
+      items: [
+        { kind: 'flame', at: 7, side: -1, period: 3 },
+        { kind: 'flame', at: 15, side: 1, period: 3, phase: 0.33 },
+        { kind: 'flame', at: 23, side: -1, period: 3, phase: 0.66 },
+      ],
+    },
+    { len: 28, turn: 45, width: 14, items: [{ kind: 'spinner', at: 14, arm: 3.2, speed: 1.4, arms: 3 }] },
+    { len: 24, width: 14, items: [{ kind: 'whirlpool', at: 8, d: 3.4, swirl: -6 }, { kind: 'whirlpool', at: 18, d: -3.4, swirl: 6 }] },
+
+    { len: 26, checkpoint: true, width: 10 },
+    { len: 24, drop: 7, flow: 4.4, width: 8.5 },
+    { len: 26, width: 13, flow: 1.6, left: 'open', right: 'open', items: [{ kind: 'piston', at: 13, d: 0, period: 3, r: 1.3 }] },
+    { len: 28, turn: -50, width: 11, left: 'open', right: 'open', items: [{ kind: 'current', at: 4, push: -3.5, len: 16 }] },
+    { len: 22, width: 12, items: [{ kind: 'sweeper', at: 11, side: -1, len: 7.5, period: 3.6 }] },
+
+    { len: 26, checkpoint: true, width: 12 },
+    { len: 24, width: 12, items: [{ kind: 'fence', at: 8, amp: 3, period: 5.5 }, { kind: 'fence', at: 18, amp: 3, period: 5.5, phase: 0.5 }] },
+    { len: 30, turn: 50, width: 11, left: 'spikes', right: 'spikes', items: [{ kind: 'flame', at: 15, side: 1, period: 3.2, len: 6 }] },
+    { len: 22, width: 11, items: [{ kind: 'crusher', at: 11, period: 3.2 }] },
+    { len: 18, width: 12, items: [{ kind: 'pickup', at: 9, d: -3, item: 'chili' }, { kind: 'pickup', at: 9, d: 3, item: 'beans' }] },
+
+    { len: 26, checkpoint: true, width: 13 },
+    { len: 26, width: 14, items: [{ kind: 'whirlpool', at: 9, d: -3.6, swirl: -5 }, { kind: 'flame', at: 19, side: -1, period: 3.4, len: 7 }] },
+    { len: 28, turn: 40, width: 12, items: [{ kind: 'slider', at: 9, len: 4.5, amp: 3, period: 4.2 }, { kind: 'piston', at: 20, d: 0, period: 3.2, r: 1.3 }] },
+    { len: 24, width: 12, items: [{ kind: 'fence', at: 12, amp: 3, period: 5.5 }] },
+
+    { len: 26, checkpoint: true, width: 11 },
+    { len: 26, left: 'open', right: 'open', width: 10, flow: 2.6, items: [{ kind: 'flame', at: 13, side: 1, period: 3, len: 6 }] },
+    { len: 30, turn: -55, left: 'open', right: 'open', width: 10, items: [{ kind: 'whirlpool', at: 15, d: 0, r: 4 }] },
+    { len: 22, drop: 6, left: 'open', right: 'open', flow: 3.6, width: 9.5 },
+    { len: 34, width: 13, flow: 2, items: [{ kind: 'sweeper', at: 12, side: 1, len: 8.5, period: 3.6 }, { kind: 'sweeper', at: 28, side: -1, len: 8.5, period: 3.6 }] },
+    { len: 20, width: 12, items: [{ kind: 'mace', at: 10, amp: 4, period: 2.6 }] },
+    { len: 10, finish: true, width: 16, flow: 1.2 },
+    { len: 26, width: 20, flow: 0.15, shelf: 10 },
+  ],
+}
+
+const THUNDER_RUN: CourseDef = {
+  id: 'thunder-run',
+  name: 'Thunder Run',
+  blurb: 'A storm-lashed river with every trap at once.',
+  theme: 'storm',
+  difficulty: 5,
+  medals: [240, 330, 500],
+  startHeading: 0,
+  pieces: [
+    { len: 28, width: 20, flow: 0.25, shelf: 10 },
+    { len: 12, width: 10, flow: 1.8, shelf: 7 },
+
+    { len: 18, start: true, width: 10, flow: 2.6, items: [{ kind: 'boost', at: 8 }] },
+    { len: 30, turn: -40, width: 11, items: [{ kind: 'current', at: 4, push: 4.5, len: 12 }, { kind: 'mine', at: 22, d: -2.2 }] },
+    { len: 24, width: 11, items: [{ kind: 'fence', at: 12, amp: 2.5, period: 5 }] },
+    { len: 30, turn: 45, width: 12, right: 'spikes', items: [{ kind: 'sweeper', at: 15, side: -1, len: 7.5, period: 3.6 }] },
+    { len: 16, width: 12, items: [{ kind: 'pickup', at: 8, d: 0, item: 'beans' }] },
+
+    { len: 26, checkpoint: true, width: 14 },
+    { len: 24, width: 16, items: [{ kind: 'spinner', at: 12, arm: 3.2, speed: -1.5, arms: 3 }, { kind: 'whirlpool', at: 12, d: 5.8, r: 3 }] },
+    { len: 28, turn: -45, width: 13, items: [{ kind: 'flame', at: 9, side: 1, period: 3, len: 7 }, { kind: 'flame', at: 19, side: -1, period: 3, len: 7, phase: 0.5 }] },
+    {
+      len: 24,
+      width: 12,
+      items: [
+        { kind: 'slider', at: 8, len: 4.5, amp: 3.4, period: 3.4 },
+        { kind: 'slider', at: 17, len: 4.5, amp: 3.4, period: 3.4, phase: 0.5 },
+      ],
+    },
+
+    { len: 26, checkpoint: true, width: 10 },
+    { len: 24, drop: 8, flow: 4.6, width: 8.5 },
+    { len: 28, ice: true, left: 'open', right: 'open', width: 12, flow: 1.3, items: [{ kind: 'whirlpool', at: 14, d: 0, r: 5 }] },
+    { len: 30, turn: 55, ice: true, left: 'open', right: 'open', width: 11, items: [{ kind: 'current', at: 4, push: -3, len: 14 }, { kind: 'mine', at: 24, d: 2 }] },
+    { len: 26, turn: -35, ice: true, left: 'open', width: 11, items: [{ kind: 'piston', at: 9, d: -2.4, period: 3, r: 1.3 }, { kind: 'piston', at: 18, d: 2.4, period: 3, phase: 0.5, r: 1.3 }] },
+    { len: 14, flow: 2.2, width: 11 },
+
+    { len: 26, checkpoint: true, width: 10 },
+    { len: 20, left: 'spikes', right: 'spikes', items: [{ kind: 'crusher', at: 10, period: 3.4 }] },
+    { len: 24, width: 11, items: [{ kind: 'fence', at: 12, amp: 3, period: 5 }] },
+    { len: 20, left: 'spikes', right: 'spikes', width: 10, items: [{ kind: 'crusher', at: 10, period: 3, phase: 0.3 }] },
+    { len: 26, turn: 40, width: 12, items: [{ kind: 'sweeper', at: 13, side: 1, len: 7.5, period: 3.2 }] },
+    { len: 18, width: 12, items: [{ kind: 'pickup', at: 9, d: -3, item: 'chili' }, { kind: 'pickup', at: 9, d: 3, item: 'prune' }] },
+
+    { len: 26, checkpoint: true, width: 13 },
+    { len: 28, width: 14, items: [{ kind: 'whirlpool', at: 10, d: 3.4 }, { kind: 'whirlpool', at: 20, d: -3.4, swirl: -5 }] },
+    { len: 30, turn: -45, width: 11, right: 'spikes', items: [{ kind: 'flame', at: 10, side: -1, period: 3.2, len: 5 }, { kind: 'current', at: 16, push: 3.5, len: 12 }] },
+    { len: 26, width: 12, items: [{ kind: 'crusher', at: 8, period: 3.6 }, { kind: 'fence', at: 19, amp: 2.6, period: 5.5 }] },
+    { len: 18, width: 12, items: [{ kind: 'pickup', at: 9, d: 0, item: 'beans' }] },
+
+    { len: 26, checkpoint: true, width: 12 },
+    { len: 26, width: 13, items: [{ kind: 'mace', at: 8, amp: 4, period: 3 }, { kind: 'flame', at: 19, side: -1, period: 3, phase: 0.4 }] },
+    { len: 30, turn: -50, width: 12, left: 'spikes', items: [{ kind: 'current', at: 4, push: -4.5, len: 16 }, { kind: 'mine', at: 24, d: 2.5 }] },
+    { len: 22, drop: 6, left: 'open', right: 'open', flow: 3.8, width: 9.5 },
+    { len: 34, width: 13, flow: 2, items: [{ kind: 'sweeper', at: 12, side: -1, len: 8.5, period: 3.4 }, { kind: 'sweeper', at: 28, side: 1, len: 8.5, period: 3.4 }] },
+    { len: 22, width: 13, items: [{ kind: 'fence', at: 8, amp: 3.4, period: 5 }, { kind: 'spinner', at: 17, arm: 3, speed: 2, arms: 2 }] },
+    { len: 10, finish: true, width: 16, flow: 1.2 },
+    { len: 26, width: 20, flow: 0.15, shelf: 10 },
+  ],
+}
+
 /** Levels in play order; each unlocks the next. */
-export const COURSE_LIST: CourseDef[] = [LAZY_RIVER, CANYON_RUN, VOLCANO_PEAK]
+export const COURSE_LIST: CourseDef[] = [LAZY_RIVER, CANYON_RUN, VOLCANO_PEAK, BAYOU_BENDS, FROSTBITE_FALLS, SUNKEN_TEMPLE, DRAGONS_GULLET, THUNDER_RUN]
 /** Null-prototype so untrusted ids like "constructor" or "__proto__" never match. */
 export const COURSES: Readonly<Record<string, CourseDef>> = Object.assign(Object.create(null) as Record<string, CourseDef>, Object.fromEntries(COURSE_LIST.map((c) => [c.id, c])))
 export const DEFAULT_COURSE = LAZY_RIVER.id

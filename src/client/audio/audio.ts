@@ -572,6 +572,25 @@ class AudioEngine {
     o.stop(t + 0.5)
   }
 
+  flame() {
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    const n = this.noise()
+    const bp = ctx.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.setValueAtTime(500, t)
+    bp.frequency.exponentialRampToValueAtTime(1400, t + 0.25)
+    bp.Q.value = 0.7
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0, t)
+    g.gain.linearRampToValueAtTime(0.32, t + 0.05)
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.9)
+    n.connect(bp).connect(g).connect(this.sfx)
+    n.start(t)
+    n.stop(t + 0.95)
+  }
+
   slam() {
     const ctx = this.ctx
     if (!ctx) return

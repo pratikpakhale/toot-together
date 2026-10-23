@@ -2,13 +2,18 @@
 
 ## What's in it
 
-- **Three rivers that ramp up**, each with its own look, and each harder towards its end:
+- **Eight rivers that ramp up**, each with its own look, and each harder towards its end:
   1. **Lazy River** (meadow): introduces each hazard on its own, with room to recover.
   2. **Canyon Run** (desert canyon): spike alley, spinner plaza, the drop, the ice shelf, crusher canyon and the sky-ribbon finale.
   3. **Volcano Peak** (lava): spinner gauntlet, lava chute, obsidian ice, the crusher corridor and the caldera rim.
+  4. **Bayou Bends** (swamp at dusk): introduces sideways currents, whirlpools and spike fences.
+  5. **Frostbite Falls** (glacier): ice runs, sweeper booms, fences over open edges and two frozen falls.
+  6. **Sunken Temple** (jungle ruins): introduces fire jets, mixed with crushers, sweepers and pistons.
+  7. **Dragon's Gullet** (lava): fire-jet waves, whirlpool pairs, open-edged drops and a double sweeper.
+  8. **Thunder Run** (storm): every hazard in the game, back to back.
 - **Progression**: finishing a river unlocks the next. Best times and bronze/silver/gold medals are saved per river, and the results screen has *Next river*, *Again* and *Share*.
 - **Hippo school**: first-time players get a hands-on checklist in the practice pond (walk, toot, burst, then START).
-- **Hazards**: spiked walls, spinning spike crosses, swinging maces, sliding spike logs, crusher doors, slamming pistons, floating mines, bouncy mushrooms, rocks, boost pads, and open edges you can fall off.
+- **Hazards**: spiked walls, spinning spike crosses, swinging maces, sliding spike logs, crusher doors, slamming pistons, floating mines, sweeper booms hinged on a bank, wall-mounted fire jets, spike fences with a sliding gap, whirlpools that drag the raft in, sideways currents, bouncy mushrooms, rocks, boost pads, and open edges you can fall off. Hit shapes cover the spikes you can see, so a raft that looks like it touched them did.
 - **Gas tank**: tooting drains stamina. Run dry and you wheeze until it refills.
 - **Toot Sync**: two or more hippos tooting the same way at the same moment get a rainbow speed boost and a chord.
 - **Snacks**: beans (turbo), chili (endless fire farts), prune (you can't stop tooting).
@@ -24,9 +29,9 @@
 ```
 src/sim/        Deterministic, framework-free game simulation (runs in browser AND server)
   track.ts        Turtle-style course pieces → baked samples; track-relative queries
-  courses.ts      The three rivers (pieces, difficulty, medal times)
-  bot.ts          Autopilot: dodges hazards and waits for timed ones (tests, balance, menu raft)
-  obstacles.ts    Hazards as pure functions of time (+ collision shapes)
+  courses.ts      The eight rivers (pieces, difficulty, medal times)
+  bot.ts          Autopilot: plans a lane and speed (or waits, or backs off) clear of timed hazards (tests, balance, menu raft)
+  obstacles.ts    Hazards as pure functions of time (+ collision shapes, and the force fields of boosts, currents and whirlpools)
   sim.ts          Raft physics, hippos, stamina, sync, pickups, deaths, checkpoints
   sectors.ts      Which slice of the rim each hippo in a crew may stand on
   protocol.ts     Client/server message types
@@ -51,5 +56,6 @@ pnpm test                 # sim, netcode and restart hand-off tests
 pnpm typecheck
 pnpm knip                 # unused files, exports and dependencies
 pnpm balance [course-id]  # autopilot timings / death stats per river for tuning
+pnpm level-shots [id...]  # re-render level-select thumbnails (public/levels/) in headless Chromium
 pnpm trailer              # re-render the README preview (trailer/preview.webp), the 1080p master and a 1080p copy for social (trailer/out/)
 ```

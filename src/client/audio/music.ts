@@ -1,4 +1,6 @@
-export type MusicStyle = 'meadow' | 'canyon' | 'volcano'
+import type { ThemeId } from '../../sim/track'
+
+export type MusicStyle = ThemeId
 
 export interface MusicHandle {
   stop(): void
@@ -47,6 +49,10 @@ const STYLES: Record<MusicStyle, Style> = {
   meadow: { bpm: 106, transpose: 0, progression: MAJOR_PROGRESSION, scale: PENTA_MAJOR, lead: 'triangle', leadVol: 0.06, drive: false },
   canyon: { bpm: 116, transpose: 2, progression: MAJOR_PROGRESSION, scale: PENTA_MAJOR, lead: 'square', leadVol: 0.035, drive: false },
   volcano: { bpm: 128, transpose: -2, progression: MINOR_PROGRESSION, scale: PENTA_MINOR, lead: 'sawtooth', leadVol: 0.026, drive: true },
+  bayou: { bpm: 100, transpose: -3, progression: MINOR_PROGRESSION, scale: PENTA_MINOR, lead: 'triangle', leadVol: 0.055, drive: false },
+  glacier: { bpm: 112, transpose: 4, progression: MAJOR_PROGRESSION, scale: PENTA_MAJOR, lead: 'sine', leadVol: 0.07, drive: false },
+  temple: { bpm: 120, transpose: 1, progression: MINOR_PROGRESSION, scale: PENTA_MINOR, lead: 'square', leadVol: 0.03, drive: true },
+  storm: { bpm: 136, transpose: -4, progression: MINOR_PROGRESSION, scale: PENTA_MINOR, lead: 'sawtooth', leadVol: 0.024, drive: true },
 }
 
 const REST = -1

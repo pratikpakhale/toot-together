@@ -55,8 +55,42 @@ export function pistonState(d: Def<'piston'>, t: number): PistonState {
 
 export const crusherInner = (open: number, hw: number) => 0.1 + open * (hw + 0.25)
 
+/** Boom angle from straight across the river, radians; positive swings it downstream. */
+export const sweeperAngle = (d: Def<'sweeper'>, t: number) =>
+  (((d.swing ?? 65) * Math.PI) / 180) * Math.sin((TAU * t) / d.period + (d.phase ?? 0) * TAU)
+
+/** Where the boom is hinged, across the river, for a bank at half width `hw`. */
+export const sweeperPivot = (d: Def<'sweeper'>, hw: number) => d.side * (hw + 0.4)
+
+export interface FlameState {
+  /** 0 = nozzle off … 1 = jet at full length. */
+  reach: number
+  warn: boolean
+}
+
+const FLAME_WARN = 0.7
+
+export function flameState(d: Def<'flame'>, t: number): FlameState {
+  const on = d.on ?? 0.35
+  const u = cycle(t, d.period, d.phase)
+  const lit = u - (1 - on)
+  if (lit < 0) return { reach: 0, warn: -lit * d.period < FLAME_WARN }
+  const k = lit / on
+  const reach = k < 0.12 ? smoothstep(k / 0.12) : k > 0.9 ? 1 - smoothstep((k - 0.9) / 0.1) : 1
+  return { reach, warn: false }
+}
+
+/** Length of the fire jet from its bank, for a river of half width `hw`. */
+export const flameLength = (d: Def<'flame'>, hw: number) => d.len ?? 2 * hw
+
+/** Which way the water turns round a whirlpool (sign) and how hard, m/s² near its drain. */
+export const whirlpoolSwirl = (d: Def<'whirlpool'>) => d.swirl ?? 5
+
+export const fenceGapCentre = (d: Def<'fence'>, t: number) =>
+  (d.d ?? 0) + d.amp * Math.sin((TAU * t) / d.period + (d.phase ?? 0) * TAU)
+
 export const ITEM_SIZES = {
-  spinnerThickness: 0.3,
+  spinnerArm: 0.24,
   spinnerHub: 0.5,
   mace: 0.85,
   sliderThickness: 0.34,
@@ -68,17 +102,42 @@ export const ITEM_SIZES = {
   boostWidth: 3,
   piston: 1.5,
   pickup: 0.85,
+  whirlpool: 4.6,
+  whirlpoolCore: 1.1,
+  currentLen: 12,
+  sweeperArm: 0.26,
+  flameHalf: 0.75,
+  fenceLog: 0.34,
+  fenceGap: 6.5,
 } as const
+
+/**
+ * How far past its body a spiked hazard kills: most of the length of the spikes drawn on it,
+ * so a raft that looks like it touched the spikes did.
+ */
+const SPIKE_HIT = 0.25
+
+const BOOST_ACCEL = 30
 
 export type Contact =
   | { type: 'kill'; cause: KillCause }
   | { type: 'push'; nx: number; nz: number; depth: number; restitution: number; minSpeed: number; bounce: boolean }
-  | { type: 'boost'; ax: number; az: number }
   | { type: 'pickup' }
 
-export type KillCause = 'spikes' | 'spinner' | 'mace' | 'crusher' | 'slider' | 'mine' | 'piston' | 'fall' | 'reset'
-
-const KILL_FORGIVE = 0.2
+export type KillCause =
+  | 'spikes'
+  | 'spinner'
+  | 'mace'
+  | 'crusher'
+  | 'slider'
+  | 'mine'
+  | 'piston'
+  | 'whirlpool'
+  | 'sweeper'
+  | 'flame'
+  | 'fence'
+  | 'fall'
+  | 'reset'
 
 export function collideItem(item: BakedItem, t: number, px: number, pz: number, r: number): Contact | null {
   const dx = px - item.x
@@ -86,7 +145,6 @@ export function collideItem(item: BakedItem, t: number, px: number, pz: number, 
   const along = dx * item.hx + dz * item.hz
   const across = rightOffset(dx, dz, item.hx, item.hz)
   const def = item.def
-  const kr = r - KILL_FORGIVE
 
   if (Math.abs(along) > item.hw + 8) return null
 
@@ -99,18 +157,18 @@ export function collideItem(item: BakedItem, t: number, px: number, pz: number, 
         const a = a0 + (k * TAU) / arms
         const ex = Math.cos(a) * def.arm
         const ey = cv + Math.sin(a) * def.arm
-        if (segDist(along, across, 0, cv, ex, ey) < kr + ITEM_SIZES.spinnerThickness) return { type: 'kill', cause: 'spinner' }
+        if (segDist(along, across, 0, cv, ex, ey) < r + ITEM_SIZES.spinnerArm + SPIKE_HIT) return { type: 'kill', cause: 'spinner' }
       }
       return null
     }
     case 'mace': {
       const bv = maceOffset(def, t)
-      return Math.hypot(along, across - bv) < kr + ITEM_SIZES.mace ? { type: 'kill', cause: 'mace' } : null
+      return Math.hypot(along, across - bv) < r + ITEM_SIZES.mace + SPIKE_HIT ? { type: 'kill', cause: 'mace' } : null
     }
     case 'slider': {
       const c = sliderOffset(def, t)
       const half = def.len / 2
-      return rectDist(along, across, -ITEM_SIZES.sliderThickness, ITEM_SIZES.sliderThickness, c - half, c + half) < kr
+      return rectDist(along, across, -ITEM_SIZES.sliderThickness, ITEM_SIZES.sliderThickness, c - half, c + half) < r + SPIKE_HIT
         ? { type: 'kill', cause: 'slider' }
         : null
     }
@@ -118,6 +176,7 @@ export function collideItem(item: BakedItem, t: number, px: number, pz: number, 
       const inner = crusherInner(crusherOpen(def, t), item.hw)
       const depth = ITEM_SIZES.crusherDepth
       const far = item.hw + 3
+      const kr = r + SPIKE_HIT
       if (rectDist(along, across, -depth, depth, inner, far) < kr || rectDist(along, across, -depth, depth, -far, -inner) < kr)
         return { type: 'kill', cause: 'crusher' }
       return null
@@ -126,13 +185,13 @@ export function collideItem(item: BakedItem, t: number, px: number, pz: number, 
       const st = pistonState(def, t)
       const pr = def.r ?? ITEM_SIZES.piston
       const dist = Math.hypot(along, across - def.d)
-      if (st.lethal && st.height < 0.6 && dist < kr + pr * 0.85) return { type: 'kill', cause: 'piston' }
+      if (st.lethal && st.height < 0.6 && dist < r + pr) return { type: 'kill', cause: 'piston' }
       if (st.height < 0.35) return circlePush(item, along, across - def.d, dist, r + pr, 0.25, 0, false)
       return null
     }
     case 'mine': {
       const mr = def.r ?? ITEM_SIZES.mine
-      return Math.hypot(along, across - def.d) < kr + mr ? { type: 'kill', cause: 'mine' } : null
+      return Math.hypot(along, across - def.d) < r + mr + SPIKE_HIT ? { type: 'kill', cause: 'mine' } : null
     }
     case 'bumper': {
       const dist = Math.hypot(along, across - def.d)
@@ -142,15 +201,89 @@ export function collideItem(item: BakedItem, t: number, px: number, pz: number, 
       const dist = Math.hypot(along, across - def.d)
       return circlePush(item, along, across - def.d, dist, r + (def.r ?? ITEM_SIZES.rock), 0.3, 0, false)
     }
+    case 'pickup':
+      return Math.hypot(along, across - def.d) < r + ITEM_SIZES.pickup ? { type: 'pickup' } : null
+    case 'whirlpool':
+      return Math.hypot(along, across - def.d) < ITEM_SIZES.whirlpoolCore ? { type: 'kill', cause: 'whirlpool' } : null
+    case 'sweeper': {
+      const a = sweeperAngle(def, t)
+      const pv = sweeperPivot(def, item.hw)
+      const hit = segDist(along, across, 0, pv, Math.sin(a) * def.len, pv - def.side * Math.cos(a) * def.len)
+      return hit < r + ITEM_SIZES.sweeperArm + SPIKE_HIT ? { type: 'kill', cause: 'sweeper' } : null
+    }
+    case 'flame': {
+      const reach = flameState(def, t).reach * flameLength(def, item.hw)
+      if (reach < 0.05) return null
+      const wall = def.side * item.hw
+      const tip = wall - def.side * reach
+      const half = ITEM_SIZES.flameHalf
+      return rectDist(along, across, -half, half, Math.min(wall, tip), Math.max(wall, tip)) < r ? { type: 'kill', cause: 'flame' } : null
+    }
+    case 'fence': {
+      const c = fenceGapCentre(def, t)
+      const half = (def.gap ?? ITEM_SIZES.fenceGap) / 2
+      const far = item.hw + 3
+      const log = ITEM_SIZES.fenceLog
+      const kr = r + SPIKE_HIT
+      if (rectDist(along, across, -log, log, -far, c - half) < kr || rectDist(along, across, -log, log, c + half, far) < kr)
+        return { type: 'kill', cause: 'fence' }
+      return null
+    }
+    case 'boost':
+    case 'current':
+      return null
+  }
+}
+
+/** Hazards that shove the raft around rather than touching it. */
+export const FIELD_KINDS: ReadonlySet<ItemDef['kind']> = new Set(['boost', 'current', 'whirlpool'])
+
+interface Field {
+  ax: number
+  az: number
+  spin: number
+}
+
+/** Acceleration (m/s²) and spin (rad/s²) a field item puts on a raft centred at (px, pz), or null if out of reach. */
+export function fieldAt(item: BakedItem, px: number, pz: number): Field | null {
+  const dx = px - item.x
+  const dz = pz - item.z
+  const along = dx * item.hx + dz * item.hz
+  const across = rightOffset(dx, dz, item.hx, item.hz)
+  const def = item.def
+  // Unit vector to the right of the heading, in world space.
+  const rx = -item.hz
+  const rz = item.hx
+  switch (def.kind) {
     case 'boost': {
       const len = def.len ?? ITEM_SIZES.boostLen
       const w = def.w ?? ITEM_SIZES.boostWidth
-      const cv = def.d ?? 0
-      if (along >= 0 && along <= len && Math.abs(across - cv) <= w / 2) return { type: 'boost', ax: item.hx, az: item.hz }
-      return null
+      if (along < 0 || along > len || Math.abs(across - (def.d ?? 0)) > w / 2) return null
+      return { ax: item.hx * BOOST_ACCEL, az: item.hz * BOOST_ACCEL, spin: 0 }
     }
-    case 'pickup':
-      return Math.hypot(along, across - def.d) < r + ITEM_SIZES.pickup ? { type: 'pickup' } : null
+    case 'current': {
+      const len = def.len ?? ITEM_SIZES.currentLen
+      const w = def.w ?? 2 * item.hw
+      if (along < 0 || along > len || Math.abs(across - (def.d ?? 0)) > w / 2) return null
+      return { ax: rx * def.push, az: rz * def.push, spin: 0 }
+    }
+    case 'whirlpool': {
+      const v = across - def.d
+      const dist = Math.hypot(along, v)
+      const reach = def.r ?? ITEM_SIZES.whirlpool
+      if (dist >= reach || dist < 1e-5) return null
+      const f = 1 - dist / reach
+      const pull = (def.pull ?? 11) * Math.sqrt(f)
+      const swirl = whirlpoolSwirl(def) * f
+      // Towards the drain, plus a sideways swirl round it.
+      const iu = -along / dist
+      const iv = -v / dist
+      const au = iu * pull - iv * swirl
+      const av = iv * pull + iu * swirl
+      return { ax: au * item.hx + av * rx, az: au * item.hz + av * rz, spin: Math.sign(swirl) * 3 * f }
+    }
+    default:
+      return null
   }
 }
 

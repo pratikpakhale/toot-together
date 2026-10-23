@@ -15,6 +15,7 @@
     "knip": "knip",
     "balance": "tsx scripts/balance.ts",
     "icons": "tsx scripts/icons.ts",
+    "level-shots": "tsx scripts/level-shots.ts",
     "trailer": "node trailer/record.mjs",
     "trailer:dryrun": "tsx trailer/dryrun.ts"
   },

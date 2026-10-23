@@ -37,7 +37,7 @@ import {
   WATER_DRAG,
 } from './constants'
 import { angleDiff, clamp, createRng, type Rng, wrapAngle } from './math'
-import { collideItem, type KillCause } from './obstacles'
+import { collideItem, FIELD_KINDS, fieldAt, type KillCause } from './obstacles'
 import { homeRim, type RimSector, rimSector, sectorOffset } from './sectors'
 import { type BakedCourse, EDGE_CODE, type PickupKind, pointAt, queryTrack, type TrackQuery } from './track'
 import {
@@ -416,15 +416,15 @@ export class Sim {
     az += drag * (hz * flow - raft.vz) + SLOPE_GRAVITY * c.slope[i] * hz
 
     for (const item of c.items) {
-      if (item.def.kind !== 'boost' || Math.abs(item.s - q.s) > 8) continue
-      const hit = collideItem(item, this.t, raft.x, raft.z, RAFT_RADIUS)
-      if (hit?.type === 'boost') {
-        ax += hit.ax * 30
-        az += hit.az * 30
-        if (this.boostCooldown <= 0) {
-          this.emit({ type: 'boost', t: this.t })
-          this.boostCooldown = 0.6
-        }
+      if (!FIELD_KINDS.has(item.def.kind) || Math.abs(item.s - q.s) > item.hw + 14) continue
+      const field = fieldAt(item, raft.x, raft.z)
+      if (!field) continue
+      ax += field.ax
+      az += field.az
+      torque += field.spin
+      if (item.def.kind === 'boost' && this.boostCooldown <= 0) {
+        this.emit({ type: 'boost', t: this.t })
+        this.boostCooldown = 0.6
       }
     }
 
@@ -521,7 +521,7 @@ export class Sim {
     for (let k = 0; k < items.length; k++) {
       const item = items[k]
       if (Math.abs(item.s - raft.s) > item.hw + 10) continue
-      if (item.def.kind === 'boost') continue
+      if (item.def.kind === 'boost' || item.def.kind === 'current') continue
       if (item.def.kind === 'pickup') {
         const slot = this.pickupItems.indexOf(k)
         if (this.pickupReadyAt[slot] > this.t) continue

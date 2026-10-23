@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { botInput } from '../src/sim/bot'
-import { DT, HIPPO_GAP, RESPAWN_AHEAD_OF_CHECKPOINT } from '../src/sim/constants'
+import { DT, HIPPO_GAP, RAFT_RADIUS, RESPAWN_AHEAD_OF_CHECKPOINT } from '../src/sim/constants'
 import { COURSE_LIST, getCourse } from '../src/sim/courses'
 import { Sim } from '../src/sim/sim'
-import { nearestSampleAt, queryTrack } from '../src/sim/track'
+import { type BakedItem, type ItemDef, nearestSampleAt, queryTrack } from '../src/sim/track'
+import { collideItem, fieldAt, flameState, ITEM_SIZES } from '../src/sim/obstacles'
 import { angleDiff } from '../src/sim/math'
 import { clampToSector, rimSector, sectorOffset } from '../src/sim/sectors'
 import { aimFromStick, walkFromTurn } from '../src/client/game/input'
@@ -234,5 +235,69 @@ describe('walking around the rim', () => {
     sim.setInput(1, { aim: null, fart: false, burst: 0 } as never)
     sim.step()
     expect(sim.players.get(1)!.rim).toBeCloseTo(rim, 5)
+  })
+})
+
+describe('hazards', () => {
+  // A hazard on a straight river heading +x, so `along` is x and `across` (to the right) is z.
+  const at = (def: ItemDef, hw = 6): BakedItem => ({ def, index: 0, s: 0, x: 0, y: 0, z: 0, hx: 1, hz: 0, hw })
+  const kills = (item: BakedItem, t: number, x: number, z: number) => collideItem(item, t, x, z, RAFT_RADIUS)?.type === 'kill'
+  // How far the spikes drawn on a spiked body reach past it.
+  const SPIKES = 0.2
+
+  it('pops a raft whose rim touches the spikes, not just the body', () => {
+    const mine = at({ kind: 'mine', at: 0, d: 0 })
+    expect(kills(mine, 0, 0, RAFT_RADIUS + ITEM_SIZES.mine + SPIKES)).toBe(true)
+    expect(kills(mine, 0, 0, RAFT_RADIUS + ITEM_SIZES.mine + 0.4)).toBe(false)
+    const mace = at({ kind: 'mace', at: 0, amp: 0, period: 4 })
+    expect(kills(mace, 0, 0, RAFT_RADIUS + ITEM_SIZES.mace + SPIKES)).toBe(true)
+    const spinner = at({ kind: 'spinner', at: 0, arm: 3, speed: 0, arms: 1 })
+    expect(kills(spinner, 0, 1.5, RAFT_RADIUS + ITEM_SIZES.spinnerArm + SPIKES)).toBe(true)
+    const slider = at({ kind: 'slider', at: 0, len: 4, amp: 0, period: 4 })
+    expect(kills(slider, 0, RAFT_RADIUS + ITEM_SIZES.sliderThickness + SPIKES, 0)).toBe(true)
+  })
+
+  it('a slammed piston pops anything under its whole head', () => {
+    const piston = at({ kind: 'piston', at: 0, d: 0, period: 1 })
+    expect(kills(piston, 0.8, RAFT_RADIUS + ITEM_SIZES.piston - 0.05, 0)).toBe(true)
+  })
+
+  it('a whirlpool drags the raft towards its drain and pulls it under at the core', () => {
+    const pool = at({ kind: 'whirlpool', at: 0, d: 0 })
+    const f = fieldAt(pool, 0, 3)!
+    expect(f.az).toBeLessThan(0)
+    expect(Math.abs(f.ax)).toBeGreaterThan(0)
+    expect(fieldAt(pool, 0, ITEM_SIZES.whirlpool + 0.1)).toBeNull()
+    expect(kills(pool, 0, 0, ITEM_SIZES.whirlpoolCore - 0.1)).toBe(true)
+    expect(kills(pool, 0, 0, ITEM_SIZES.whirlpoolCore + 0.1)).toBe(false)
+  })
+
+  it('a current pushes sideways only over its stretch of river', () => {
+    const current = at({ kind: 'current', at: 0, push: 4, len: 10 })
+    expect(fieldAt(current, 5, 0)).toEqual({ ax: -0, az: 4, spin: 0 })
+    expect(fieldAt(current, -1, 0)).toBeNull()
+    expect(fieldAt(current, 11, 0)).toBeNull()
+  })
+
+  it('a flame jet only burns while lit, and warns first', () => {
+    const def: ItemDef = { kind: 'flame', at: 0, side: 1, period: 4, on: 0.25 }
+    const flame = at(def)
+    expect(kills(flame, 1, 0, 0)).toBe(false)
+    expect(flameState(def, 2.7).warn).toBe(true)
+    expect(kills(flame, 3.5, 0, -2)).toBe(true)
+  })
+
+  it('a spike fence lets the raft through its gap and nowhere else', () => {
+    const fence = at({ kind: 'fence', at: 0, amp: 0, period: 4 })
+    expect(kills(fence, 0, 0, 0)).toBe(false)
+    expect(kills(fence, 0, 0, 2.5)).toBe(true)
+    expect(kills(fence, 0, 0, -2.5)).toBe(true)
+  })
+
+  it('a sweeper boom sweeps across the river and leaves its far bank clear', () => {
+    const sweeper = at({ kind: 'sweeper', at: 0, side: 1, len: 7.5, period: 4 }, 6)
+    expect(kills(sweeper, 0, 0, 0)).toBe(true)
+    expect(kills(sweeper, 0, 0, -(6 - RAFT_RADIUS))).toBe(false)
+    expect(kills(sweeper, 1, 0, 0)).toBe(false)
   })
 })

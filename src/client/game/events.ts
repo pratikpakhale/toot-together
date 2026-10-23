@@ -17,6 +17,10 @@ const DEATH_LINES: Record<KillCause, [string, string]> = {
   slider: ['SKEWERED!', 'That log had places to be.'],
   mine: ['KABOOM!', 'Floaty spiky balls are bad, actually.'],
   piston: ['FLATTENED!', 'Watch for the shadow!'],
+  whirlpool: ['SUCKED UNDER!', 'Round and round and… down.'],
+  sweeper: ['SWEPT!', 'That boom had a schedule.'],
+  flame: ['TOASTED!', 'Roast hippo, extra crispy.'],
+  fence: ['SNAGGED!', 'Aim for the gap, not the spikes.'],
   fall: ['OVERBOARD!', 'Hippos cannot fly. Confirmed.'],
   reset: ['RESET!', 'Back to the last checkpoint.'],
 }

@@ -18,6 +18,18 @@ export type ItemDef =
   | { kind: 'boost'; at: number; d?: number; len?: number; w?: number }
   | { kind: 'piston'; at: number; d: number; period: number; phase?: number; r?: number }
   | { kind: 'pickup'; at: number; d: number; item: PickupKind }
+  /** Drain that drags the raft in and spins it; its core pulls the raft under. */
+  | { kind: 'whirlpool'; at: number; d: number; r?: number; pull?: number; swirl?: number }
+  /** Cross current over `len` metres pushing the raft sideways (`push` > 0 shoves it right). */
+  | { kind: 'current'; at: number; push: number; len?: number; d?: number; w?: number }
+  /** Spiked boom hinged on one bank (`side` 1 = right) that swings `swing` degrees either way of straight across. */
+  | { kind: 'sweeper'; at: number; side: Side; len: number; swing?: number; period: number; phase?: number }
+  /** Nozzle on one bank that blasts fire `len` metres across the river for the `on` share of each period. */
+  | { kind: 'flame'; at: number; side: Side; period: number; len?: number; on?: number; phase?: number }
+  /** Spiked fence across the whole river with one `gap` that slides `amp` metres either way. */
+  | { kind: 'fence'; at: number; gap?: number; amp: number; period: number; phase?: number; d?: number }
+
+type Side = 1 | -1
 
 interface PieceDef {
   len: number
@@ -39,7 +51,7 @@ interface PieceDef {
   shelf?: number
 }
 
-export type ThemeId = 'meadow' | 'canyon' | 'volcano'
+export type ThemeId = 'meadow' | 'canyon' | 'volcano' | 'bayou' | 'glacier' | 'temple' | 'storm'
 
 export interface CourseDef {
   id: string
@@ -47,13 +59,16 @@ export interface CourseDef {
   /** One line for the level select. */
   blurb: string
   theme: ThemeId
-  /** 1 (gentle) … 3 (brutal), shown as pips. */
-  difficulty: 1 | 2 | 3
+  /** 1 (gentle) … 5 (brutal), shown as pips. */
+  difficulty: Difficulty
   /** Finish times (seconds) for gold, silver and bronze medals. */
   medals: [gold: number, silver: number, bronze: number]
   startHeading: number
   pieces: PieceDef[]
 }
+
+export const MAX_DIFFICULTY = 5
+type Difficulty = 1 | 2 | 3 | 4 | 5
 
 const SAMPLE_SPACING = 0.5
 const WIDTH_BLEND = 7

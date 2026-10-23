@@ -52,7 +52,7 @@ const CARDS: { icon: IconName; title: string; body: ReactNode }[] = [
   {
     icon: 'medalGold',
     title: 'Rivers & medals',
-    body: <>Three rivers, each wilder than the last. Finish one to unlock the next, and beat the clock for bronze, silver and gold.</>,
+    body: <>Eight rivers, each wilder than the last. Finish one to unlock the next, and beat the clock for bronze, silver and gold.</>,
   },
   {
     icon: 'spikes',
