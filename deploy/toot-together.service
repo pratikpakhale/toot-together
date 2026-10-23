@@ -1,0 +1,24 @@
+[Unit]
+Description=Toot Together game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=toot
+Group=toot
+WorkingDirectory=/opt/toot-together/current
+StateDirectory=toot-together
+ExecStart=/usr/bin/node dist-server/index.js
+Environment=NODE_ENV=production HOST=127.0.0.1 PORT=8080 TRUST_PROXY_HEADER=x-forwarded-for
+Restart=always
+RestartSec=1
+KillSignal=SIGINT
+TimeoutStopSec=5
+Nice=-5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

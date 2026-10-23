@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-server
+trailer/out
+.DS_Store
+*.log
+
+# Owner-specific config and agent notes (see .env.example, AGENTS.md)
+*.local
+AGENTS.local.md
+.agents/settings.local.json
+.agents/scheduled_tasks.lock

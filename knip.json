@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["trailer/main.tsx", "trailer/vite.config.ts"],
+  "ignore": [".agents/skills/**/scripts/**"],
+  "ignoreBinaries": ["ffmpeg"]
+}
