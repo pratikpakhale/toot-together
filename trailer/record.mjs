@@ -11,6 +11,7 @@ const stills = opts.from !== undefined
 
 const MASTER = 'trailer/out/toot-together-trailer.mp4'
 const SOCIAL = 'trailer/out/toot-together-trailer-1080p.mp4'
+const PREVIEW = 'trailer/preview.webp'
 const WORK = join(tmpdir(), 'toot-trailer')
 const VIEWPORT = { width: 1280, height: 720 }
 const SCALE = 1.5
@@ -49,7 +50,7 @@ try {
   await page.goto(url)
   await page.waitForFunction(() => window.__trailer && document.fonts.status === 'loaded')
   await page.evaluate(() => document.fonts.ready)
-  const { fps, frames } = await page.evaluate(() => ({ fps: window.__trailer.fps, frames: window.__trailer.frames }))
+  const { fps, frames, highlights } = await page.evaluate(() => ({ fps: window.__trailer.fps, frames: window.__trailer.frames, highlights: window.__trailer.highlights }))
   await page.clock.pauseAt(60_000)
   await page.clock.runFor(WARM_UP_MS)
   const renderer = await page.evaluate(() => {
@@ -98,7 +99,10 @@ try {
     const q = ['-y', '-loglevel', 'error']
     await run('ffmpeg', [...q, '-i', join(WORK, 'video.mp4'), '-i', join(WORK, 'audio.wav'), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '256k', '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11', '-ar', '48000', '-shortest', '-movflags', '+faststart', MASTER])
     await run('ffmpeg', [...q, '-i', MASTER, '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-maxrate', '12M', '-bufsize', '24M', '-vf', 'scale=out_range=tv', '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-c:a', 'copy', '-movflags', '+faststart', SOCIAL])
-    console.log(`wrote ${MASTER} and ${SOCIAL}`)
+    const cuts = highlights.map(([a, b], n) => `[0:v]trim=${a.toFixed(3)}:${b.toFixed(3)},setpts=PTS-STARTPTS[h${n}]`)
+    const chain = highlights.map((_, n) => `[h${n}]`).join('')
+    await run('ffmpeg', [...q, '-i', MASTER, '-filter_complex', `${cuts.join(';')};${chain}concat=n=${highlights.length}:v=1:a=0,fps=15,scale=800:-1:flags=lanczos[v]`, '-map', '[v]', '-c:v', 'libwebp_anim', '-lossless', '0', '-quality', '60', '-compression_level', '5', '-loop', '0', PREVIEW])
+    console.log(`wrote ${MASTER}, ${SOCIAL} and ${PREVIEW}`)
   }
 } finally {
   await browser.close()

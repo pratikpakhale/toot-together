@@ -21,6 +21,7 @@ export interface Shot {
   seed: number
   startWhen: (sim: Sim) => boolean
   seconds: number
+  highlight?: [number, number]
   chat: ChatCue[]
   caption?: { text: string; at: number; color: string }
   steer?: (sim: Sim, id: number, t: number) => PlayerInput | undefined
@@ -55,6 +56,7 @@ export const SHOTS: Shot[] = [
     seed: 23,
     startWhen: (sim) => sim.raft.s >= itemS(canyon, 'spinner') - 17,
     seconds: 13,
+    highlight: [1.6, 4.6],
     caption: { text: 'TOOT TOGETHER', at: 0.4, color: '#a6e84a' },
     chat: [{ at: 1.2, seat: 2, text: 'Ruko… ab! 😬' }],
   },
@@ -72,6 +74,7 @@ export const SHOTS: Shot[] = [
     seed: 47,
     startWhen: (sim) => sim.raft.s >= volcano.startS + 6,
     seconds: 11,
+    highlight: [1, 4.6],
     caption: { text: 'BLAME EACH OTHER', at: 0.4, color: '#ff6b6b' },
     chat: [
       { at: 1.8, seat: 1, text: 'Kabir STOP tooting!' },
@@ -89,6 +92,7 @@ export const SHOTS: Shot[] = [
     seed: 88,
     startWhen: (sim) => sim.raft.s >= volcano.finishS - 32,
     seconds: 12,
+    highlight: [7.8, 10],
     everyoneToots: true,
     chat: [{ at: 9.4, seat: 0, text: 'GG 🦛' }],
   },

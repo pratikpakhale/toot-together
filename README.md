@@ -4,6 +4,8 @@ A co-op physics party game for the browser, inspired by *Fart Together*. Up to f
 
 **Play it at https://toot.pakhale.com**
 
+<img src="trailer/preview.webp" width="800" alt="Trailer: four hippos toot their raft past spinners, Kabir pops it on the spikes, and the crew makes the finish">
+
 ## Run it
 
 ```bash

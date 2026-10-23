@@ -51,5 +51,5 @@ pnpm test                 # sim, netcode and restart hand-off tests
 pnpm typecheck
 pnpm knip                 # unused files, exports and dependencies
 pnpm balance [course-id]  # autopilot timings / death stats per river for tuning
-pnpm trailer              # re-render the 1080p trailer master and a 1080p copy for social (trailer/out/)
+pnpm trailer              # re-render the README preview (trailer/preview.webp), the 1080p master and a 1080p copy for social (trailer/out/)
 ```

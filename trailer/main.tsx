@@ -249,6 +249,11 @@ Object.assign(window, {
     fps: FPS,
     frames: FRAMES,
     duration: DURATION,
+    highlights: [
+      [1, 3.4],
+      ...SHOTS.flatMap((shot, n) => (shot.highlight ? [shot.highlight.map((t) => starts[n] + t)] : [])),
+      [DURATION - 2.4, DURATION - 0.4],
+    ],
     startAudio,
     async waitAudio(k: number) {
       if (k > 0) await suspends[k]
