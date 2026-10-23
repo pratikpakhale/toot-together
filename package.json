@@ -1,5 +1,5 @@
 {
-  "name": "toot-together",
+  "name": "hippo-toot",
   "private": true,
   "version": "0.1.0",
   "license": "MIT",
@@ -16,6 +16,7 @@
     "balance": "tsx scripts/balance.ts",
     "icons": "tsx scripts/icons.ts",
     "level-shots": "tsx scripts/level-shots.ts",
+    "og": "tsx scripts/og.ts",
     "trailer": "node trailer/record.mjs",
     "trailer:dryrun": "tsx trailer/dryrun.ts"
   },

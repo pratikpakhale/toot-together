@@ -9,10 +9,10 @@ import { createServer } from 'vite'
 const { values: opts } = parseArgs({ options: { from: { type: 'string' }, to: { type: 'string' }, step: { type: 'string' } } })
 const stills = opts.from !== undefined
 
-const MASTER = 'trailer/out/toot-together-trailer.mp4'
-const SOCIAL = 'trailer/out/toot-together-trailer-1080p.mp4'
+const MASTER = 'trailer/out/hippo-toot-trailer.mp4'
+const SOCIAL = 'trailer/out/hippo-toot-trailer-1080p.mp4'
 const PREVIEW = 'trailer/preview.webp'
-const WORK = join(tmpdir(), 'toot-trailer')
+const WORK = join(tmpdir(), 'hippo-toot-trailer')
 const VIEWPORT = { width: 1280, height: 720 }
 const SCALE = 1.5
 const WARM_UP_MS = 300

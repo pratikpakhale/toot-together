@@ -19,7 +19,7 @@ A player creates a room on a chosen river and gets a 4-letter code, shown in the
 - Any link `http(s)://host/?room=CODE`, including the one copied from the HUD `ROOM` chip (title `Copy invite link`).
 - In a room: `Esc` or the `Menu` button for the pause menu.
 
-## Driving it with toot-verify + verify-browser
+## Driving it with hippo-verify + verify-browser
 
 Preconditions:
 

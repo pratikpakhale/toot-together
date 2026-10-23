@@ -16,8 +16,8 @@ export function InstallPrompt() {
         <div className="font-display mt-2 text-3xl">Install the game</div>
         <p className="mt-2 font-extrabold text-ink/70">
           {ios
-            ? 'Tap Share, then "Add to Home Screen". Toot Together opens from there full screen, with no browser bars.'
-            : 'Add Toot Together to your home screen. It opens full screen, with no browser bars, and solo games work offline.'}
+            ? 'Tap Share, then "Add to Home Screen". Hippo Toot opens from there full screen, with no browser bars.'
+            : 'Add Hippo Toot to your home screen. It opens full screen, with no browser bars, and solo games work offline.'}
         </p>
         <div className="mt-5 flex gap-3">
           <button autoFocus={ios} className={`btn ${ios ? 'btn-green' : 'btn-cream'} flex-1 text-xl`} onClick={() => (audio.click(), dismissInstall())}>

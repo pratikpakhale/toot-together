@@ -77,7 +77,7 @@ export function Results() {
     const text = `Our hippo crew floated ${def?.name ?? 'the river'} in ${formatTime(results.time)} with ${plural(results.deaths, 'death')}${medal ? ` (${MEDAL_NAME[medal]} medal)` : ''}. Toot along:`
     const url = location.origin
     try {
-      if (navigator.share) await navigator.share({ title: 'Toot Together', text, url })
+      if (navigator.share) await navigator.share({ title: 'Hippo Toot', text, url })
       else {
         await navigator.clipboard.writeText(`${text} ${url}`)
         setShared(true)

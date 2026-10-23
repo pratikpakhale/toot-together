@@ -38,7 +38,7 @@ function sounds(b: Beat) {
   cue(i, 0.1, 'puff', () => audio.fartStart('intro', 1))
   cue(i, 0.4, 'puffEnd', () => audio.fartStop('intro'))
   cue(i, 0.95, 'slam', () => audio.burst(0, 0))
-  cue(i, 1.4, 'together', () => audio.boing())
+  cue(i, 1.4, 'hippo', () => audio.boing())
   cue(i, 2.2, 'tag1', () => audio.click())
   cue(i, 2.85, 'tag2', () => audio.click())
   cue(i, 3.3, 'longToot', () => audio.fartStart('introLong', 3))
@@ -78,12 +78,26 @@ function Logo({ t, scale = 1 }: { t: number; scale?: number }) {
   const slam = prog(t, 0, 0.32)
   const toot = slam > 0 ? 2.6 - 1.6 * outBack(slam) : 0
   const icon = outBack(prog(t, 0.25, 0.3))
-  const together = outBack(prog(t, 0.45, 0.32))
+  const hippo = outBack(prog(t, 0.45, 0.32))
   const shake = t > 0.3 && t < 0.62 ? Math.sin(t * 90) * 10 * (0.62 - t) * 3 : 0
   const bob = Math.sin(t * 2.4) * 6
   return (
     <div style={{ transform: `translate(${shake}px, ${bob}px) scale(${scale}) rotate(-3deg)`, textAlign: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.12em', fontSize: 200, opacity: slam > 0 ? 1 : 0 }}>
+      <div
+        className="font-display stroke-text text-white"
+        style={{
+          fontSize: 130,
+          lineHeight: 0.9,
+          marginBottom: -8,
+          WebkitTextStrokeWidth: 11,
+          filter: `drop-shadow(0 8px 0 ${INK})`,
+          transform: `translateY(${(hippo - 1) * 80}px) scale(${0.4 + 0.6 * hippo})`,
+          opacity: clamp(hippo * 3),
+        }}
+      >
+        HIPPO
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.12em', fontSize: 210, opacity: slam > 0 ? 1 : 0 }}>
         <div
           className="font-display stroke-text"
           style={{
@@ -100,20 +114,6 @@ function Logo({ t, scale = 1 }: { t: number; scale?: number }) {
           TOOT
         </div>
         <Icon name="toot" size="0.62em" style={{ transform: `scale(${icon}) rotate(${Math.sin(t * 5) * 8}deg)` }} />
-      </div>
-      <div
-        className="font-display stroke-text text-white"
-        style={{
-          fontSize: 122,
-          lineHeight: 0.9,
-          marginTop: -10,
-          WebkitTextStrokeWidth: 11,
-          filter: `drop-shadow(0 8px 0 ${INK})`,
-          transform: `translateY(${(1 - together) * 80}px) scale(${0.4 + 0.6 * together})`,
-          opacity: clamp(together * 3),
-        }}
-      >
-        TOGETHER
       </div>
     </div>
   )
@@ -235,7 +235,7 @@ function Outro({ t }: { t: number }) {
         </Pop>
         <Pop t={t} at={1.7}>
           <div className="font-display" style={{ fontSize: 76, color: INK, background: '#fff8ec', border: `6px solid ${INK}`, borderRadius: 999, padding: '6px 46px 12px', boxShadow: `0 10px 0 ${INK}` }}>
-            toot.pakhale.com
+            hippotoot.fun
           </div>
         </Pop>
         <div style={{ display: 'flex', gap: 22, marginTop: 14 }}>

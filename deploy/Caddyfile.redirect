@@ -1,0 +1,11 @@
+
+# Other names for the site (www, domains it moved from) 301 to {$DOMAIN}, keeping path and query.
+# Pages opened before a move keep their WebSocket.
+{$REDIRECT_FROM} {
+	handle /ws {
+		reverse_proxy 127.0.0.1:8080
+	}
+	handle {
+		redir https://{$DOMAIN}{uri} permanent
+	}
+}

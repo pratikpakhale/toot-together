@@ -1,4 +1,4 @@
-# Toot Together: what's in it and how it's built
+# Hippo Toot: what's in it and how it's built
 
 ## What's in it
 
@@ -58,4 +58,5 @@ pnpm knip                 # unused files, exports and dependencies
 pnpm balance [course-id]  # autopilot timings / death stats per river for tuning
 pnpm level-shots [id...]  # re-render level-select thumbnails (public/levels/) in headless Chromium
 pnpm trailer              # re-render the README preview (trailer/preview.webp), the 1080p master and a 1080p copy for social (trailer/out/)
+pnpm og                   # re-render the link preview card (public/og.jpg) from a trailer frame
 ```

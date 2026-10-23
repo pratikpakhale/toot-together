@@ -3,7 +3,13 @@ import { Icon } from './Icon'
 export function Logo({ size = 'lg' }: { size?: 'lg' | 'md' }) {
   const big = size === 'lg'
   return (
-    <div className="relative inline-block select-none -rotate-3 anim-float" aria-label="Toot Together">
+    <div className="relative inline-block select-none -rotate-3 anim-float" aria-label="Hippo Toot">
+      <div
+        className="font-display stroke-text leading-[0.9] text-white"
+        style={{ fontSize: big ? 'clamp(28px, min(5.6vw, 8vh), 76px)' : '34px', filter: 'drop-shadow(0 5px 0 var(--color-ink))', marginBottom: big ? -4 : -2 }}
+      >
+        HIPPO
+      </div>
       <div className="flex items-center gap-[0.12em]" style={{ fontSize: big ? 'clamp(44px, min(9vw, 13vh), 124px)' : '56px' }}>
         <div
           className="font-display stroke-text leading-[0.85]"
@@ -19,12 +25,6 @@ export function Logo({ size = 'lg' }: { size?: 'lg' | 'md' }) {
           TOOT
         </div>
         <Icon name="toot" size="0.62em" className="anim-wobble" />
-      </div>
-      <div
-        className="font-display stroke-text leading-[0.9] text-white"
-        style={{ fontSize: big ? 'clamp(28px, min(5.6vw, 8vh), 76px)' : '34px', filter: 'drop-shadow(0 5px 0 var(--color-ink))', marginTop: big ? -6 : -2 }}
-      >
-        TOGETHER
       </div>
     </div>
   )

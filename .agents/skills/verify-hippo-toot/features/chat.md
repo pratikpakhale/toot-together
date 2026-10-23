@@ -20,7 +20,7 @@ Players in an online room can send eight quick lines (a tap, or Q then a number 
 - Phone, in an online room: tap the speech-bubble button (accessible name `Chat`) under `Menu`/`Respawn`.
 - Over the results screen of an online run the same keys and button work.
 
-## Driving it with toot-verify + verify-browser
+## Driving it with hippo-verify + verify-browser
 
 Preconditions:
 
