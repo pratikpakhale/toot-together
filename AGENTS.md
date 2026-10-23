@@ -23,4 +23,4 @@ Test with `pnpm test` (vitest; `tests/handoff.test.ts` spawns real servers), nod
 
 ## Agent files
 
-`AGENTS.md` and `.agents/skills/` are the source of truth for every agent. `CLAUDE.md` and `.claude` (a symlink to `.agents`) exist only because Claude Code looks there, so don't put content in them. Keep anything specific to the owner's machine or servers in `AGENTS.local.md`, never in committed files.
+`AGENTS.md` and `.agents/skills/` are the source of truth for every agent. `.claude` is a symlink to `.agents` so Claude Code finds the skills; don't put content in it. Keep anything specific to the owner's machine or servers in `AGENTS.local.md`, never in committed files.
