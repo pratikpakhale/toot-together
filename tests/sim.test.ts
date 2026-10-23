@@ -80,25 +80,26 @@ describe('sim', () => {
     for (const id of ids) sim.addPlayer(id, `Bot${id}`, id - 1)
     runBot(sim, ids, 900)
     expect(sim.phase).toBe('finished')
-    expect(sim.cp).toBe(course.checkpoints.length - 1)
+    expect(sim.rafts[0].cp).toBe(course.checkpoints.length - 1)
   })
 
   it('spikes kill and the raft respawns at the last checkpoint', () => {
     const sim = new Sim(course, 1)
     sim.addPlayer(1, 'A', 0)
     const i = nearestSampleAt(course, course.checkpoints[0] + 34)
-    sim.cp = 0
+    const raft = sim.rafts[0]
+    raft.cp = 0
     sim.phase = 'racing'
-    sim.raft.x = course.x[i]
-    sim.raft.z = course.z[i]
-    sim.raft.index = i
-    sim.raft.vx = -course.hz[i] * 8
-    sim.raft.vz = course.hx[i] * 8
+    raft.x = course.x[i]
+    raft.z = course.z[i]
+    raft.index = i
+    raft.vx = -course.hz[i] * 8
+    raft.vz = course.hx[i] * 8
     const events = runBot(sim, [], 3)
     const death = events.find((e) => e.type === 'death')
     expect(death && death.type === 'death' && death.cause).toBe('spikes')
     expect(events.some((e) => e.type === 'respawn')).toBe(true)
-    expect(Math.abs(sim.raft.s - (course.checkpoints[0] + RESPAWN_AHEAD_OF_CHECKPOINT))).toBeLessThan(2)
+    expect(Math.abs(raft.s - (course.checkpoints[0] + RESPAWN_AHEAD_OF_CHECKPOINT))).toBeLessThan(2)
   })
 
   it('burst counter baseline never fires a burst on join', () => {
@@ -126,9 +127,9 @@ describe('walking around the rim', () => {
   const raftWithCrew = (crew: number) => {
     const sim = new Sim(course, 1)
     for (let i = 0; i < crew; i++) sim.addPlayer(i + 1, `P${i}`, i)
-    const fx = Math.cos(sim.raft.a)
-    const fz = Math.sin(sim.raft.a)
-    return { sim, fx, fz, angle: (id: number) => sim.raft.a + sim.players.get(id)!.rim }
+    const fx = Math.cos(sim.rafts[0].a)
+    const fz = Math.sin(sim.rafts[0].a)
+    return { sim, fx, fz, angle: (id: number) => sim.rafts[0].a + sim.players.get(id)!.rim }
   }
 
   it('holding right moves the hippo rightwards across the back of the raft', () => {
@@ -146,9 +147,9 @@ describe('walking around the rim', () => {
 
   const expectInSlices = (sim: Sim) => {
     const list = [...sim.players.values()]
-    const seats = list.map((p) => p.seat)
+    const ords = list.map((p) => p.ord)
     for (const p of list) {
-      const sector = rimSector(p.seat, seats)!
+      const sector = rimSector(p.ord, ords)!
       expect(Math.abs(sectorOffset(sector, p.rim))).toBeLessThanOrEqual(sector.half + 1e-9)
     }
     for (let i = 0; i < list.length; i++)
@@ -158,14 +159,14 @@ describe('walking around the rim', () => {
   it.each([2, 3, 4])('with a crew of %i, one held key walks each hippo to the edge of its own slice and no further', (crew) => {
     const { sim } = raftWithCrew(crew)
     const ids = Array.from({ length: crew }, (_, i) => i + 1)
-    const seats = ids.map((id) => sim.players.get(id)!.seat)
+    const ords = ids.map((id) => sim.players.get(id)!.ord)
     hold(sim, {}, 1)
     expectInSlices(sim)
     for (const dir of [1, -1] as const) {
       hold(sim, Object.fromEntries(ids.map((id) => [id, { walk: dir }])), 2, expectInSlices)
       for (const id of ids) {
         const p = sim.players.get(id)!
-        const sector = rimSector(p.seat, seats)!
+        const sector = rimSector(p.ord, ords)!
         expect(sectorOffset(sector, p.rim)).toBeCloseTo(dir * sector.half, 6)
         expect(p.walk).toBe(0)
       }
@@ -189,14 +190,14 @@ describe('walking around the rim', () => {
     let lastSide = 0
     for (let k = 0; k < 120; k++) {
       const wobble = Math.sin(k * 0.7) * 0.2
-      hold(sim, { 1: { aim: sim.raft.a + sector.center + Math.PI + wobble } }, DT)
+      hold(sim, { 1: { aim: sim.rafts[0].a + sector.center + Math.PI + wobble } }, DT)
       const side = Math.sign(sectorOffset(sector, sim.players.get(1)!.rim))
       if (lastSide && side && side !== lastSide) flips++
       if (side) lastSide = side
     }
     expect(flips).toBe(0)
     expect(Math.abs(sectorOffset(sector, sim.players.get(1)!.rim))).toBeCloseTo(sector.half, 6)
-    hold(sim, { 1: { aim: sim.raft.a + sector.center - sector.half - 0.4 } }, 1.5)
+    hold(sim, { 1: { aim: sim.rafts[0].a + sector.center - sector.half - 0.4 } }, 1.5)
     expect(sectorOffset(sector, sim.players.get(1)!.rim)).toBeCloseTo(-sector.half, 6)
   })
 

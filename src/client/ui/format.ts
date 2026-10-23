@@ -8,3 +8,9 @@ export function formatTime(t: number, digits: 1 | 2 = 2) {
 export function formatMedalTime(t: number) {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
 }
+
+export function ordinal(n: number) {
+  const tens = n % 100
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')
+  return `${n}${suffix}`
+}

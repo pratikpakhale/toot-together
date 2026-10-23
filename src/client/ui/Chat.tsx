@@ -2,7 +2,7 @@ import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 
 import { MAX_CHAT_LENGTH } from '../../sim/protocol'
 import type { RosterEntry } from '../../sim/types'
 import { audio } from '../audio/audio'
-import { SEAT_COLORS } from '../game/frame'
+import { seatColor } from '../game/frame'
 import { input } from '../game/input'
 import type { ChatEntry } from '../game/session'
 import { isTouch } from '../platform'
@@ -81,7 +81,7 @@ export function ChatDock() {
             {shown.map((l) => {
               const content = (
                 <>
-                  <span className="font-display mr-1.5" style={{ color: SEAT_COLORS[l.seat], WebkitTextStroke: '0.5px var(--color-ink)' }}>
+                  <span className="font-display mr-1.5" style={{ color: seatColor(l.seat), WebkitTextStroke: '0.5px var(--color-ink)' }}>
                     {l.name}
                   </span>
                   {l.text}
@@ -208,7 +208,7 @@ function ChatPanel({ focus, others }: { focus: boolean; others: RosterEntry[] })
                 key={p.id}
                 tabIndex={-1}
                 className={`chip px-2 py-0.5 font-display ${off ? 'line-through opacity-60' : ''}`}
-                style={{ color: SEAT_COLORS[p.seat] }}
+                style={{ color: seatColor(p.seat) }}
                 onClick={() => (audio.click(), toggleMute(p.id))}
                 aria-pressed={off}
                 title={off ? `Unmute ${p.name}` : `Mute ${p.name}`}
@@ -223,12 +223,12 @@ function ChatPanel({ focus, others }: { focus: boolean; others: RosterEntry[] })
   )
 }
 
-export function ChatBubble({ seat }: { seat: number }) {
+export function ChatBubble({ raft, seat }: { raft: number; seat: number }) {
   const chat = useApp((s) => s.sessionInfo?.chat) ?? NO_CHAT
   const roster = useApp((s) => s.sessionInfo?.roster) ?? NO_ROSTER
   const muted = useApp((s) => s.muted)
   const on = useApp((s) => s.settings.chat)
-  const occupant = roster.find((p) => p.seat === seat)?.id
+  const occupant = roster.find((p) => p.raft === raft && p.seat === seat)?.id
   const line = chat.findLast((l) => l.id === occupant && l.liveAt !== null)
   const now = performance.now()
   const life = line ? bubbleMs(line.text) : 0

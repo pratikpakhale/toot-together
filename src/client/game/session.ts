@@ -8,6 +8,7 @@ import {
   type ClientMsg,
   type JoinError,
   mayRestart,
+  PROTOCOL_VERSION,
   sanitizeChat,
   sanitizeName,
   SEAT_HOLD_MS,
@@ -50,7 +51,12 @@ export interface SessionInfo {
   roster: RosterEntry[]
   chat: ChatEntry[]
   error: { code: JoinError | 'disconnected' | 'unreachable'; message: string } | null
+  /** The server's latest "no" to something this player tried; `key` changes with each one. */
+  refused: { key: number; reason: string } | null
 }
+
+/** What a player can do about crews in a race room. */
+export type CrewAction = Extract<ClientMsg, { type: 'pick' | 'spot' | 'ready' | 'rafts' | 'move' | 'shuffle' | 'start' }>
 
 export interface NetStats {
   pingMs: number | null
@@ -69,9 +75,13 @@ export interface GameSession {
   update(dt: number): Snapshot | null
   drainEvents(): SimEvent[]
   setInput(id: number, input: PlayerInput): void
+  /** Sends your own raft back to its checkpoint. */
   respawn(): void
   restart(courseId?: string): void
   canRestart(): boolean
+  /** Online race rooms only; elsewhere it does nothing. */
+  act(action: CrewAction): void
+  isHost(): boolean
   setPaused(paused: boolean): void
   sendChat(text: string): 'sent' | 'empty' | 'limited'
   subscribe(fn: () => void): () => void
@@ -83,7 +93,7 @@ abstract class BaseSession {
   private listeners = new Set<() => void>()
 
   constructor(courseId: string) {
-    this.info = { status: 'connecting', courseId: getCourse(courseId).def.id, roomCode: null, roster: [], chat: [], error: null }
+    this.info = { status: 'connecting', courseId: getCourse(courseId).def.id, roomCode: null, roster: [], chat: [], error: null, refused: null }
   }
 
   get course() {
@@ -164,7 +174,8 @@ export class LocalSession extends BaseSession implements GameSession {
   }
 
   respawn() {
-    this.sim.requestRespawn()
+    const id = this.localPlayers[0]?.id
+    if (id !== undefined) this.sim.requestRespawn(id)
   }
 
   restart(courseId?: string) {
@@ -172,9 +183,7 @@ export class LocalSession extends BaseSession implements GameSession {
       this.sim.restart()
       return
     }
-    const old = this.sim
-    this.sim = new Sim(getCourse(courseId), randomSeed())
-    for (const p of old.players.values()) this.sim.addPlayer(p.id, p.name, p.seat)
+    this.sim = Sim.carryOver(this.sim, getCourse(courseId), randomSeed())
     this.events = []
     this.acc = 0
     this.cur = this.sim.snapshot()
@@ -184,6 +193,12 @@ export class LocalSession extends BaseSession implements GameSession {
   }
 
   canRestart() {
+    return true
+  }
+
+  act() {}
+
+  isHost() {
     return true
   }
 
@@ -269,8 +284,12 @@ export class NetSession extends BaseSession implements GameSession {
   private clock = new SnapshotClock()
   private renderT = 0
   private extrapolatedFrom: Snapshot | null = null
-  private shown = { t: 0, x: 0, z: 0, a: 0, st: 0 }
-  private correction = { x: 0, z: 0, a: 0 }
+  /** Render time of the last frame drawn, and what each raft looked like in it. */
+  private shownT = 0
+  private shown: { x: number; z: number; a: number; st: number }[] = []
+  /** Per raft: how far the drawn raft is off the truth after a wrong guess, fading out. */
+  private corrections: { x: number; z: number; a: number }[] = []
+  private refusals = 0
   private lastInput: PlayerInput = { ...EMPTY_INPUT }
   private pendingInput: PlayerInput | null = null
   private lastSentAt = 0
@@ -286,6 +305,8 @@ export class NetSession extends BaseSession implements GameSession {
     private readonly room: string | null,
     courseId = DEFAULT_COURSE,
     readonly spectating = false,
+    /** Rafts for a room this session creates: 1 = co-op, 2–4 = race. */
+    private readonly rafts = 1,
   ) {
     super(courseId)
     this.canChat = !spectating
@@ -306,9 +327,11 @@ export class NetSession extends BaseSession implements GameSession {
     this.ws = ws
     ws.onopen = () => {
       const name = sanitizeName(this.name)
-      if (this.spectating) this.send({ type: 'watch', room: this.room ?? undefined })
-      else if (this.token && this.info.roomCode) this.send({ type: 'join', name, room: this.info.roomCode, resume: this.token })
-      else this.send({ type: 'join', name, room: this.room ?? undefined, course: this.room ? undefined : this.info.courseId })
+      const v = PROTOCOL_VERSION
+      if (this.spectating) this.send({ type: 'watch', v, room: this.room ?? undefined })
+      else if (this.token && this.info.roomCode) this.send({ type: 'join', v, name, room: this.info.roomCode, resume: this.token })
+      else if (this.room) this.send({ type: 'join', v, name, room: this.room })
+      else this.send({ type: 'join', v, name, course: this.info.courseId, rafts: this.rafts })
     }
     ws.onmessage = (e) => {
       if (ws === this.ws) this.onMessage(JSON.parse(String(e.data)) as ServerMsg)
@@ -362,7 +385,7 @@ export class NetSession extends BaseSession implements GameSession {
     this.view = null
     this.clock.reset()
     this.extrapolatedFrom = null
-    this.correction = { x: 0, z: 0, a: 0 }
+    this.corrections = []
   }
 
   private resumeAfterGap(catchUp: CatchUp) {
@@ -440,6 +463,9 @@ export class NetSession extends BaseSession implements GameSession {
         this.setInfo({ status: 'error', error: { code: msg.code, message: msg.message } })
         this.ws.close()
         break
+      case 'refused':
+        this.setInfo({ refused: { key: ++this.refusals, reason: msg.reason } })
+        break
       case 'pong': {
         this.pings.push(performance.now() - msg.t)
         if (this.pings.length > PING_SAMPLES) this.pings.shift()
@@ -467,11 +493,11 @@ export class NetSession extends BaseSession implements GameSession {
 
     if (this.extrapolatedFrom && this.extrapolatedFrom !== latest) this.absorbExtrapolationError(latest)
     this.view ??= cloneSnapshot(latest)
-    const r = this.sample(t, this.view).raft
+    const rafts = this.sample(t, this.view).rafts
     this.extrapolatedFrom = t > latest.t ? latest : null
     this.net.bufferMs = this.clock.delay * 1000
     this.net.lateFraction += ((this.extrapolatedFrom ? 1 : 0) - this.net.lateFraction) * (1 - Math.exp(-dt / LATE_AVERAGE_TIME))
-    this.applyCorrection(r, t, dt)
+    this.applyCorrections(rafts, t, dt)
 
     if (this.pending.length) {
       const keep: SimEvent[] = []
@@ -485,26 +511,32 @@ export class NetSession extends BaseSession implements GameSession {
   }
 
   private absorbExtrapolationError(latest: Snapshot) {
-    const shown = this.shown
     this.scratch ??= cloneSnapshot(latest)
-    const truth = this.sample(shown.t, this.scratch).raft
-    if (truth.st !== shown.st || Math.hypot(truth.x - shown.x, truth.z - shown.z) >= CORRECTION_MAX_DISTANCE) return
-    this.correction.x += shown.x - truth.x
-    this.correction.z += shown.z - truth.z
-    this.correction.a += angleDiff(truth.a, shown.a)
+    const truths = this.sample(this.shownT, this.scratch).rafts
+    truths.forEach((truth, i) => {
+      const shown = this.shown[i]
+      const c = this.corrections[i]
+      if (!shown || !c || truth.st !== shown.st || Math.hypot(truth.x - shown.x, truth.z - shown.z) >= CORRECTION_MAX_DISTANCE) return
+      c.x += shown.x - truth.x
+      c.z += shown.z - truth.z
+      c.a += angleDiff(truth.a, shown.a)
+    })
   }
 
-  private applyCorrection(r: Snapshot['raft'], t: number, dt: number) {
-    const c = this.correction
-    if (r.st !== this.shown.st) c.x = c.z = c.a = 0
-    Object.assign(this.shown, { t, x: r.x, z: r.z, a: r.a, st: r.st })
+  private applyCorrections(rafts: Snapshot['rafts'], t: number, dt: number) {
+    this.shownT = t
     const fade = Math.exp(-dt / CORRECTION_TIME)
-    c.x *= fade
-    c.z *= fade
-    c.a *= fade
-    r.x += c.x
-    r.z += c.z
-    r.a = wrapAngle(r.a + c.a)
+    rafts.forEach((r, i) => {
+      const c = (this.corrections[i] ??= { x: 0, z: 0, a: 0 })
+      if (r.st !== this.shown[i]?.st) c.x = c.z = c.a = 0
+      this.shown[i] = { x: r.x, z: r.z, a: r.a, st: r.st }
+      c.x *= fade
+      c.z *= fade
+      c.a *= fade
+      r.x += c.x
+      r.z += c.z
+      r.a = wrapAngle(r.a + c.a)
+    })
   }
 
   private sample(t: number, out: Snapshot) {
@@ -534,7 +566,7 @@ export class NetSession extends BaseSession implements GameSession {
     const now = performance.now()
     const s = this.snaps[this.snaps.length - 1]
     const me = s?.players.find((p) => p.id === this.localPlayers[0]?.id)
-    if (!s || !me || s.raft.st !== RAFT_STATE.float || s.phase === 'finished') return
+    if (!s || !me || s.rafts[me.raft].st !== RAFT_STATE.float || s.phase === 'finished') return
     const freeGas = me.buff === BUFF_CODE.chili || me.buff === BUFF_CODE.prune
     const last = this.predictedBursts[this.predictedBursts.length - 1] ?? -Infinity
     if (me.burstAgo < BURST_COOLDOWN || now - last < BURST_COOLDOWN * 1000 || (!freeGas && me.stam < BURST_COST)) return
@@ -595,9 +627,16 @@ export class NetSession extends BaseSession implements GameSession {
 
   canRestart() {
     if (this.spectating) return false
+    return this.view ? mayRestart(this.isHost(), this.view.phase, this.view.rafts.length > 1) : this.isHost()
+  }
+
+  isHost() {
     const me = this.localPlayers[0]?.id
-    const isHost = this.info.roster.some((p) => p.id === me && p.host)
-    return this.view ? mayRestart(isHost, this.view.phase) : isHost
+    return !this.spectating && this.info.roster.some((p) => p.id === me && p.host)
+  }
+
+  act(action: CrewAction) {
+    if (!this.spectating) this.send(action)
   }
 
   setPaused() {}

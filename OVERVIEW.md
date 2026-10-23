@@ -20,6 +20,7 @@
 - **Blame**: every crash names the hippo whose toots caused it. The results screen hands out awards (Most Toxic, Saboteur, Harmony Hippo, Silent But Deadly…).
 - **Legendary toots**: rare and announced to the whole room.
 - **Chat** (online): eight quick lines a tap or a number key away, or type your own. What a hippo says pops up over its head and in a short log, and late joiners get the last 20 lines. Swear words are starred out, each player gets 5 lines per 10 s, and anyone can be muted from the chat panel. Settings › Chat turns it all off.
+- **Raft racing** (online): 2–4 rafts with crews of 1–4 race down the same river. Players pick their raft and spot around the rim (the host can also set the raft count, shuffle and move hippos), ready up in the pond, and a 3·2·1 countdown drops the start gate for everyone at once. Rafts bump, toots shove rivals (a rival pushed into a hazard counts as a snipe, for the Gas Assassin award), a respawning raft is a ghost until it's clear, and after the first finish the rest have 30 s before they're out of time. Results rank every raft; races don't touch medals or best times. Newcomers wait on the bench and can hop onto a raft that's still racing.
 - **Online play**: a dropped player keeps their seat for 30 s while the game reconnects them; the host (crown) is the only one who can restart mid-run; rooms, connections and join attempts are rate limited; names go through a profanity filter.
 - **Procedural audio**: every toot, splash, boing and the music loop is synthesised with WebAudio, so there are no audio files and no two toots sound the same.
 - **Procedural art**: the hippos, raft, track, cliffs and scenery are all generated in code, so there are no 3D model files. The UI uses the game's own SVG icon set (`src/client/ui/icons.ts`); `pnpm icons` re-renders the favicon and app icons from it.
@@ -32,7 +33,8 @@ src/sim/        Deterministic, framework-free game simulation (runs in browser A
   courses.ts      The eight rivers (pieces, difficulty, medal times)
   bot.ts          Autopilot: plans a lane and speed (or waits, or backs off) clear of timed hazards (tests, balance, menu raft)
   obstacles.ts    Hazards as pure functions of time (+ collision shapes, and the force fields of boosts, currents and whirlpools)
-  sim.ts          Raft physics, hippos, stamina, sync, pickups, deaths, checkpoints
+  sim.ts          Raft physics, hippos, stamina, sync, pickups, deaths, checkpoints; crews, countdown, places and the rest of a race
+                  (co-op is simply a race with one raft)
   sectors.ts      Which slice of the rim each hippo in a crew may stand on
   protocol.ts     Client/server message types
 server/index.ts   ws rooms with 4-letter codes, 60 Hz authoritative sim, 30 Hz snapshots
@@ -42,7 +44,8 @@ src/client/
   audio/          WebAudio synth (farts, sfx) + procedural music
   ui/             Menus, HUD, level select, results, settings (Tailwind) + the icon set
   state/          App store and saved progress (best times, medals, unlocks)
-tests/            Vitest: every course is intact and finishable by bots with hazards live, deaths/respawn, stamina
+tests/            Vitest: every course is intact and finishable by bots with hazards live, deaths/respawn, stamina,
+                  race rules and a random-action fuzz against the room's invariants, and golden runs that pin co-op bit for bit
 trailer/          The launch trailer: shot list, title cards and the frame-by-frame recorder
 ```
 

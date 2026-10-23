@@ -20,7 +20,7 @@ T=.agents/skills/verify-toot-together/scripts/toot-verify.mjs   # from the repo 
 | `$T up [--web-port N] [--server-port N]` | Starts the room server and vite on free ports (defaults 2667 and 5273), waits until usable, then runs `doctor`. Refuses if a run is already up. |
 | `$T doctor` | Read-only. Processes alive, ports owned by our process groups, `/health` ok, page served, and a `watch` socket through vite's `/ws` proxy reaches **our** server. Ends with `DOCTOR OK` or `DOCTOR FAIL`. |
 | `$T status` | Prints the run's ports, PIDs, log paths and evidence folder as JSON. |
-| `$T bot --name N --room CODE [--say TEXT]... [--gap MS] [--stay S] [--out FILE]` | A second/third player. Joins, says each `--say` line (`--gap` ms apart, default 600), stays `--stay` s (default 20), prints every message except snapshots/events/pongs as JSON lines, and appends them to `--out`. `--create [--course lazy-river]` makes a room instead of joining. `--via server` skips the vite proxy. |
+| `$T bot --name N --room CODE [--say TEXT]... [--gap MS] [--stay S] [--out FILE]` | A second/third player. Joins, says each `--say` line (`--gap` ms apart, default 600), stays `--stay` s (default 20), prints every message except snapshots/events/pongs as JSON lines, and appends them to `--out`. `--create [--course lazy-river] [--rafts N]` makes a room instead of joining. Race rooms: `--pick RAFT\|bench` hops on, `--ready` readies up between races, `--drive` steers down the river with the game's test bot. `--via server` skips the vite proxy. |
 | `$T down` | Kills only the two process groups `up` started (SIGTERM, then SIGKILL), copies the logs into the evidence folder, deletes the scratch state. Evidence stays. |
 
 ## Launch

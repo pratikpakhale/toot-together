@@ -5,7 +5,7 @@ import { angleDiff } from '../../sim/math'
 import { pointAt } from '../../sim/track'
 import { audio } from '../audio/audio'
 import { handleEvent } from '../game/events'
-import { frame } from '../game/frame'
+import { followedRaft, frame } from '../game/frame'
 import { aimFromStick, input, walkFromTurn } from '../game/input'
 import { type GameSession, LocalSession } from '../game/session'
 import { useApp } from '../state/store'
@@ -32,6 +32,13 @@ export function Driver({ mode }: { mode: 'menu' | 'game' }) {
     } else readDevices(session, inputBlocked(mode))
 
     frame.view = session.update(dt)
+    if (frame.view) {
+      const follow = followedRaft(frame.view, session)
+      if (follow !== frame.follow) {
+        frame.follow = follow
+        frame.cameraCuts++
+      }
+    }
     audio.setMusicIntensity(mode === 'game' && frame.view?.phase === 'racing' ? 1 : 0)
     for (const e of session.drainEvents()) handleEvent(e, mode === 'menu')
     audio.update()
@@ -40,9 +47,12 @@ export function Driver({ mode }: { mode: 'menu' | 'game' }) {
   return null
 }
 
+/** Menus that take the keys and taps; the hippo lets go of everything while one is open. */
+const MENUS = new Set(['pause', 'settings', 'howto', 'crews', 'join'])
+
 function inputBlocked(mode: 'menu' | 'game') {
   const overlay = useApp.getState().overlay
-  return mode === 'menu' || overlay === 'pause' || overlay === 'settings' || overlay === 'howto'
+  return mode === 'menu' || (overlay !== null && MENUS.has(overlay))
 }
 
 function readDevices(session: GameSession, blocked: boolean) {
@@ -59,9 +69,10 @@ function readDevices(session: GameSession, blocked: boolean) {
 function driveAttract(session: GameSession, t: number, st: { next: number; aim: number; fart: boolean; until: number }) {
   const v = frame.view
   if (!v) return
+  const raft = v.rafts[0]
   const home = pointAt(session.course, session.course.spawnS)
-  const dx = home.x - v.raft.x
-  const dz = home.z - v.raft.z
+  const dx = home.x - raft.x
+  const dz = home.z - raft.z
   const far = Math.hypot(dx, dz) > 4
   if (t > st.next) {
     st.next = t + 1.8 + Math.random() * 2.5
@@ -75,7 +86,7 @@ function driveAttract(session: GameSession, t: number, st: { next: number; aim: 
       return
     }
     const p = v.players.find((pp) => pp.id === lp.id)
-    const aligned = p ? Math.abs(angleDiff(v.raft.a + p.rim, st.aim)) < 0.5 : false
+    const aligned = p ? Math.abs(angleDiff(raft.a + p.rim, st.aim)) < 0.5 : false
     session.setInput(lp.id, { aim: st.aim, walk: 0, fart: aligned && t < st.until, burst: 0 })
   })
 }

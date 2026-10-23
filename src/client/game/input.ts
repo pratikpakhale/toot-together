@@ -23,13 +23,13 @@ const KB2 = {
 type Layout = typeof KB1
 
 const GAME_KEYS = new Set([...Object.values(KB1).flat(), ...Object.values(KB2).flat()])
-type Action = 'pause' | 'respawn' | 'confirm' | 'chat' | 'quickChat'
+type Action = 'pause' | 'respawn' | 'confirm' | 'chat' | 'quickChat' | 'ready' | 'crews'
 
 const GAMEPAD_DEADZONE = 0.22
 const TRIGGER_THRESHOLD = 0.25
 const MAX_PADS = 4
 
-const STANDARD_PAD = { a: 0, b: 1, x: 2, rb: 5, lt: 6, rt: 7, back: 8, start: 9, dpadUp: 12, dpadDown: 13, dpadLeft: 14, dpadRight: 15 } as const
+const STANDARD_PAD = { a: 0, b: 1, x: 2, y: 3, rb: 5, lt: 6, rt: 7, back: 8, start: 9, dpadUp: 12, dpadDown: 13, dpadLeft: 14, dpadRight: 15 } as const
 const STICK_X = 0
 const STICK_Y = 1
 
@@ -41,7 +41,7 @@ const RIM_WALK_ON_SCREEN = { right: -1, left: 1 } as const
 class InputManager {
   private keys = new Set<string>()
   private burstPresses: Record<DeviceId, number> = { any: 0, kb1: 0, kb2: 0, gp0: 0, gp1: 0, gp2: 0, gp3: 0, touch: 0 }
-  private padPrev: Record<number, { burst: boolean; start: boolean; back: boolean; a: boolean }> = {}
+  private padPrev: Record<number, { burst: boolean; start: boolean; back: boolean; a: boolean; y: boolean }> = {}
   private listeners = new Set<(action: Action, device: DeviceId) => void>()
   private changeListeners = new Set<() => void>()
   private changeQueued = false
@@ -121,6 +121,8 @@ class InputManager {
       if (e.code === 'KeyR') this.emit('respawn', 'any')
       if (e.code === 'KeyT') this.emit('chat', 'any')
       if (e.code === 'KeyQ') this.emit('quickChat', 'any')
+      if (e.code === 'KeyY') this.emit('ready', 'any')
+      if (e.code === 'KeyC') this.emit('crews', 'any')
       if (KB1.fart.includes(e.code)) this.emit('confirm', 'kb1')
       if (KB2.fart.includes(e.code)) this.emit('confirm', 'kb2')
     }
@@ -148,17 +150,19 @@ class InputManager {
     const pads = navigator.getGamepads?.() ?? []
     for (const pad of pads) {
       if (!pad) continue
-      const prev = this.padPrev[pad.index] ?? { burst: false, start: false, back: false, a: false }
+      const prev = this.padPrev[pad.index] ?? { burst: false, start: false, back: false, a: false, y: false }
       const burst = pressed(pad, STANDARD_PAD.x) || pressed(pad, STANDARD_PAD.rb) || pressed(pad, STANDARD_PAD.b)
       const start = pressed(pad, STANDARD_PAD.start)
       const back = pressed(pad, STANDARD_PAD.back)
       const a = pressed(pad, STANDARD_PAD.a)
+      const y = pressed(pad, STANDARD_PAD.y)
       const id = `gp${pad.index}` as DeviceId
       if (burst && !prev.burst && pad.index < MAX_PADS) this.countBurstPress(id)
       if (start && !prev.start) this.emit('pause', id)
       if (back && !prev.back) this.emit('respawn', id)
       if (a && !prev.a) this.emit('confirm', id)
-      this.padPrev[pad.index] = { burst, start, back, a }
+      if (y && !prev.y) this.emit('ready', id)
+      this.padPrev[pad.index] = { burst, start, back, a, y }
     }
   }
 

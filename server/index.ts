@@ -13,7 +13,7 @@ import {
   TextCensor,
 } from 'obscenity'
 import { WebSocket, WebSocketServer } from 'ws'
-import { DT, MAX_PLAYERS, SNAPSHOT_EVERY } from '../src/sim/constants'
+import { DT, MAX_RAFTS, SNAPSHOT_EVERY } from '../src/sim/constants'
 import { DEFAULT_COURSE, getCourse, isCourseId } from '../src/sim/courses'
 import {
   CHAT_LIMIT,
@@ -22,6 +22,7 @@ import {
   type ClientMsg,
   type JoinError,
   normalizeRoomCode,
+  PROTOCOL_VERSION,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   quantizeSnapshot,
@@ -33,7 +34,7 @@ import {
   type ServerMsg,
   type ServerStats,
 } from '../src/sim/protocol'
-import { Sim } from '../src/sim/sim'
+import { type Refusal, Sim } from '../src/sim/sim'
 import type { RosterEntry } from '../src/sim/types'
 
 const PORT = Number(process.env.PORT ?? 2567)
@@ -94,13 +95,15 @@ class Room {
   chat: ChatLine[] = []
   createdAt = Date.now()
   private nextId = 1
+  private rosterSent = -1
   emptySince: number | null = null
 
   constructor(
     readonly code: string,
     courseId: string,
+    rafts = 1,
   ) {
-    this.sim = new Sim(getCourse(courseId), randomSeed())
+    this.sim = new Sim(getCourse(courseId), randomSeed(), rafts)
   }
 
   get courseId() {
@@ -108,12 +111,13 @@ class Room {
   }
 
   get full() {
-    return this.clients.size >= MAX_PLAYERS
+    return this.clients.size >= this.sim.capacity
   }
 
+  /** Co-op seats newcomers on the raft; a race room puts them on the bench to pick a raft. */
   join(ws: WebSocket, name: string): Client | null {
-    const seat = this.sim.freeSeat()
-    if (seat === null) return null
+    if (this.full) return null
+    const seat = this.sim.race ? null : this.sim.freeSeat()
     const client: Client = {
       ws,
       id: this.nextId++,
@@ -142,6 +146,7 @@ class Room {
     client.ws = ws
     client.awaySince = null
     client.lastInputAt = Date.now()
+    this.sim.setAway(client.id, false)
     this.emptySince = null
     this.welcome(client)
     return client
@@ -180,6 +185,7 @@ class Room {
       const client: Client = { ws: null, id, token, msgCount: 0, msgWindow: now, lastInputAt: now, stale: false, awaySince: now, chatTimes: [] }
       room.clients.set(id, client)
       room.releaseInput(client)
+      sim.setAway(id, true)
     }
     room.emptySince = now
     return room
@@ -199,16 +205,21 @@ class Room {
   }
 
   summary(): RoomSummary {
-    const course = this.sim.course
-    const s = this.sim.snapshot()
+    const sim = this.sim
+    const course = sim.course
     const now = Date.now()
+    const progress = sim.rafts.map((r, i) =>
+      sim.crew(i).length ? Math.min(1, Math.max(0, (r.s - course.startS) / (course.finishS - course.startS))) : null,
+    )
+    const leader = progress.reduce<number>((best, p, i) => (p !== null && p > (progress[best] ?? -1) ? i : best), 0)
     return {
       code: this.code,
       course: this.courseId,
-      phase: s.phase,
-      raceTime: Math.round(s.raceTime * 10) / 10,
-      deaths: s.deaths,
-      progress: Math.min(1, Math.max(0, (s.raft.s - course.startS) / (course.finishS - course.startS))),
+      rafts: sim.rafts.length,
+      phase: sim.phase,
+      raceTime: Math.round(sim.raceTime * 10) / 10,
+      deaths: sim.rafts[leader].deaths,
+      progress,
       age: Math.round((now - this.createdAt) / 1000),
       idle: this.connectedCount() === 0 && this.emptySince !== null ? Math.round((now - this.emptySince) / 1000) : null,
       spectators: this.spectators.size,
@@ -223,6 +234,7 @@ class Room {
     client.ws = null
     client.awaySince = Date.now()
     this.releaseInput(client)
+    this.sim.setAway(client.id, true)
     if (this.connectedCount() === 0) this.emptySince = Date.now()
     this.broadcastRoster()
   }
@@ -246,6 +258,11 @@ class Room {
   }
 
   handle(client: Client, msg: ClientMsg) {
+    const host = this.hostId() === client.id
+    const refuse = (reason: Refusal) => {
+      if (reason) send(client.ws, { type: 'refused', reason })
+    }
+    const hostOnly = (act: () => Refusal) => refuse(host ? act() : 'Only the host can do that.')
     switch (msg.type) {
       case 'input':
         client.lastInputAt = Date.now()
@@ -258,15 +275,39 @@ class Room {
         })
         break
       case 'respawn':
-        this.sim.requestRespawn()
+        refuse(this.sim.requestRespawn(client.id))
         break
       case 'restart': {
-        if (!mayRestart(this.hostId() === client.id, this.sim.phase)) break
+        if (!mayRestart(host, this.sim.phase, this.sim.race)) {
+          refuse('Only the host can restart.')
+          break
+        }
         const course = isCourseId(msg.course) ? msg.course : null
         if (course && course !== this.courseId) this.switchCourse(course)
         else this.sim.restart()
         break
       }
+      case 'pick':
+        refuse(this.sim.pick(client.id, msg.raft === null ? null : Number(msg.raft), msg.spot === undefined ? undefined : Number(msg.spot)))
+        break
+      case 'spot':
+        refuse(this.sim.swapSpot(client.id, Number(msg.dir)))
+        break
+      case 'ready':
+        refuse(this.sim.setReady(client.id, msg.on === true))
+        break
+      case 'rafts':
+        hostOnly(() => this.sim.setRaftCount(Number(msg.count)))
+        break
+      case 'move':
+        hostOnly(() => (this.clients.has(Number(msg.id)) ? this.sim.move(Number(msg.id), msg.raft === null ? null : Number(msg.raft)) : 'That hippo left.'))
+        break
+      case 'shuffle':
+        hostOnly(() => this.sim.shuffle())
+        break
+      case 'start':
+        hostOnly(() => this.sim.start())
+        break
       case 'ping':
         if (typeof msg.t === 'number') send(client.ws, { type: 'pong', t: msg.t })
         break
@@ -290,9 +331,7 @@ class Room {
   }
 
   private switchCourse(courseId: string) {
-    const old = this.sim
-    this.sim = new Sim(getCourse(courseId), randomSeed())
-    for (const p of old.players.values()) this.sim.addPlayer(p.id, p.name, p.seat)
+    this.sim = Sim.carryOver(this.sim, getCourse(courseId), randomSeed())
     this.broadcast({ type: 'course', course: courseId })
     this.broadcastRoster()
     this.broadcast(this.snapMsg())
@@ -322,6 +361,7 @@ class Room {
     if (this.connectedCount() === 0) return
     this.sim.step()
     const events = this.sim.drainEvents()
+    if (this.sim.rosterVersion !== this.rosterSent) this.broadcastRoster()
     if (events.length) this.broadcast({ type: 'events', events })
     if (this.sim.tick % SNAPSHOT_EVERY === 0) this.broadcast(this.snapMsg())
   }
@@ -332,6 +372,7 @@ class Room {
   }
 
   private broadcastRoster() {
+    this.rosterSent = this.sim.rosterVersion
     this.broadcast({ type: 'roster', players: this.roster() })
   }
 
@@ -516,6 +557,10 @@ wss.on('connection', (ws, req) => {
         reject(ws, 'rate_limited', 'Too many attempts. Wait a minute and try again.')
         return
       }
+      if (msg.v !== PROTOCOL_VERSION) {
+        reject(ws, 'outdated', 'Toot Together just got an update. Reload the page to keep playing.')
+        return
+      }
       if (msg.type === 'watch') {
         const code = normalizeRoomCode(msg.room)
         if (!code) {
@@ -547,7 +592,7 @@ wss.on('connection', (ws, req) => {
           return
         }
         if (room.full) {
-          failJoin('full', `Room ${code} already has ${MAX_PLAYERS} hippos.`)
+          failJoin('full', `Room ${code} already has ${room.sim.capacity} hippos.`)
           return
         }
       } else {
@@ -560,7 +605,8 @@ wss.on('connection', (ws, req) => {
           return
         }
         const course = isCourseId(msg.course) ? msg.course : DEFAULT_COURSE
-        room = new Room(newRoomCode(), course)
+        const rafts = Number.isInteger(msg.rafts) ? Math.min(MAX_RAFTS, Math.max(1, Number(msg.rafts))) : 1
+        room = new Room(newRoomCode(), course, rafts)
         rooms.set(room.code, room)
       }
       client = room.join(ws, cleanName(msg.name))

@@ -19,9 +19,9 @@ for (const def of COURSE_LIST) {
       for (let k = 0; k < 1200 / DT && sim.phase !== 'finished'; k++) {
         for (const id of ids) sim.setInput(id, botInput(sim, id))
         sim.step()
-        for (const e of sim.drainEvents()) if (e.type === 'death') { causes[e.cause] = (causes[e.cause] ?? 0) + 1; deathAt.push(Math.round(sim.raft.s)) }
+        for (const e of sim.drainEvents()) if (e.type === 'death') { causes[e.cause] = (causes[e.cause] ?? 0) + 1; deathAt.push(Math.round(sim.rafts[0].s)) }
       }
-      console.log(`  crew ${crew} god=${god}: ${sim.phase} time=${sim.raceTime.toFixed(0)}s deaths=${sim.deaths} cp=${sim.cp}`, JSON.stringify(causes), deathAt.slice(0, 10).join(' '))
+      console.log(`  crew ${crew} god=${god}: ${sim.phase} time=${sim.raceTime.toFixed(0)}s deaths=${sim.rafts[0].deaths} cp=${sim.rafts[0].cp}`, JSON.stringify(causes), deathAt.slice(0, 10).join(' '))
     }
   }
 }

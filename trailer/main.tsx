@@ -20,7 +20,7 @@ import { Environment } from '../src/client/scene/Environment'
 import { FxLayer } from '../src/client/scene/Fx'
 import { Gates } from '../src/client/scene/Gates'
 import { Obstacles } from '../src/client/scene/Obstacles'
-import { Raft } from '../src/client/scene/Raft'
+import { Rafts } from '../src/client/scene/Raft'
 import { Track } from '../src/client/scene/Track'
 import { useApp } from '../src/client/state/store'
 import { ChatDock } from '../src/client/ui/Chat'
@@ -148,7 +148,7 @@ function Scene() {
         <Decor course={course} />
         <Gates course={course} />
         <Obstacles course={course} />
-        <Raft course={course} />
+        <Rafts course={course} />
         <FxLayer />
         <CameraRig course={course} mode={mode} />
       </Suspense>

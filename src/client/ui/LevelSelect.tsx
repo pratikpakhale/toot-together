@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { MAX_RAFTS } from '../../sim/constants'
 import { COURSE_LIST } from '../../sim/courses'
 import { type CourseDef, MAX_DIFFICULTY } from '../../sim/track'
 import { audio } from '../audio/audio'
@@ -98,7 +100,13 @@ export function LevelCards({ onPick, compact = false }: { onPick: (id: string) =
 export function LevelSelect() {
   const mode = useApp((s) => s.levelMode)
   const setOverlay = useApp((s) => s.setOverlay)
+  const [rafts, setRafts] = useState(1)
   const close = () => setOverlay(null)
+  const online = mode === 'online'
+  const pick = (n: number) => () => {
+    audio.click()
+    setRafts(n)
+  }
   return (
     <Modal
       width={960}
@@ -110,12 +118,53 @@ export function LevelSelect() {
       }
     >
       <div className="mb-1 text-center font-display text-4xl short:text-3xl">CHOOSE A RIVER</div>
+      {online && (
+        <div className="mb-2 flex flex-wrap items-center justify-center gap-2">
+          <div role="radiogroup" aria-label="Mode" className="flex rounded-[18px] border-[3px] border-ink bg-white p-1">
+            {(['coop', 'race'] as const).map((m) => {
+              const on = m === 'race' ? rafts > 1 : rafts === 1
+              return (
+                <button
+                  key={m}
+                  role="radio"
+                  aria-checked={on}
+                  className={`font-display flex items-center gap-1.5 rounded-[12px] px-4 py-1 text-lg short:text-base ${on ? 'bg-toot text-ink' : 'text-ink/55'}`}
+                  onClick={pick(m === 'race' ? Math.max(2, rafts) : 1)}
+                >
+                  <Icon name={m === 'race' ? 'flag' : 'hippo'} size="1.1em" />
+                  {m === 'race' ? 'Race' : 'Float together'}
+                </button>
+              )
+            })}
+          </div>
+          {rafts > 1 && (
+            <div role="radiogroup" aria-label="Rafts" className="flex items-center gap-1.5">
+              <span className="font-display text-sm text-ink/55">RAFTS</span>
+              {Array.from({ length: MAX_RAFTS - 1 }, (_, k) => k + 2).map((n) => (
+                <button
+                  key={n}
+                  role="radio"
+                  aria-checked={rafts === n}
+                  className={`btn ${rafts === n ? 'btn-purple' : 'btn-cream'} rounded-xl px-3 py-0.5 text-base shadow-[0_3px_0_var(--color-ink)]`}
+                  onClick={pick(n)}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <p className="mb-4 text-center font-extrabold text-ink/60 short:mb-2 short:text-sm">
-        {mode === 'online' ? 'Your crew will float this one together. You can switch level after the finish.' : 'Each river unlocks the next. Beat the clock for medals!'}
+        {!online
+          ? 'Each river unlocks the next. Beat the clock for medals!'
+          : rafts > 1
+            ? `${rafts} crews race down the same river. First raft to the finish wins.`
+            : 'Your crew will float this one together. You can switch level after the finish.'}
       </p>
       <LevelCards
         onPick={(id) => {
-          if (mode === 'online') createRoom(id)
+          if (online) createRoom(id, rafts)
           else startSolo(id)
         }}
       />

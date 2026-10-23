@@ -10,7 +10,7 @@ import { Environment } from './Environment'
 import { FxLayer } from './Fx'
 import { Gates } from './Gates'
 import { Obstacles } from './Obstacles'
-import { Raft } from './Raft'
+import { Rafts } from './Raft'
 import { Track } from './Track'
 
 function ContextWatch() {
@@ -80,7 +80,7 @@ export function GameScene() {
         <Decor course={course} />
         <Gates course={course} />
         <Obstacles course={course} />
-        <Raft course={course} />
+        <Rafts course={course} />
         <FxLayer />
         <CameraRig course={course} mode={mode} />
       </Suspense>

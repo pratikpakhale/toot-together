@@ -1,8 +1,8 @@
 import { lerp, lerpAngle, wrapAngle } from '../../sim/math'
-import { type PlayerSnap, RAFT_STATE, type Snapshot } from '../../sim/types'
+import { type PlayerSnap, RAFT_STATE, type RaftSnap, type Snapshot } from '../../sim/types'
 
 export function cloneSnapshot(s: Snapshot): Snapshot {
-  return { ...s, raft: { ...s.raft }, players: s.players.map((p) => ({ ...p })), pickups: [...s.pickups] }
+  return { ...s, rafts: s.rafts.map((r) => ({ ...r })), players: s.players.map((p) => ({ ...p })), pickups: [...s.pickups] }
 }
 
 const TELEPORT_DISTANCE = 6
@@ -13,21 +13,11 @@ function burstAgoAt(t: number, a: Snapshot, pa: PlayerSnap, b: Snapshot, pb: Pla
   return burstOfBIsAfterT ? pa.burstAgo + (t - a.t) : agoFromB
 }
 
-export function interpolate(a: Snapshot, b: Snapshot, t: number, out: Snapshot): Snapshot {
-  const ra = a.raft
-  const rb = b.raft
-  const teleport = ra.st !== rb.st || Math.hypot(rb.x - ra.x, rb.z - ra.z) > TELEPORT_DISTANCE
-  const k = teleport ? 1 : t
+/** Whether a raft jumped between two snapshots (respawn, pop, fall), so it shouldn't slide. */
+const jumped = (ra: RaftSnap, rb: RaftSnap) => ra.st !== rb.st || Math.hypot(rb.x - ra.x, rb.z - ra.z) > TELEPORT_DISTANCE
 
-  out.t = lerp(a.t, b.t, t)
-  out.tick = b.tick
-  out.phase = b.phase
-  out.raceTime = b.phase === 'racing' ? lerp(a.raceTime, b.raceTime, t) : b.raceTime
-  out.deaths = b.deaths
-  out.cp = b.cp
-  out.pickups = b.pickups
-
-  const r = out.raft
+function interpolateRaft(ra: RaftSnap, rb: RaftSnap, t: number, r: RaftSnap) {
+  const k = jumped(ra, rb) ? 1 : t
   r.x = lerp(ra.x, rb.x, k)
   r.y = lerp(ra.y, rb.y, k)
   r.z = lerp(ra.z, rb.z, k)
@@ -39,13 +29,41 @@ export function interpolate(a: Snapshot, b: Snapshot, t: number, out: Snapshot):
   r.stT = ra.st === rb.st ? lerp(ra.stT, rb.stT, t) : rb.stT
   r.i = rb.i
   r.s = lerp(ra.s, rb.s, k)
+  r.d = rb.d
+  r.cp = rb.cp
+  r.res = rb.res
+  r.pl = rb.pl
+  r.ft = rb.ft
+  r.gh = rb.gh
+}
+
+export function interpolate(a: Snapshot, b: Snapshot, t: number, out: Snapshot): Snapshot {
+  out.t = lerp(a.t, b.t, t)
+  out.tick = b.tick
+  out.phase = b.phase
+  out.raceTime = b.phase === 'racing' ? lerp(a.raceTime, b.raceTime, t) : b.raceTime
+  out.goAt = b.goAt
+  out.closeAt = b.closeAt
+  out.pickups = b.pickups
+
+  out.rafts.length = b.rafts.length
+  for (let i = 0; i < b.rafts.length; i++) {
+    const rb = b.rafts[i]
+    out.rafts[i] ??= { ...rb }
+    interpolateRaft(a.rafts[i] ?? rb, rb, t, out.rafts[i])
+  }
 
   const players: PlayerSnap[] = []
   for (const pb of b.players) {
-    const pa = a.players.find((p) => p.id === pb.id) ?? pb
+    const found = a.players.find((p) => p.id === pb.id)
+    const pa = found && found.raft === pb.raft ? found : pb
+    const ra = a.rafts[pb.raft]
+    const k = ra && jumped(ra, b.rafts[pb.raft]) ? 1 : t
     const prev = out.players.find((p) => p.id === pb.id)
     const o: PlayerSnap = prev ?? { ...pb }
+    o.raft = pb.raft
     o.seat = pb.seat
+    o.ord = pb.ord
     o.rim = lerpAngle(pa.rim, pb.rim, k)
     o.walk = pb.walk
     o.fart = pb.fart
@@ -65,13 +83,14 @@ export function extrapolate(s: Snapshot, dt: number, out: Snapshot): Snapshot {
   interpolate(s, s, 1, out)
   out.t = s.t + dt
   if (s.phase === 'racing') out.raceTime = s.raceTime + dt
-  const r = out.raft
-  r.stT = s.raft.stT + dt
-  if (s.raft.st === RAFT_STATE.float) {
-    r.x += s.raft.vx * dt
-    r.z += s.raft.vz * dt
-    r.a = wrapAngle(r.a + s.raft.av * dt)
-  }
+  s.rafts.forEach((from, i) => {
+    const r = out.rafts[i]
+    r.stT = from.stT + dt
+    if (from.st !== RAFT_STATE.float) return
+    r.x += from.vx * dt
+    r.z += from.vz * dt
+    r.a = wrapAngle(r.a + from.av * dt)
+  })
   for (const p of out.players) p.burstAgo += dt
   return out
 }

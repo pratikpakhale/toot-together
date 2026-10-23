@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { BUFF_DURATION, MAX_PLAYERS } from '../../sim/constants'
+import { BUFF_DURATION, CREW_SIZE, MAX_RAFTS } from '../../sim/constants'
 import { BUFF_CODE, BUFF_NAMES } from '../../sim/types'
 import { audio } from '../audio/audio'
 import { inviteLink } from '../game/controller'
-import { frame, SEAT_COLORS } from '../game/frame'
+import { crewed, frame, isRace, myRaft, seatColor } from '../game/frame'
 import type { GameSession, NetStats } from '../game/session'
 import { isTouch, SHORT_SCREEN, useShortScreen } from '../platform'
 import { useProgress } from '../state/progress'
@@ -11,10 +11,12 @@ import { useApp } from '../state/store'
 import { formatTime } from './format'
 import { setTagContent } from './NameTags'
 import { Icon } from './Icon'
+import { ClosingChip, Countdown, MiniStandings, PlaceChip, RaceLobby, TeamBadge, useJoinPrompt, usePhase, useRace, WatchBar } from './Race'
 
 export function Hud() {
   const session = useApp((s) => s.session)
   const info = useApp((s) => s.sessionInfo)
+  const overlay = useApp((s) => s.overlay)
   const setOverlay = useApp((s) => s.setOverlay)
   const course = session?.course
   const localIds = session?.localPlayers.map((p) => p.id) ?? []
@@ -22,19 +24,25 @@ export function Hud() {
   const short = useShortScreen()
   const shortRef = useRef(short)
   shortRef.current = short
+  const race = useRace()
+  const phase = usePhase()
+  useJoinPrompt(session)
 
   const timerRef = useRef<HTMLDivElement>(null)
   const deathRef = useRef<HTMLSpanElement>(null)
   const markerRef = useRef<HTMLDivElement>(null)
+  const rivalRefs = useRef<(HTMLDivElement | null)[]>([])
   const fillRef = useRef<HTMLDivElement>(null)
-  const meterRefs = useRef<(HTMLDivElement | null)[]>([])
-  const meterWrapRefs = useRef<(HTMLDivElement | null)[]>([])
-  const emptyRefs = useRef<(HTMLSpanElement | null)[]>([])
-  const lastExh = useRef<boolean[]>([])
-  const buffRefs = useRef<(HTMLDivElement | null)[]>([])
-  const crewRefs = useRef<(HTMLDivElement | null)[]>([])
-  const [phase, setPhase] = useState<'pond' | 'racing' | 'finished'>('pond')
+  const meterRefs = useRef(new Map<number, HTMLDivElement>())
+  const meterWrapRefs = useRef(new Map<number, HTMLDivElement>())
+  const emptyRefs = useRef(new Map<number, HTMLSpanElement>())
+  const lastExh = useRef(new Map<number, boolean>())
+  const buffRefs = useRef(new Map<number, HTMLDivElement>())
+  const crewRefs = useRef(new Map<number, HTMLDivElement>())
   const lastDeaths = useRef(0)
+  const [resultsSeen, setResultsSeen] = useState(false)
+  const seen = overlay === 'results' || (resultsSeen && phase === 'finished')
+  if (seen !== resultsSeen) setResultsSeen(seen)
 
   useEffect(() => {
     let raf = 0
@@ -42,40 +50,54 @@ export function Hud() {
       raf = requestAnimationFrame(loop)
       const v = frame.view
       if (!v || !course) return
-      if (timerRef.current) timerRef.current.textContent = formatTime(v.phase === 'pond' ? 0 : v.raceTime, shortRef.current ? 1 : 2)
-      if (deathRef.current && v.deaths !== lastDeaths.current) {
-        lastDeaths.current = v.deaths
-        deathRef.current.textContent = String(v.deaths)
+      const mine = myRaft(v, session)
+      const shown = v.rafts[mine ?? frame.follow] ?? v.rafts[0]
+      if (timerRef.current) timerRef.current.textContent = formatTime(v.phase === 'pond' || v.phase === 'countdown' ? 0 : v.raceTime, shortRef.current ? 1 : 2)
+      if (deathRef.current && shown.d !== lastDeaths.current) {
+        lastDeaths.current = shown.d
+        deathRef.current.textContent = String(shown.d)
         deathRef.current.parentElement?.animate(
           [{ transform: 'scale(1.5) rotate(-8deg)' }, { transform: 'scale(1) rotate(0)' }],
           { duration: 420, easing: 'cubic-bezier(.2,.9,.3,1.3)' },
         )
       }
       const span = course.finishS - course.startS
-      const progress = Math.min(1, Math.max(0, (v.raft.s - course.startS) / span))
-      if (markerRef.current) markerRef.current.style.left = `${progress * 100}%`
+      const progressOf = (s: number) => Math.min(1, Math.max(0, (s - course.startS) / span))
+      const progress = progressOf(shown.s)
+      const race = isRace(v)
+      if (markerRef.current) {
+        markerRef.current.style.left = `${progress * 100}%`
+        markerRef.current.style.display = race && mine === null ? 'none' : ''
+      }
       if (fillRef.current) fillRef.current.style.width = `${progress * 100}%`
-      setPhase((p) => (p === v.phase ? p : v.phase))
+      for (let r = 0; r < rivalRefs.current.length; r++) {
+        const el = rivalRefs.current[r]
+        if (!el) continue
+        const on = race && r < v.rafts.length && r !== mine && crewed(v, r)
+        el.style.display = on ? '' : 'none'
+        if (on) el.style.left = `${progressOf(v.rafts[r].s) * 100}%`
+      }
 
       for (const p of v.players) {
-        const meter = meterRefs.current[p.seat]
+        if (!localIds.includes(p.id) && !crewRefs.current.has(p.id)) continue
+        const meter = meterRefs.current.get(p.id)
         if (meter) {
           meter.style.width = `${Math.max(0, Math.min(1, p.stam)) * 100}%`
-          meter.style.background = p.buff === BUFF_CODE.chili || p.buff === BUFF_CODE.prune ? 'linear-gradient(90deg,#ff7a2f,var(--color-gold))' : p.exh ? '#ff6b6b' : SEAT_COLORS[p.seat]
+          meter.style.background = p.buff === BUFF_CODE.chili || p.buff === BUFF_CODE.prune ? 'linear-gradient(90deg,#ff7a2f,var(--color-gold))' : p.exh ? '#ff6b6b' : seatColor(p.seat)
         }
-        const wrap = meterWrapRefs.current[p.seat]
+        const wrap = meterWrapRefs.current.get(p.id)
         if (wrap) wrap.style.transform = p.fart ? `translateX(${Math.sin(performance.now() / 30) * 1.5}px)` : ''
         const exh = !!p.exh
-        if (exh !== !!lastExh.current[p.seat]) {
-          lastExh.current[p.seat] = exh
-          const empty = emptyRefs.current[p.seat]
+        if (exh !== !!lastExh.current.get(p.id)) {
+          lastExh.current.set(p.id, exh)
+          const empty = emptyRefs.current.get(p.id)
           if (empty) empty.style.display = exh ? 'flex' : 'none'
           if (exh && wrap) {
             wrap.animate([{ translate: '0' }, { translate: '-6px' }, { translate: '6px' }, { translate: '-4px' }, { translate: '3px' }, { translate: '0' }], { duration: 380, easing: 'ease-out' })
             wrap.animate([{ boxShadow: '0 0 0 0 #ff6b6b' }, { boxShadow: '0 0 0 6px #ff6b6b' }, { boxShadow: '0 4px 0 rgb(28 53 87 / 0.3)' }], { duration: 650, easing: 'ease-out' })
           }
         }
-        const buff = buffRefs.current[p.seat]
+        const buff = buffRefs.current.get(p.id)
         if (buff) {
           const name = BUFF_NAMES[p.buff]
           if (name === 'none') buff.style.display = 'none'
@@ -88,21 +110,28 @@ export function Hud() {
             buff.style.opacity = String(0.5 + 0.5 * Math.min(1, p.buffT / BUFF_DURATION[name]))
           }
         }
-        const crew = crewRefs.current[p.seat]
-        if (crew) crew.style.boxShadow = p.fart ? `0 0 0 4px ${SEAT_COLORS[p.seat]}` : ''
+        const crew = crewRefs.current.get(p.id)
+        if (crew) crew.style.boxShadow = p.fart ? `0 0 0 4px ${seatColor(p.seat)}` : ''
       }
     }
     loop()
     return () => cancelAnimationFrame(raf)
-  }, [course])
+  }, [course, session, localIds.join(',')])
 
   if (!course || !session) return null
   const localPlayers = session.localPlayers.flatMap((lp) => {
     const entry = roster.find((r) => r.id === lp.id)
-    return entry ? [{ id: lp.id, entry }] : []
+    return entry && entry.raft !== null ? [{ id: lp.id, entry }] : []
   })
+  const benched = race && !session.spectating && localPlayers.length === 0
   const span = course.finishS - course.startS
   const online = session.kind === 'online'
+  const setRef = <T,>(map: Map<number, T>, id: number) => (el: T | null) => {
+    if (el) map.set(id, el)
+    else map.delete(id)
+  }
+  // After a race, the lobby comes back once the results have had their turn.
+  const lobby = race && (phase === 'pond' || (phase === 'finished' && overlay === null && resultsSeen))
 
   return (
     <div className="safe-area pointer-events-none select-none">
@@ -114,18 +143,38 @@ export function Hud() {
           ))}
           <Icon name="flag" size={26} className="absolute -left-3 top-1/2 -translate-y-[60%]" />
           <Icon name="finishFlag" size={26} className="absolute -right-4 top-1/2 -translate-y-[60%]" />
+          {Array.from({ length: MAX_RAFTS }, (_, r) => (
+            <div
+              key={r}
+              ref={(d) => {
+                rivalRefs.current[r] = d
+              }}
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[left] duration-150"
+              style={{ display: 'none' }}
+            >
+              <TeamBadge raft={r} size={short ? 16 : 18} />
+            </div>
+          ))}
           <div ref={markerRef} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[left] duration-150">
             <Icon name="hippo" size={30} />
           </div>
         </div>
         {!short && (
-          <div className="mt-2 flex flex-col items-center">
-            <div ref={timerRef} className="chip px-4 py-0.5 font-display text-2xl tabular-nums">
-              00:00.00
+          <div className="mt-2 flex flex-col items-center gap-1.5">
+            <div className={`chip flex items-center gap-2.5 py-0.5 pr-4 font-display text-2xl tabular-nums ${race ? 'pl-1' : 'pl-4'}`}>
+              <PlaceChip session={session} short={false} />
+              <div ref={timerRef}>00:00.00</div>
             </div>
-            <div className="font-display stroke-text mt-1 text-sm tracking-wider text-white" style={{ WebkitTextStrokeWidth: 4 }}>
+            <div className="font-display stroke-text text-sm tracking-wider text-white" style={{ WebkitTextStrokeWidth: 4 }}>
               {course.def.name.toUpperCase()}
+              {race && ' · RACE'}
             </div>
+            <ClosingChip session={session} />
+          </div>
+        )}
+        {short && (
+          <div className="mt-1.5 flex justify-center">
+            <ClosingChip session={session} />
           </div>
         )}
       </div>
@@ -134,7 +183,8 @@ export function Hud() {
         <div className="chip flex items-center gap-2 px-3 py-1 font-display text-2xl short:text-xl">
           {short && (
             <>
-              <Icon name="clock" size="0.95em" />
+              <PlaceChip session={session} short />
+              {!race && <Icon name="clock" size="0.95em" />}
               <span ref={timerRef} className="tabular-nums">
                 00:00.0
               </span>
@@ -155,62 +205,40 @@ export function Hud() {
       </div>
 
       <div className="absolute left-3 top-3 flex flex-col gap-2">
-        {localPlayers.map(({ id, entry }) => {
-          const seat = entry.seat
-          return (
-            <div key={id} className="flex items-center gap-2">
-              <div
-                ref={(d) => {
-                  meterWrapRefs.current[seat] = d
-                }}
-                className="chip flex items-center gap-2 py-1 pl-2 pr-1"
-              >
-                <span className="font-display text-sm" style={{ color: SEAT_COLORS[seat], WebkitTextStroke: '0.5px var(--color-ink)' }}>
-                  {localPlayers.length > 1 ? entry.name : 'GAS'}
+        {localPlayers.map(({ id, entry }) => (
+          <div key={id} className="flex items-center gap-2">
+            <div ref={setRef(meterWrapRefs.current, id)} className="chip flex items-center gap-2 py-1 pl-2 pr-1">
+              <span className="font-display text-sm" style={{ color: seatColor(entry.seat), WebkitTextStroke: '0.5px var(--color-ink)' }}>
+                {localPlayers.length > 1 ? entry.name : 'GAS'}
+              </span>
+              <div className="relative h-4 w-36 overflow-hidden rounded-full border-2 border-ink bg-ink/10">
+                <div ref={setRef(meterRefs.current, id)} className="h-full rounded-full transition-[width] duration-75" style={{ width: '100%', background: seatColor(entry.seat) }} />
+                <span
+                  ref={setRef(emptyRefs.current, id)}
+                  className="font-display absolute inset-0 hidden items-center justify-center text-[11px] leading-none tracking-[0.2em] text-ink"
+                >
+                  EMPTY
                 </span>
-                <div className="relative h-4 w-36 overflow-hidden rounded-full border-2 border-ink bg-ink/10">
-                  <div
-                    ref={(d) => {
-                      meterRefs.current[seat] = d
-                    }}
-                    className="h-full rounded-full transition-[width] duration-75"
-                    style={{ width: '100%', background: SEAT_COLORS[seat] }}
-                  />
-                  <span
-                    ref={(d) => {
-                      emptyRefs.current[seat] = d
-                    }}
-                    className="font-display absolute inset-0 hidden items-center justify-center text-[11px] leading-none tracking-[0.2em] text-ink"
-                  >
-                    EMPTY
-                  </span>
-                </div>
               </div>
-              <div
-                ref={(d) => {
-                  buffRefs.current[seat] = d
-                }}
-                className="chip hidden items-center px-2 py-0.5 font-display text-sm"
-              />
             </div>
-          )
-        })}
+            <div ref={setRef(buffRefs.current, id)} className="chip hidden items-center px-2 py-0.5 font-display text-sm" />
+          </div>
+        ))}
+        {benched && (
+          <div className="chip flex items-center gap-1.5 px-3 py-1 font-display text-base">
+            <Icon name="eye" size="1.2em" /> ON THE BENCH
+          </div>
+        )}
       </div>
 
-      {roster.length > 1 && (
+      {!race && roster.length > 1 && (
         <div className={`absolute right-3 flex flex-col items-end gap-1.5 ${isTouch ? 'top-[104px] short:hidden' : 'bottom-3'}`}>
           {[...roster]
             .sort((a, b) => a.seat - b.seat)
-            .slice(0, MAX_PLAYERS)
+            .slice(0, CREW_SIZE)
             .map((p) => (
-              <div
-                key={p.id}
-                ref={(d) => {
-                  crewRefs.current[p.seat] = d
-                }}
-                className="chip flex items-center gap-2 px-3 py-0.5 font-display text-sm transition-shadow"
-              >
-                <Icon name="hippo" size={20} style={{ ['--hippo' as string]: SEAT_COLORS[p.seat] }} />
+              <div key={p.id} ref={setRef(crewRefs.current, p.id)} className="chip flex items-center gap-2 px-3 py-0.5 font-display text-sm transition-shadow">
+                <Icon name="hippo" size={20} style={{ ['--hippo' as string]: seatColor(p.seat) }} />
                 <span className={p.away ? 'text-ink/40' : undefined}>{p.name}</span>
                 {online && p.host && <Icon name="crown" size={18} label="Host" />}
                 {p.away ? <span className="text-ink/50">(reconnecting)</span> : localIds.includes(p.id) && <span className="text-ink/50">(you)</span>}
@@ -218,19 +246,23 @@ export function Hud() {
             ))}
         </div>
       )}
+      {race && !isTouch && <MiniStandings session={session} />}
 
       <div className={`pointer-events-auto absolute left-3 z-20 flex gap-2 ${isTouch ? 'top-[58px] max-[620px]:top-[112px]' : 'bottom-3'}`}>
         <button tabIndex={-1} className="btn btn-cream px-3 py-1 text-sm" onClick={() => (audio.click(), setOverlay('pause'))}>
           {!isTouch && <span className="kbd mr-1">Esc</span>} Menu
         </button>
-        {!session.spectating && (
+        {!session.spectating && !benched && (
           <button tabIndex={-1} className="btn btn-cream px-3 py-1 text-sm" onClick={() => session.respawn()}>
             {!isTouch && <span className="kbd mr-1">R</span>} Respawn
           </button>
         )}
       </div>
 
-      {phase === 'pond' && !session.spectating && <PondHint localCount={localPlayers.length} localIds={localIds} />}
+      {!race && phase === 'pond' && !session.spectating && <PondHint localCount={localPlayers.length} localIds={localIds} />}
+      {lobby && <RaceLobby session={session} short={short} />}
+      {race && <Countdown />}
+      {race && <WatchBar session={session} short={short} />}
     </div>
   )
 }

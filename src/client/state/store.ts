@@ -5,7 +5,8 @@ import type { IconName } from '../ui/icons'
 import type { FinishOutcome } from './progress'
 
 type Screen = 'menu' | 'local-lobby' | 'game' | 'hippocam'
-type Overlay = null | 'pause' | 'settings' | 'howto' | 'results' | 'levels'
+/** `crews`: pick a raft and spot in a race room; `join`: the sheet a newcomer on the bench gets. */
+type Overlay = null | 'pause' | 'settings' | 'howto' | 'results' | 'levels' | 'crews' | 'join'
 type LevelMode = 'solo' | 'online'
 type ChatPanel = null | 'quick' | 'type'
 

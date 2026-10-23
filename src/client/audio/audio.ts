@@ -115,7 +115,8 @@ class AudioEngine {
     return p
   }
 
-  fartStart(key: string, seat: number, opts: { pan?: number; kind?: 'normal' | 'chili' } = {}) {
+  /** `gain` scales the voice, for rival rafts further off. */
+  fartStart(key: string, seat: number, opts: { pan?: number; kind?: 'normal' | 'chili'; gain?: number } = {}) {
     const ctx = this.ctx
     if (!ctx || this.voices.has(key)) return
     const t = ctx.currentTime
@@ -131,7 +132,7 @@ class AudioEngine {
 
     const env = ctx.createGain()
     env.gain.setValueAtTime(0, t)
-    env.gain.linearRampToValueAtTime(squeaky ? 0.22 : 0.34, t + 0.025)
+    env.gain.linearRampToValueAtTime((squeaky ? 0.22 : 0.34) * (opts.gain ?? 1), t + 0.025)
 
     const flutter = ctx.createGain()
     flutter.gain.value = 0.6
@@ -488,6 +489,12 @@ class AudioEngine {
       o.stop(t + 0.65)
       o2.stop(t + 0.65)
     })
+  }
+
+  /** One beat of the race countdown; `go` for the last, higher one. */
+  countdown(go: boolean) {
+    if (go) this.bell([784, 1046.5, 1568], 0.03, 0.2, 'square')
+    else this.bell([523.3], 0, 0.18, 'square')
   }
 
   checkpoint() {

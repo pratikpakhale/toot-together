@@ -8,7 +8,7 @@ SHOTS.forEach((shot, n) => {
   const seeds = seedArgs.length ? seedArgs.map(Number) : [shot.seed]
   for (const seed of seeds) {
     const sim = prime({ ...shot, seed })
-    const s0 = sim.raft.s
+    const s0 = sim.rafts[0].s
     const log: string[] = []
     for (let i = 0; i < shotSteps(shot); i++) {
       steer(shot, sim, i * DT)
@@ -19,6 +19,6 @@ SHOTS.forEach((shot, n) => {
         log.push(`${(i * DT).toFixed(2)} ${e.type} ${extra}`)
       }
     }
-    console.log(`#${n} ${shot.name} (${shot.course}) seed=${seed} s ${s0.toFixed(0)}→${sim.raft.s.toFixed(0)} phase=${sim.phase}\n  ${log.join('\n  ')}`)
+    console.log(`#${n} ${shot.name} (${shot.course}) seed=${seed} s ${s0.toFixed(0)}→${sim.rafts[0].s.toFixed(0)} phase=${sim.phase}\n  ${log.join('\n  ')}`)
   }
 })

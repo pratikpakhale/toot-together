@@ -2,7 +2,8 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { EDGE_CODE, nearestSampleAt, pointAt, type BakedCourse } from '../../sim/track'
-import { frame } from '../game/frame'
+import { RAFT_RESULT } from '../../sim/types'
+import { frame, isRace } from '../game/frame'
 import { CHASE_CAM_HEIGHT } from './CameraRig'
 import { toon } from './materials'
 import { themeFor } from './themes'
@@ -108,8 +109,9 @@ function Gate({ course, kind, s, index }: { course: BakedCourse; kind: GateKind;
 
   useFrame((_, dt) => {
     const v = frame.view
-    if (!v || kind === 'start') return
-    const reached = kind === 'finish' ? v.phase === 'finished' : v.cp >= index && v.phase !== 'pond'
+    const r = v?.rafts[frame.follow]
+    if (!v || !r || kind === 'start') return
+    const reached = kind === 'finish' ? r.res === RAFT_RESULT.finished : r.cp >= index && (v.phase === 'racing' || v.phase === 'finished')
     if (reached !== reachedRef.current) {
       reachedRef.current = reached
       drawSign(canvas, kind, reached)
@@ -166,6 +168,33 @@ function Gate({ course, kind, s, index }: { course: BakedCourse; kind: GateKind;
         ))}
       </group>
       {kind !== 'start' && <GateLine hw={hw} finish={kind === 'finish'} />}
+      {kind === 'start' && <StartBoom halfWidth={postZ} />}
+    </group>
+  )
+}
+
+const BOOM_SEGMENT = 1.1
+const BOOM_OPEN = 1.35
+
+/** Race rooms: a striped boom across the start that stays down until GO. */
+function StartBoom({ halfWidth }: { halfWidth: number }) {
+  const pivot = useRef<THREE.Group>(null!)
+  const segments = Math.ceil((halfWidth * 2) / BOOM_SEGMENT)
+  const length = (halfWidth * 2) / segments
+  useFrame((_, dt) => {
+    const v = frame.view
+    const race = !!v && isRace(v)
+    const down = race && (v.phase === 'pond' || v.phase === 'countdown')
+    pivot.current.visible = race
+    pivot.current.rotation.x = THREE.MathUtils.damp(pivot.current.rotation.x, down ? 0 : -BOOM_OPEN, 5, Math.min(dt, 0.05))
+  })
+  return (
+    <group ref={pivot} position={[0, 1.3, -halfWidth]} visible={false}>
+      {Array.from({ length: segments }, (_, k) => (
+        <mesh key={k} position={[0, 0, (k + 0.5) * length]} rotation={[Math.PI / 2, 0, 0]} material={toon(k % 2 ? '#ffffff' : '#ff4b4b')}>
+          <cylinderGeometry args={[0.16, 0.16, length, 8]} />
+        </mesh>
+      ))}
     </group>
   )
 }

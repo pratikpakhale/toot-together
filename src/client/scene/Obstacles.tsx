@@ -19,7 +19,7 @@ import {
 } from '../../sim/obstacles'
 import type { BakedCourse, BakedItem, ItemDef } from '../../sim/track'
 import { audio } from '../audio/audio'
-import { frame } from '../game/frame'
+import { crewed, frame } from '../game/frame'
 import { CHASE_CAM_HEIGHT } from './CameraRig'
 import { PALETTE, toon, toonGradient } from './materials'
 import { BlobShadow } from './shadow'
@@ -33,8 +33,9 @@ const PISTON_RISE = CHASE_CAM_HEIGHT - PISTON_HEAD_LEN - PISTON_REST_Y - 0.65
 
 const simTime = () => frame.view?.t ?? 0
 
+/** Whether the raft on camera is close enough to hear `item`. */
 function nearRaft(item: BakedItem) {
-  const r = frame.view?.raft
+  const r = frame.view?.rafts[frame.follow]
   return !!r && Math.hypot(r.x - item.x, r.z - item.z) < 22
 }
 
@@ -397,11 +398,11 @@ function Bumper({ def, item }: { def: Def<'bumper'>; item: BakedItem }) {
   const squash = useRef(0)
   const wasClose = useRef(false)
   useFrame((_, dt) => {
-    const raft = frame.view?.raft
-    if (raft) {
+    const v = frame.view
+    if (v) {
       const wx = item.x - item.hz * def.d
       const wz = item.z + item.hx * def.d
-      const close = Math.hypot(raft.x - wx, raft.z - wz) < r + 1.85
+      const close = v.rafts.some((raft, i) => crewed(v, i) && Math.hypot(raft.x - wx, raft.z - wz) < r + 1.85)
       if (close && !wasClose.current) squash.current = 1
       wasClose.current = close
     }

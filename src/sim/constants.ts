@@ -1,7 +1,10 @@
 const TICK_RATE = 60
 export const DT = 1 / TICK_RATE
 export const SNAPSHOT_EVERY = 1
-export const MAX_PLAYERS = 4
+/** Hippos on one raft. */
+export const CREW_SIZE = 4
+/** Rafts racing down one river. One raft is co-op. */
+export const MAX_RAFTS = 4
 
 export const RAFT_RADIUS = 1.55
 
@@ -48,5 +51,23 @@ export const PICKUP_RESPAWN = 22
 export const BUFF_DURATION = { beans: 6, chili: 6, prune: 5.5 } as const
 export const LEGENDARY_CHANCE = 1 / 160
 export const LEGENDARY_COOLDOWN = 45
+
+/** Race rooms: seconds of 3·2·1 before the start gate opens. */
+export const COUNTDOWN = 3
+/** Race rooms: seconds the others get to finish after the first raft does. */
+export const CLOSING_TIME = 30
+
+/** A tooting hippo's plume shoves rival rafts behind its butt, up to this far (m). */
+export const GAS_RANGE = 4.5
+/** Push (m/s²) at the butt, fading to nothing at `GAS_RANGE`. Weaker than a crew's own push. */
+export const GAS_PUSH = 9
+/** The plume's half width: this much at the butt, widening by `GAS_CONE_SLOPE` per metre. */
+export const GAS_CONE_BASE = 1.2
+export const GAS_CONE_SLOPE = 0.6
+/** Share of a burst's kick that lands on a rival raft in the plume. */
+export const BURST_RIVAL = 0.7
+/** A raft that dies this soon after a rival shoved it is that rival's kill. */
+export const SNIPE_WINDOW = 1.5
+export const RAFT_RESTITUTION = 0.6
 
 export const crewScale = (n: number) => (n <= 1 ? 1.45 : 1.75 / Math.sqrt(n))

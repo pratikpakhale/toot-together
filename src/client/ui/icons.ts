@@ -368,6 +368,16 @@ export const ICONS = {
     `<path d="M14 19C22 6 42 6 50 17" fill="none" stroke="${INK}" stroke-width="11"/><path d="M14 19C22 6 42 6 50 17" fill="none" stroke="#ffcf3f" stroke-width="5"/>` +
     `<path d="M41 17.5l13 5 1-13.5z" fill="#ffcf3f" ${O3}/>` +
     shine(14, 31, 3, 1.4, -10, 0.7),
+
+  // Race rafts: a shape each, so they tell apart without colour.
+  teamRed: `<path d="M32 7L58 54H6z" fill="#ff5d5d" stroke="${INK}" stroke-width="5"/>` + shine(26, 30, 3, 7, 30),
+  teamYellow: `<circle cx="32" cy="32" r="24" fill="#ffc53d" stroke="${INK}" stroke-width="5"/>` + shine(23, 22, 4, 7, 40),
+  teamTeal: `<rect x="9" y="9" width="46" height="46" rx="8" fill="#1fbfae" stroke="${INK}" stroke-width="5"/>` + shine(20, 20, 3.5, 7, 45),
+  teamPink: `<path d="M32 4L60 32 32 60 4 32z" fill="#f25fd0" stroke="${INK}" stroke-width="5"/>` + shine(24, 24, 3, 7, 45),
+
+  target:
+    `<circle cx="32" cy="32" r="24" fill="#fff8ec" ${O}/><circle cx="32" cy="32" r="15" fill="#ff5b8a" ${O3}/><circle cx="32" cy="32" r="6" fill="#fff8ec" ${O3}/>` +
+    `<path d="M32 2v12M32 50v12M2 32h12M50 32h12" stroke="${INK}" stroke-width="5"/>`,
 } satisfies Record<string, string>
 
 export type IconName = keyof typeof ICONS

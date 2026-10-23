@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHAT_LIMIT, MAX_CHAT_LENGTH, MAX_NAME_LENGTH, sanitizeChat, sanitizeName } from '../src/sim/protocol'
+import { CHAT_LIMIT, MAX_CHAT_LENGTH, MAX_NAME_LENGTH, PROTOCOL_VERSION, sanitizeChat, sanitizeName } from '../src/sim/protocol'
 import { connect, freePort, startServer } from './server'
 
 describe('chat text', () => {
@@ -28,11 +28,11 @@ describe('chat in a room', { timeout: 20_000 }, () => {
     await startServer(port)
 
     const alice = await connect(port)
-    alice.send({ type: 'join', name: 'Alice' })
+    alice.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Alice' })
     const { room, id } = await alice.next('welcome')
     expect((await alice.next('chat')).history).toBe(true)
     const bob = await connect(port)
-    bob.send({ type: 'join', name: 'Bob', room })
+    bob.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Bob', room })
     await bob.next('welcome')
 
     alice.send({ type: 'chat', text: '  LEFT!   now ' })
@@ -51,13 +51,13 @@ describe('chat in a room', { timeout: 20_000 }, () => {
     expect(live).toHaveLength(CHAT_LIMIT)
 
     const carol = await connect(port)
-    carol.send({ type: 'join', name: 'Carol', room })
+    carol.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Carol', room })
     const history = await carol.next('chat')
     expect(history.history).toBe(true)
     expect(history.lines.map((l) => l.text)).toEqual(live)
 
     const spy = await connect(port)
-    spy.send({ type: 'watch', room })
+    spy.send({ type: 'watch', v: PROTOCOL_VERSION, room })
     expect((await spy.next('chat')).lines).toHaveLength(CHAT_LIMIT)
     spy.send({ type: 'chat', text: 'boo' })
     carol.send({ type: 'chat', text: 'hi all' })

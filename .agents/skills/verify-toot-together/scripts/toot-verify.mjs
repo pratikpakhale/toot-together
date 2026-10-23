@@ -14,6 +14,8 @@ const DEFAULT_WEB_PORT = 5273
 const DEFAULT_SERVER_PORT = 2667
 
 const { WebSocket } = await import(pathToFileURL(join(REPO, 'node_modules/ws/wrapper.mjs')).href)
+const { tsImport } = await import(pathToFileURL(join(REPO, 'node_modules/tsx/dist/esm/api/index.mjs')).href)
+const { PROTOCOL_VERSION } = await tsImport(join(REPO, 'src/sim/protocol.ts'), import.meta.url)
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -205,7 +207,7 @@ async function doctor() {
   }
   try {
     const before = (await (await fetch(`${s.server.url}/health`)).json()).sockets
-    const { msg, ws } = await wsAsk(`ws://127.0.0.1:${s.web.port}/ws`, { type: 'watch' }, (m) => m.type === 'rooms')
+    const { msg, ws } = await wsAsk(`ws://127.0.0.1:${s.web.port}/ws`, { type: 'watch', v: PROTOCOL_VERSION }, (m) => m.type === 'rooms')
     const during = (await (await fetch(`${s.server.url}/health`)).json()).sockets
     ws.close()
     check(during > before, `vite /ws proxy reaches our room server`, `room list has ${msg.rooms.length} room(s); our server sockets ${before} -> ${during}`)
@@ -237,27 +239,62 @@ async function bot(o) {
     if (out) appendFileSync(out, `${line}\n`)
   }
   const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`)
+  const send = (msg, quiet = false) => {
+    ws.send(JSON.stringify(msg))
+    if (!quiet) log({ sent: msg })
+  }
+  const drive = !!o.drive
+  const course = drive ? (await tsImport(join(REPO, 'src/sim/courses.ts'), import.meta.url)).getCourse : null
+  const botInput = drive ? (await tsImport(join(REPO, 'src/sim/bot.ts'), import.meta.url)).botInput : null
   let welcomed = false
+  let me = null
+  let courseId = String(o.course ?? 'lazy-river')
+  let ready = false
+  let readySentAt = 0
   ws.on('message', (raw) => {
     const msg = JSON.parse(String(raw))
-    if (msg.type === 'snap' || msg.type === 'events' || msg.type === 'pong') return
     if (msg.type === 'welcome') {
       welcomed = true
+      me = msg.id
+      if (msg.course) courseId = msg.course
       delete msg.token
     }
+    if (msg.type === 'course') courseId = msg.course
+    if (msg.type === 'roster') ready = !!msg.players.find((p) => p.id === me)?.ready
+    if (msg.type === 'snap') return onSnap(msg.s)
+    if (msg.type === 'events' || msg.type === 'pong') return
     log({ recv: msg })
   })
+  // --ready: say ready whenever the room is between races. --drive: steer with the game's own test bot,
+  // fed a stand-in for the sim built from each snapshot (all it reads: the rafts, this hippo, the clock).
+  function onSnap(s) {
+    const p = s.players.find((pl) => pl.id === me)
+    if (o.ready && p && !ready && (s.phase === 'pond' || s.phase === 'finished') && Date.now() - readySentAt > 1000) {
+      readySentAt = Date.now()
+      send({ type: 'ready', on: true })
+    }
+    if (!drive || !p) return
+    const mirror = {
+      course: course(courseId),
+      t: s.t,
+      rafts: s.rafts.map((r) => ({ ...r, index: r.i })),
+      players: new Map([[me, { raft: p.raft, rim: p.rim }]]),
+    }
+    const input = botInput(mirror, me)
+    send({ type: 'input', ...input, fart: input.fart && s.phase !== 'countdown' }, true)
+  }
   ws.on('close', (code) => log({ closed: code }))
   await new Promise((r, j) => (ws.once('open', r), ws.once('error', j)))
-  const join = o.create ? { type: 'join', name, course: String(o.course ?? 'lazy-river') } : { type: 'join', name, room: String(o.room) }
-  ws.send(JSON.stringify(join))
-  log({ sent: join })
+  const hello = o.create
+    ? { type: 'join', v: PROTOCOL_VERSION, name, course: courseId, ...(o.rafts ? { rafts: Number(o.rafts) } : {}) }
+    : { type: 'join', v: PROTOCOL_VERSION, name, room: String(o.room) }
+  send(hello)
   await waitFor(() => welcomed || ws.readyState !== WebSocket.OPEN, 5000, 'welcome')
   if (!welcomed) process.exit(2)
+  if (o.pick !== undefined) send({ type: 'pick', raft: o.pick === 'bench' ? null : Number(o.pick) })
   for (const text of o.say) {
     await sleep(Number(o.gap ?? 600))
-    ws.send(JSON.stringify({ type: 'chat', text }))
-    log({ sent: { type: 'chat', text } })
+    send({ type: 'chat', text })
   }
   await sleep(stay * 1000)
   ws.close()
@@ -301,10 +338,13 @@ const USAGE = `usage: toot-verify <command>
   up [--web-port N] [--server-port N]   start the room server and vite on free ports (defaults ${DEFAULT_SERVER_PORT}, ${DEFAULT_WEB_PORT}), then run doctor
   doctor                                read-only health check of the current run
   status                                print the current run's ports, PIDs, logs and evidence folder as JSON
-  bot --name N (--room CODE | --create [--course lazy-river])
+  bot --name N (--room CODE | --create [--course lazy-river] [--rafts N])
+      [--pick RAFT|bench] [--ready] [--drive]
       [--say TEXT]... [--gap MS] [--stay S] [--out FILE] [--via server] [--port N]
                                         a headless player: says each --say line --gap ms apart (600), stays --stay s (20),
-                                        logs messages as JSON lines (and appends to --out); --via server skips the vite proxy
+                                        logs messages as JSON lines (and appends to --out); --via server skips the vite proxy.
+                                        Race rooms: --pick hops on a raft, --ready readies up between races,
+                                        --drive steers down the river like the game's test bots
   down                                  stop the run's process groups and keep its evidence`
 
 const o = args(process.argv.slice(2))

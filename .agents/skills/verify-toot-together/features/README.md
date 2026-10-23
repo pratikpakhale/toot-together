@@ -37,4 +37,5 @@ Each feature file starts with an H1 and one paragraph on the user-visible behavi
 | Online rooms: create, join, invite link, reconnect | [online-rooms.md](./online-rooms.md) | create + invite-link join exercised as part of the chat proof; join-by-code, reload reconnect and errors not yet run |
 | Solo run | [solo-run.md](./solo-run.md) | not yet run |
 | Couch party lobby | [couch-party.md](./couch-party.md) | not yet run |
+| Raft racing: river picker, join sheet, lobby, crews, countdown, race HUD, closing, results, rematch | [race.md](./race.md) | 2026-10-24, R1–R10 on desktop 1280×720 and phone 844×390 (runs `2026-10-23T20-02-00-892`, `2026-10-23T20-06-12-387`) |
 | Hippocam spectator page | [hippocam.md](./hippocam.md) | room list with two rooms seen 2026-10-23 (run `2026-10-23T10-38-39-617`); Watch/Back/closed not yet run |

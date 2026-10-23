@@ -32,8 +32,8 @@ const itemS = (c: BakedCourse, kind: string, nth = 0) => c.items.filter((i) => i
 
 function aimTowards(sim: Sim, d: number) {
   const c = sim.course
-  const here = pointAt(c, sim.raft.s + 1.5, d)
-  return Math.atan2(here.z - sim.raft.z, here.x - sim.raft.x)
+  const here = pointAt(c, sim.rafts[0].s + 1.5, d)
+  return Math.atan2(here.z - sim.rafts[0].z, here.x - sim.rafts[0].x)
 }
 
 const lazy = getCourse('lazy-river')
@@ -45,7 +45,7 @@ export const SHOTS: Shot[] = [
     name: 'Over the START line',
     course: 'lazy-river',
     seed: 11,
-    startWhen: (sim) => sim.raft.s >= lazy.startS - 13,
+    startWhen: (sim) => sim.rafts[0].s >= lazy.startS - 13,
     seconds: 12,
     caption: { text: 'STEER TOGETHER', at: 0.4, color: '#7fe3ff' },
     chat: [{ at: 0.6, seat: 0, text: 'Sab ready? 🦛' }],
@@ -54,7 +54,7 @@ export const SHOTS: Shot[] = [
     name: 'Spinner plaza',
     course: 'canyon-run',
     seed: 23,
-    startWhen: (sim) => sim.raft.s >= itemS(canyon, 'spinner') - 17,
+    startWhen: (sim) => sim.rafts[0].s >= itemS(canyon, 'spinner') - 17,
     seconds: 13,
     highlight: [1.6, 4.6],
     caption: { text: 'TOOT TOGETHER', at: 0.4, color: '#a6e84a' },
@@ -64,7 +64,7 @@ export const SHOTS: Shot[] = [
     name: 'Crusher canyon',
     course: 'canyon-run',
     seed: 31,
-    startWhen: (sim) => sim.raft.s >= itemS(canyon, 'crusher') - 16,
+    startWhen: (sim) => sim.rafts[0].s >= itemS(canyon, 'crusher') - 16,
     seconds: 12,
     chat: [{ at: 2.5, seat: 3, text: 'Bhai crusher!! 😱' }],
   },
@@ -72,7 +72,7 @@ export const SHOTS: Shot[] = [
     name: 'Kabir has one job',
     course: 'volcano-peak',
     seed: 47,
-    startWhen: (sim) => sim.raft.s >= volcano.startS + 6,
+    startWhen: (sim) => sim.rafts[0].s >= volcano.startS + 6,
     seconds: 11,
     highlight: [1, 4.6],
     caption: { text: 'BLAME EACH OTHER', at: 0.4, color: '#ff6b6b' },
@@ -90,7 +90,7 @@ export const SHOTS: Shot[] = [
     name: 'Caldera finale',
     course: 'volcano-peak',
     seed: 88,
-    startWhen: (sim) => sim.raft.s >= volcano.finishS - 32,
+    startWhen: (sim) => sim.rafts[0].s >= volcano.finishS - 32,
     seconds: 12,
     highlight: [7.8, 10],
     everyoneToots: true,

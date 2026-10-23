@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MAX_PLAYERS } from '../../sim/constants'
+import { CREW_SIZE } from '../../sim/constants'
 import { audio } from '../audio/audio'
 import { selectLevel, startLocal } from '../game/controller'
 import { useProgress } from '../state/progress'
@@ -47,7 +47,7 @@ export function LocalLobby() {
           return
         }
         if (action !== 'confirm' || device === 'any' || device === 'touch') return
-        if (list.includes(device) || list.length >= MAX_PLAYERS) return
+        if (list.includes(device) || list.length >= CREW_SIZE) return
         audio.unlock()
         audio.burst(list.length)
         const next = [...list, device]
@@ -73,7 +73,7 @@ export function LocalLobby() {
           )}
         </p>
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 short:mt-3">
-          {Array.from({ length: MAX_PLAYERS }, (_, i) => {
+          {Array.from({ length: CREW_SIZE }, (_, i) => {
             const d = devices[i]
             return (
               <div

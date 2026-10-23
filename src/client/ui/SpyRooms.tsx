@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
+import { MAX_RAFTS } from '../../sim/constants'
 import { COURSES } from '../../sim/courses'
-import type { RoomSummary, ServerMsg, ServerStats } from '../../sim/protocol'
+import { PROTOCOL_VERSION, type RoomSummary, type ServerMsg, type ServerStats } from '../../sim/protocol'
 import { audio } from '../audio/audio'
 import { showMenu, watchRoom } from '../game/controller'
-import { SEAT_COLORS } from '../game/frame'
+import { seatColor, TEAMS } from '../game/frame'
 import { formatTime } from './format'
 import { Icon } from './Icon'
+import { TeamBadge } from './Race'
 
 type Feed =
   | { status: 'connecting' }
@@ -20,7 +22,7 @@ function useRoomFeed(): Feed {
     let stopped = false
     const connect = () => {
       ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
-      ws.onopen = () => ws.send(JSON.stringify({ type: 'watch' }))
+      ws.onopen = () => ws.send(JSON.stringify({ type: 'watch', v: PROTOCOL_VERSION }))
       ws.onmessage = (e) => {
         const msg = JSON.parse(String(e.data)) as ServerMsg
         if (msg.type === 'rooms') setFeed({ status: 'live', rooms: msg.rooms, server: msg.server, stale: false })
@@ -45,7 +47,7 @@ function useRoomFeed(): Feed {
   return feed
 }
 
-const PHASE_ORDER = { racing: 0, pond: 1, finished: 2 } as const
+const PHASE_ORDER = { racing: 0, countdown: 1, pond: 2, finished: 3 } as const
 
 function duration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -136,17 +138,30 @@ function RoomCard({ room }: { room: RoomSummary }) {
   const course = COURSES[room.course]
   const phase = room.idle !== null ? `EMPTY ${room.idle}s` : room.phase === 'pond' ? 'IN THE POND' : room.phase.toUpperCase()
   const phaseColor = room.idle !== null ? 'bg-ink/15' : room.phase === 'racing' ? 'bg-toot' : room.phase === 'finished' ? 'bg-gold' : 'bg-[#7fd0ff]'
+  const race = room.rafts > 1
+  const lead = Math.max(0, ...room.progress.map((p) => p ?? 0))
   return (
     <div className="panel pointer-events-auto flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
         <span className="font-display text-3xl tracking-[0.2em]">{room.code}</span>
         <span className={`ml-auto rounded-full border-2 border-ink px-2.5 py-0.5 text-xs font-extrabold ${phaseColor}`}>{phase}</span>
       </div>
-      <div className="font-display -mt-2 text-lg text-ink/70">{course?.name ?? room.course}</div>
+      <div className="font-display -mt-2 text-lg text-ink/70">
+        {course?.name ?? room.course}
+        {race && ` · Race · ${room.rafts} rafts`}
+      </div>
 
       <div className="relative h-4 rounded-full border-[3px] border-ink bg-white">
-        <div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-toot to-grass" style={{ width: `${room.progress * 100}%` }} />
-        <Icon name="hippo" size={24} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ left: `${room.progress * 100}%` }} />
+        <div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-toot to-grass" style={{ width: `${lead * 100}%` }} />
+        {race ? (
+          room.progress.map((p, r) =>
+            p === null ? null : (
+              <Icon key={r} name={TEAMS[r].icon} size={18} label={`${TEAMS[r].name} raft`} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ left: `${p * 100}%` }} />
+            ),
+          )
+        ) : (
+          <Icon name="hippo" size={24} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ left: `${lead * 100}%` }} />
+        )}
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-extrabold text-ink/75">
@@ -163,15 +178,18 @@ function RoomCard({ room }: { room: RoomSummary }) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        {room.players.map((p) => (
-          <div key={p.id} className={`flex items-center gap-2 ${p.away ? 'opacity-45' : ''}`}>
-            <span className="name-tag max-w-[60%] truncate !text-sm" style={{ ['--tag' as string]: SEAT_COLORS[p.seat] }}>
-              {p.name}
-            </span>
-            {p.host && <Icon name="crown" size={18} label="Host" />}
-            <span className="ml-auto text-xs font-extrabold tabular-nums text-ink/55">{p.away ? 'away' : p.ping === null ? '…' : `${p.ping} ms`}</span>
-          </div>
-        ))}
+        {[...room.players]
+          .sort((a, b) => (a.raft ?? MAX_RAFTS) - (b.raft ?? MAX_RAFTS) || a.ord - b.ord)
+          .map((p) => (
+            <div key={p.id} className={`flex items-center gap-2 ${p.away ? 'opacity-45' : ''}`}>
+              {race && (p.raft === null ? <span className="w-[18px] text-center text-xs font-extrabold text-ink/40">–</span> : <TeamBadge raft={p.raft} size={18} />)}
+              <span className="name-tag max-w-[60%] truncate !text-sm" style={{ ['--tag' as string]: seatColor(p.seat) }}>
+                {p.name}
+              </span>
+              {p.host && <Icon name="crown" size={18} label="Host" />}
+              <span className="ml-auto text-xs font-extrabold tabular-nums text-ink/55">{p.away ? 'away' : p.ping === null ? '…' : `${p.ping} ms`}</span>
+            </div>
+          ))}
       </div>
 
       <button

@@ -55,6 +55,15 @@ const CARDS: { icon: IconName; title: string; body: ReactNode }[] = [
     body: <>Eight rivers, each wilder than the last. Finish one to unlock the next, and beat the clock for bronze, silver and gold.</>,
   },
   {
+    icon: 'flag',
+    title: 'Racing',
+    body: (
+      <>
+        Online, a room can race 2–4 rafts. Pick a raft and a spot, press <span className="kbd">Y</span> when you're ready, and the start gate drops on GO. Bump rivals, toot them into trouble, and get there first.
+      </>
+    ),
+  },
+  {
     icon: 'spikes',
     title: 'Spikes pop, edges drop',
     body: <>Anything spiky pops the raft. No walls? Don't fall off. You respawn at the last checkpoint — and the game remembers who caused it.</>,

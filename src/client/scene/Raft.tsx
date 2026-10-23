@@ -1,15 +1,16 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { MAX_PLAYERS } from '../../sim/constants'
+import { CREW_SIZE, MAX_RAFTS } from '../../sim/constants'
 import { rimSector } from '../../sim/sectors'
 import { pointAt, type BakedCourse } from '../../sim/track'
-import { BUFF_CODE, RAFT_STATE, type PlayerSnap, type RaftStateCode } from '../../sim/types'
+import { BUFF_CODE, RAFT_RESULT, RAFT_STATE, type PlayerSnap, type RaftStateCode } from '../../sim/types'
 import { audio } from '../audio/audio'
-import { frame, SEAT_COLORS } from '../game/frame'
+import { EARSHOT, frame, isRace, myRaft, SEAT_COLORS, standings, tagSlot, TEAMS } from '../game/frame'
 import { useApp } from '../state/store'
 import type { IconName } from '../ui/icons'
 import { setTagContent } from '../ui/NameTags'
+import { ordinal } from '../ui/format'
 import { fx } from './Fx'
 import { Hippo, type HippoHandle } from './Hippo'
 import { PALETTE, toon, toonGradient } from './materials'
@@ -22,10 +23,11 @@ const PUFF_RATE = 30
 const BUFF_ICON: (IconName | null)[] = [null, 'beans', 'chili', 'prune']
 const tagPos = new THREE.Vector3()
 const SLICE_GAP = 0.08
+/** Rivals' team tags fade from this distance (m) to their faintest at twice that. */
+const TAG_FADE = 25
 
 const FART_COLORS = SEAT_COLORS.map((c) => '#' + new THREE.Color(PALETTE.fart).lerp(new THREE.Color(c), 0.3).getHexString())
 const FIRE = ['#ff5a1f', '#ffb21f', '#ff3b2f']
-const FART_KEYS = SEAT_COLORS.map((_, seat) => `p${seat}`)
 
 function plankTexture() {
   const c = document.createElement('canvas')
@@ -43,7 +45,57 @@ function plankTexture() {
   return tex
 }
 
-export function Raft({ course }: { course: BakedCourse }) {
+/** Everything every raft shares: geometry and materials built once. */
+function useRaftKit() {
+  const kit = useMemo(() => {
+    const arrow = new THREE.Shape()
+    arrow.moveTo(0, 0.55)
+    arrow.lineTo(0.5, -0.05)
+    arrow.lineTo(0.18, -0.05)
+    arrow.lineTo(0.18, -0.5)
+    arrow.lineTo(-0.18, -0.5)
+    arrow.lineTo(-0.18, -0.05)
+    arrow.lineTo(-0.5, -0.05)
+    arrow.closePath()
+    const pennant = new THREE.Shape()
+    pennant.moveTo(0, 0)
+    pennant.lineTo(-0.9, 0.28)
+    pennant.lineTo(0, 0.56)
+    pennant.closePath()
+    return {
+      sliceGeos: Array.from({ length: CREW_SIZE + 1 }, (_, n) => (n < 2 ? null : new THREE.TorusGeometry(1.45, 0.352, 12, 40, (Math.PI * 2) / n - SLICE_GAP))),
+      floorMat: new THREE.MeshToonMaterial({ map: plankTexture(), gradientMap: toonGradient() }),
+      arrowGeo: new THREE.ShapeGeometry(arrow).rotateX(-Math.PI / 2),
+      pennantGeo: new THREE.ExtrudeGeometry(pennant, { depth: 0.04, bevelEnabled: false }),
+    }
+  }, [])
+  useEffect(
+    () => () => {
+      for (const g of kit.sliceGeos) g?.dispose()
+      kit.floorMat.map?.dispose()
+      kit.floorMat.dispose()
+      kit.arrowGeo.dispose()
+      kit.pennantGeo.dispose()
+    },
+    [kit],
+  )
+  return kit
+}
+
+type Kit = ReturnType<typeof useRaftKit>
+
+export function Rafts({ course }: { course: BakedCourse }) {
+  const kit = useRaftKit()
+  return (
+    <>
+      {Array.from({ length: MAX_RAFTS }, (_, i) => (
+        <RaftView key={i} course={course} index={i} kit={kit} />
+      ))}
+    </>
+  )
+}
+
+function RaftView({ course, index, kit }: { course: BakedCourse; index: number; kit: Kit }) {
   const info = useApp((s) => s.sessionInfo)
   const session = useApp((s) => s.session)
   const roster = info?.roster ?? []
@@ -51,6 +103,10 @@ export function Raft({ course }: { course: BakedCourse }) {
   const root = useRef<THREE.Group>(null!)
   const tilt = useRef<THREE.Group>(null!)
   const raftBody = useRef<THREE.Group>(null!)
+  const band = useRef<THREE.Mesh>(null!)
+  const belt = useRef<THREE.Mesh>(null!)
+  const pennant = useRef<THREE.Group>(null!)
+  const flag = useRef<THREE.Mesh>(null!)
   const shadow = useRef<THREE.Group>(null!)
   const hippos = useRef<(HippoHandle | null)[]>([])
   const holders = useRef<(THREE.Group | null)[]>([])
@@ -58,61 +114,69 @@ export function Raft({ course }: { course: BakedCourse }) {
   const menu = useApp((s) => s.screen !== 'game')
   const arrows = useRef<(THREE.Group | null)[]>([])
   const slices = useRef<(THREE.Mesh | null)[]>([])
-  const sliceGeos = useMemo(
-    () => Array.from({ length: MAX_PLAYERS + 1 }, (_, n) => (n < 2 ? null : new THREE.TorusGeometry(1.45, 0.352, 12, 40, (Math.PI * 2) / n - SLICE_GAP))),
-    [],
-  )
-  const arrowMats = useMemo(
-    () => SEAT_COLORS.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.6, depthWrite: false })),
-    [],
-  )
-  const floorMat = useMemo(() => new THREE.MeshToonMaterial({ map: plankTexture(), gradientMap: toonGradient() }), [])
-  const state = useRef({
-    emit: [0, 0, 0, 0],
-    wake: 0,
-    tiltX: 0,
-    tiltZ: 0,
-  })
+  const arrowMats = useMemo(() => SEAT_COLORS.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.6, depthWrite: false })), [])
+  const fartKeys = useMemo(() => SEAT_COLORS.map((_, seat) => `p${index}-${seat}`), [index])
+  const state = useRef({ emit: [0, 0, 0, 0], wake: 0, tiltX: 0, tiltZ: 0, team: false })
 
-  const arrowGeo = useMemo(() => {
-    const s = new THREE.Shape()
-    s.moveTo(0, 0.55)
-    s.lineTo(0.5, -0.05)
-    s.lineTo(0.18, -0.05)
-    s.lineTo(0.18, -0.5)
-    s.lineTo(-0.18, -0.5)
-    s.lineTo(-0.18, -0.05)
-    s.lineTo(-0.5, -0.05)
-    s.closePath()
-    return new THREE.ShapeGeometry(s).rotateX(-Math.PI / 2)
-  }, [])
+  useEffect(() => () => arrowMats.forEach((m) => m.dispose()), [arrowMats])
 
-  useEffect(
-    () => () => {
-      for (const g of sliceGeos) g?.dispose()
-      for (const m of arrowMats) m.dispose()
-      floorMat.map?.dispose()
-      floorMat.dispose()
-      arrowGeo.dispose()
-    },
-    [sliceGeos, arrowMats, floorMat, arrowGeo],
-  )
+  const hideHippo = (seat: number) => {
+    const slot = tagSlot(index, seat)
+    const tag = frame.tagEls[slot]
+    const bubble = frame.bubbleEls[slot]
+    if (tag) tag.style.display = 'none'
+    if (bubble) bubble.style.display = 'none'
+    audio.fartStop(fartKeys[seat])
+    const arrow = arrows.current[seat]
+    if (arrow) arrow.visible = false
+  }
+
+  const place = (el: HTMLElement, holder: THREE.Object3D, lift: number) => {
+    holder.getWorldPosition(tagPos)
+    tagPos.y += lift
+    tagPos.project(camera)
+    if (tagPos.z >= 1) return null
+    return { x: ((tagPos.x + 1) / 2) * window.innerWidth, y: ((1 - tagPos.y) / 2) * window.innerHeight, el }
+  }
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05)
     const v = frame.view
-    if (!v) return
+    const r = v?.rafts[index]
+    const crew = v && r ? v.players.filter((p) => p.raft === index) : []
+    const raftTag = frame.raftTagEls[index]
+    // Race rafts nobody is on aren't in play; the co-op raft is always drawn, as it always was.
+    if (!v || !r || (crew.length === 0 && (index > 0 || isRace(v)))) {
+      root.current.visible = false
+      shadow.current.visible = false
+      if (raftTag) raftTag.style.display = 'none'
+      for (let seat = 0; seat < CREW_SIZE; seat++) hideHippo(seat)
+      return
+    }
+    root.current.visible = true
     const t = clock.elapsedTime
-    const r = v.raft
     const st = state.current
-    const showPlayers = v.players.length > 1 && !menu
+    const race = isRace(v)
+    const mine = myRaft(v, session)
+    const own = !race || mine === index
+    const onCamera = frame.follow === index
+    const showSlices = crew.length > 1 && !menu
+    const showTags = own && showSlices
+
+    if (st.team !== race) {
+      st.team = race
+      band.current.material = toon(race ? TEAMS[index].color : PALETTE.raftBand)
+    }
+    belt.current.visible = race
+    pennant.current.visible = race
+    if (race) flag.current.rotation.y = Math.sin(t * 6 + index) * 0.25
 
     root.current.position.set(r.x, r.y, r.z)
     root.current.rotation.y = -r.a
 
     let tx = 0
     let tz = 0
-    for (const p of v.players) {
+    for (const p of crew) {
       if (!isFarting(p, r.st, localIds)) continue
       const ang = p.rim + Math.PI
       tx += Math.cos(ang)
@@ -122,6 +186,8 @@ export function Raft({ course }: { course: BakedCourse }) {
     st.tiltZ = THREE.MathUtils.damp(st.tiltZ, -tx * 0.05, 6, dt)
     tilt.current.rotation.set(st.tiltX + Math.sin(t * 1.7) * 0.02, 0, st.tiltZ + Math.cos(t * 1.3) * 0.02)
     tilt.current.position.y = Math.sin(t * 2.1) * 0.04
+    // A raft respawning through others flickers; one that's done racing just drifts through.
+    tilt.current.visible = !(r.gh && r.res === RAFT_RESULT.none && Math.floor(t * 12) % 2)
 
     let raftScale = 1
     if (r.st === RAFT_STATE.popped) raftScale = r.stT < 0.1 ? 1 + r.stT * 3 : 0
@@ -138,37 +204,46 @@ export function Raft({ course }: { course: BakedCourse }) {
       st.wake = THREE.MathUtils.clamp(0.5 - speed * 0.04, 0.14, 0.4)
       fx.ring(r.x - (r.vx / speed) * 1.2, r.y, r.z - (r.vz / speed) * 1.2, 2.2, '#ffffff', 1.2)
     }
-    audio.setWater(Math.min(1, speed / 9 + (course.slope[r.i] > 0.05 ? 0.6 : 0)))
+    if (onCamera) audio.setWater(Math.min(1, speed / 9 + (course.slope[r.i] > 0.05 ? 0.6 : 0)))
+
+    const followed = v.rafts[frame.follow] ?? r
+    const away = Math.hypot(r.x - followed.x, r.z - followed.z)
+    const loudness = onCamera ? 1 : Math.max(0, 1 - away / EARSHOT) * 0.8
+
+    if (raftTag) {
+      const spot = race && !own && r.st !== RAFT_STATE.popped && !menu ? place(raftTag, root.current, 2.7) : null
+      raftTag.style.display = spot ? 'block' : 'none'
+      if (spot) {
+        const running = v.phase === 'racing' || v.phase === 'finished'
+        const rank = r.res === RAFT_RESULT.finished ? r.pl : r.res === RAFT_RESULT.none && running ? standings(v).indexOf(index) + 1 : 0
+        setTagContent(raftTag, [TEAMS[index].icon], ` ${TEAMS[index].name}${rank ? ` · ${ordinal(rank)}` : ''}`)
+        raftTag.style.opacity = String(THREE.MathUtils.clamp(1 - (away - TAG_FADE) / TAG_FADE, 0.45, 1))
+        raftTag.style.transform = `translate(-50%, -50%) translate(${spot.x}px, ${spot.y}px)`
+      }
+    }
 
     const bySeat: (PlayerSnap | undefined)[] = []
-    for (const p of v.players) bySeat[p.seat] = p
-    const seats = v.players.map((p) => p.seat)
-    const sliceGeo = sliceGeos[seats.length]
+    for (const p of crew) bySeat[p.seat] = p
+    const ords = crew.map((p) => p.ord)
+    const sliceGeo = kit.sliceGeos[crew.length]
 
-    for (let seat = 0; seat < MAX_PLAYERS; seat++) {
+    for (let seat = 0; seat < CREW_SIZE; seat++) {
       const p = bySeat[seat]
       const slice = slices.current[seat]
-      const sector = p && sliceGeo && showPlayers ? rimSector(seat, seats) : null
+      const sector = p && sliceGeo && showSlices ? rimSector(p.ord, ords) : null
       if (slice) {
         slice.visible = !!sector
         if (sector && sliceGeo) {
           slice.geometry = sliceGeo
-          slice.rotation.set(Math.PI / 2, 0, sector.center - ((Math.PI * 2) / seats.length - SLICE_GAP) / 2)
+          slice.rotation.set(Math.PI / 2, 0, sector.center - ((Math.PI * 2) / crew.length - SLICE_GAP) / 2)
         }
       }
       const holder = holders.current[seat]
       const hippo = hippos.current[seat]
       if (!holder || !hippo) continue
       holder.visible = !!p
-      const tag = frame.tagEls[seat]
-      const bubble = frame.bubbleEls[seat]
-      const tagVisible = !!p && showPlayers && r.st !== RAFT_STATE.popped
-      const arrow = arrows.current[seat]
       if (!p) {
-        if (tag) tag.style.display = 'none'
-        if (bubble) bubble.style.display = 'none'
-        audio.fartStop(FART_KEYS[seat])
-        if (arrow) arrow.visible = false
+        hideHippo(seat)
         continue
       }
 
@@ -194,41 +269,36 @@ export function Raft({ course }: { course: BakedCourse }) {
         burst: Math.max(0, 1 - p.burstAgo / 0.35),
         strain: farting ? 1 : 0,
         buff: p.buff,
-        celebrate: v.phase === 'finished',
+        celebrate: v.phase === 'finished' || r.res === RAFT_RESULT.finished,
       })
 
+      const slot = tagSlot(index, seat)
+      const tag = frame.tagEls[slot]
+      const bubble = frame.bubbleEls[slot]
+      const spot = tag && !menu && r.st !== RAFT_STATE.popped ? place(tag, holder, 2.05) : null
       if (tag) {
-        if (tagVisible) {
-          const name = roster.find((e) => e.id === p.id)?.name ?? ''
+        if (spot && showTags) {
           const icons: IconName[] = []
           const buff = BUFF_ICON[p.buff]
           if (buff) icons.push(buff)
           if (p.exh) icons.push('hippoTired')
-          setTagContent(tag, icons, name)
-          holder.getWorldPosition(tagPos)
-          tagPos.y += 2.05
-          tagPos.project(camera)
-          const display = tagPos.z < 1 ? 'block' : 'none'
-          const x = ((tagPos.x + 1) / 2) * window.innerWidth
-          const y = ((1 - tagPos.y) / 2) * window.innerHeight
-          tag.style.display = display
-          tag.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`
-          if (bubble) {
-            bubble.style.display = display
-            bubble.style.transform = `translate(-50%, -100%) translate(${x}px, ${y - 16}px)`
-          }
-        } else {
-          tag.style.display = 'none'
-          if (bubble) bubble.style.display = 'none'
-        }
+          setTagContent(tag, icons, roster.find((e) => e.id === p.id)?.name ?? '')
+          tag.style.display = 'block'
+          tag.style.transform = `translate(-50%, -50%) translate(${spot.x}px, ${spot.y}px)`
+        } else tag.style.display = 'none'
+      }
+      if (bubble) {
+        const talking = spot && (race || showSlices)
+        bubble.style.display = talking ? 'block' : 'none'
+        if (talking) bubble.style.transform = `translate(-50%, -100%) translate(${spot.x}px, ${spot.y - 16}px)`
       }
 
       const alpha = r.a + p.rim
       const ox = Math.cos(alpha)
       const oz = Math.sin(alpha)
-      const fartKey = FART_KEYS[seat]
-      if (!farting) audio.fartStop(fartKey)
-      else if (!audio.isFarting(fartKey)) audio.fartStart(fartKey, seat, { pan: seat % 2 ? 0.3 : -0.3, kind: p.buff === BUFF_CODE.chili ? 'chili' : 'normal' })
+      const fartKey = fartKeys[seat]
+      if (!farting || loudness < 0.08) audio.fartStop(fartKey)
+      else if (!audio.isFarting(fartKey)) audio.fartStart(fartKey, seat, { pan: seat % 2 ? 0.3 : -0.3, kind: p.buff === BUFF_CODE.chili ? 'chili' : 'normal', gain: loudness })
 
       if (farting) {
         st.emit[seat] += dt * PUFF_RATE * (p.buff === BUFF_CODE.beans ? 1.5 : 1)
@@ -243,8 +313,9 @@ export function Raft({ course }: { course: BakedCourse }) {
         }
       }
 
+      const arrow = arrows.current[seat]
       if (arrow) {
-        const local = !menu && localIds.includes(p.id) && r.st === RAFT_STATE.float && v.phase !== 'finished'
+        const local = !menu && localIds.includes(p.id) && r.st === RAFT_STATE.float && v.phase !== 'finished' && r.res === RAFT_RESULT.none
         arrow.visible = local
         if (local) {
           const push = alpha + Math.PI
@@ -260,17 +331,21 @@ export function Raft({ course }: { course: BakedCourse }) {
 
   return (
     <>
-      <group ref={root}>
+      <group ref={root} visible={false}>
         <group ref={tilt}>
           <group ref={raftBody}>
-            <mesh position={[0, 0.07, 0]} material={floorMat}>
+            <mesh position={[0, 0.07, 0]} material={kit.floorMat}>
               <cylinderGeometry args={[1.32, 1.32, 0.14, 28]} />
             </mesh>
             <mesh position={[0, 0.22, 0]} rotation={[Math.PI / 2, 0, 0]} material={toon(PALETTE.raftRing)}>
               <torusGeometry args={[1.45, 0.34, 14, 36]} />
             </mesh>
-            <mesh position={[0, 0.02, 0]} rotation={[Math.PI / 2, 0, 0]} material={toon(PALETTE.raftBand)}>
+            <mesh ref={band} position={[0, 0.02, 0]} rotation={[Math.PI / 2, 0, 0]} material={toon(PALETTE.raftBand)}>
               <torusGeometry args={[1.5, 0.2, 10, 36]} />
+            </mesh>
+            {/* Race rooms: a belt in the raft's colour round the outside, where the crew's slices don't cover it. */}
+            <mesh ref={belt} position={[0, 0.24, 0]} rotation={[Math.PI / 2, 0, 0]} material={toon(TEAMS[index].color)} visible={false}>
+              <torusGeometry args={[1.78, 0.13, 8, 40]} />
             </mesh>
             {SEAT_COLORS.map((color, seat) => (
               <mesh
@@ -286,18 +361,19 @@ export function Raft({ course }: { course: BakedCourse }) {
             {[0, 1, 2, 3].map((k) => {
               const a = Math.PI / 4 + (k * Math.PI) / 2
               return (
-                <mesh
-                  key={k}
-                  position={[Math.cos(a) * 1.45, 0.5, Math.sin(a) * 1.45]}
-                  rotation={[0, -a + Math.PI / 2, 0]}
-                  material={toon(PALETTE.raftHandle)}
-                >
+                <mesh key={k} position={[Math.cos(a) * 1.45, 0.5, Math.sin(a) * 1.45]} rotation={[0, -a + Math.PI / 2, 0]} material={toon(PALETTE.raftHandle)}>
                   <torusGeometry args={[0.2, 0.07, 8, 14, Math.PI]} />
                 </mesh>
               )
             })}
+            <group ref={pennant} visible={false}>
+              <mesh position={[0, 1.15, 0]} material={toon(PALETTE.wood)}>
+                <cylinderGeometry args={[0.05, 0.06, 2.1, 6]} />
+              </mesh>
+              <mesh ref={flag} position={[0, 1.65, 0]} geometry={kit.pennantGeo} material={toon(TEAMS[index].color)} />
+            </group>
           </group>
-          {Array.from({ length: MAX_PLAYERS }, (_, seat) => (
+          {SEAT_COLORS.map((color, seat) => (
             <group
               key={seat}
               ref={(g) => {
@@ -309,7 +385,7 @@ export function Raft({ course }: { course: BakedCourse }) {
                 ref={(h) => {
                   hippos.current[seat] = h
                 }}
-                color={SEAT_COLORS[seat]}
+                color={color}
                 seat={seat}
               />
             </group>
@@ -327,7 +403,7 @@ export function Raft({ course }: { course: BakedCourse }) {
           }}
           visible={false}
         >
-          <mesh geometry={arrowGeo} material={arrowMats[seat]} renderOrder={3} />
+          <mesh geometry={kit.arrowGeo} material={arrowMats[seat]} renderOrder={3} />
         </group>
       ))}
     </>

@@ -30,10 +30,12 @@ interface Plan {
   speed: number
 }
 
+type Raft = Sim['rafts'][number]
+
 export function botInput(sim: Sim, id: number, burstCounter = 0): PlayerInput {
-  const raft = sim.raft
   const p = sim.players.get(id)
-  if (!p) return { aim: null, walk: 0, fart: false, burst: burstCounter }
+  if (!p || p.raft === null) return { aim: null, walk: 0, fart: false, burst: burstCounter }
+  const raft = sim.rafts[p.raft]
   const c = sim.course
 
   let d = 0
@@ -56,7 +58,7 @@ export function botInput(sim: Sim, id: number, burstCounter = 0): PlayerInput {
   const cruise = icy ? 3.2 : 4.8
   const i = raft.index
   const curD = rightOffset(raft.x - c.x[i], raft.z - c.z[i], c.hx[i], c.hz[i])
-  const plan = choosePlan(sim, curD, d, cruise)
+  const plan = choosePlan(sim, raft, curD, d, cruise)
   // Velocity we want: cruise along the river, and close on the planned lane sideways.
   const along = plan.speed * cruise
   const side = lateralSpeed(plan.d - curD)
@@ -73,8 +75,7 @@ export function botInput(sim: Sim, id: number, burstCounter = 0): PlayerInput {
  * keeps clear of every timed hazard over the lookahead. If nothing is clear, the plan that stays
  * clear longest.
  */
-function choosePlan(sim: Sim, curD: number, dodgeD: number, cruise: number): Plan {
-  const raft = sim.raft
+function choosePlan(sim: Sim, raft: Raft, curD: number, dodgeD: number, cruise: number): Plan {
   const c = sim.course
   const timed: BakedItem[] = []
   for (const item of c.items) {
@@ -96,7 +97,7 @@ function choosePlan(sim: Sim, curD: number, dodgeD: number, cruise: number): Pla
   let bestClear = -1
   for (const speed of SPEEDS) {
     for (const d of lanes) {
-      const clear = clearFor(sim, timed, curD, d, along, across, speed * cruise)
+      const clear = clearFor(sim, raft, timed, curD, d, along, across, speed * cruise)
       if (clear >= LOOKAHEAD) return { d, speed }
       if (clear > bestClear) {
         bestClear = clear
@@ -117,8 +118,7 @@ function offEdge(c: BakedCourse, s: number, d: number) {
 }
 
 /** Seconds the raft stays clear of `timed` hazards if it steers to lane `d` at `speed`, up to the lookahead. */
-function clearFor(sim: Sim, timed: BakedItem[], fromD: number, d: number, along: number, across: number, speed: number) {
-  const raft = sim.raft
+function clearFor(sim: Sim, raft: Raft, timed: BakedItem[], fromD: number, d: number, along: number, across: number, speed: number) {
   const c = sim.course
   let s = raft.s
   let lane = fromD

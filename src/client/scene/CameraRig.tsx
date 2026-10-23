@@ -19,7 +19,7 @@ export function CameraRig({ course, mode }: { course: BakedCourse; mode: 'menu' 
     const v = frame.view
     if (!v) return
     const s = st.current
-    const r = v.raft
+    const r = v.rafts[frame.follow] ?? v.rafts[0]
     const ahead = pointAt(course, r.s + 6)
     const farAhead = pointAt(course, r.s + 14)
     const targetYaw = ahead.heading + angleDiff(ahead.heading, farAhead.heading) * 0.4

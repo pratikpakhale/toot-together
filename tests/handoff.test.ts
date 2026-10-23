@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { botInput } from '../src/sim/bot'
 import { DT } from '../src/sim/constants'
 import { getCourse } from '../src/sim/courses'
-import type { ServerMsg } from '../src/sim/protocol'
+import { PROTOCOL_VERSION, type ServerMsg } from '../src/sim/protocol'
 import { Sim, type SimState } from '../src/sim/sim'
 import { connect, freePort, health, startServer, stopServer } from './server'
 
@@ -76,10 +76,10 @@ describe('restarting the server', { timeout: 30_000 }, () => {
       const first = await startServer(port, roomsFile)
 
       const alice = await connect(port)
-      alice.send({ type: 'join', name: 'Alice' })
+      alice.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Alice' })
       const aliceIn = await alice.next('welcome')
       const bob = await connect(port)
-      bob.send({ type: 'join', name: 'Bob', room: aliceIn.room })
+      bob.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Bob', room: aliceIn.room })
       const bobIn = await bob.next('welcome')
 
       alice.send({ type: 'chat', text: 'brb, server restarting' })
@@ -98,7 +98,7 @@ describe('restarting the server', { timeout: 30_000 }, () => {
       expect(existsSync(roomsFile)).toBe(false)
 
       const back = await connect(port)
-      back.send({ type: 'join', name: 'Alice', room: aliceIn.room, resume: aliceIn.token })
+      back.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Alice', room: aliceIn.room, resume: aliceIn.token })
       const welcome = await back.next('welcome')
       expect(welcome.id).toBe(aliceIn.id)
       expect(welcome.room).toBe(aliceIn.room)
@@ -107,16 +107,16 @@ describe('restarting the server', { timeout: 30_000 }, () => {
       const after = (await back.next('snap')).s
       expect(after.tick).toBeGreaterThanOrEqual(before.tick)
       expect(after.t - before.t).toBeLessThan(0.2)
-      expect(Math.hypot(after.raft.x - before.raft.x, after.raft.z - before.raft.z)).toBeLessThan(2)
+      expect(Math.hypot(after.rafts[0].x - before.rafts[0].x, after.rafts[0].z - before.rafts[0].z)).toBeLessThan(2)
 
       const roster = await back.next('roster', (m) => m.players.length === 2)
       expect(roster.players.find((p) => p.id === bobIn.id)?.away).toBe(true)
       const carol = await connect(port)
-      carol.send({ type: 'join', name: 'Carol', room: aliceIn.room })
+      carol.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Carol', room: aliceIn.room })
       expect((await carol.next('welcome')).id).toBe(bobIn.id + 1)
 
       const bobBack = await connect(port)
-      bobBack.send({ type: 'join', name: 'Bob', room: aliceIn.room, resume: bobIn.token })
+      bobBack.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Bob', room: aliceIn.room, resume: bobIn.token })
       expect((await bobBack.next('welcome')).id).toBe(bobIn.id)
     }))
 
@@ -132,7 +132,7 @@ describe('restarting the server', { timeout: 30_000 }, () => {
   it('skips rooms the new release can no longer simulate', () =>
     withRoomsFile(async (roomsFile) => {
       const state = soloSave()
-      delete (state.raft as Partial<typeof state.raft>).vy
+      delete (state.rafts[0] as Partial<(typeof state.rafts)[number]>).vy
       parkRoom(roomsFile, 'OLDS', state)
       const port = await freePort()
       const { log } = await startServer(port, roomsFile)

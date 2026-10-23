@@ -20,6 +20,7 @@ Open the URL, pick a name, and choose a mode:
 | **Play solo** | One hippo, keyboard / gamepad / touch. |
 | **Couch party** | Up to 4 hippos on one screen: WASD + Space, Arrows + Enter, and gamepads (press A to join). |
 | **Online** | **Create room**, pick a river, then share the 4-letter code or the invite link from the HUD. Friends hit **Join**. |
+| **Race** (online) | **Create room**, switch the river picker to **Race** and choose 2–4 rafts. Everyone picks a raft and a spot, readies up, and the start gate drops on GO. First raft to the finish wins. |
 
 To play online on your LAN, friends open `http://<your-ip>:5173` (Vite prints it as "Network").
 
@@ -59,10 +60,14 @@ Redeploying restarts the server, but rooms carry over: they're parked in `/var/l
 | Respawn | R | Back/Select | Menu button |
 | Menu | Esc / P | Start | Menu button |
 | Chat (online) | Q quick lines (then 1–8), T to type | | Chat button |
+| Ready / start the race (race rooms) | Y | Y | Ready button |
+| Crews: switch raft or spot (race rooms) | C | | Crews button |
 
 Hold left or right and your hippo keeps walking around the rim; point the stick and it walks to that spot. Its butt faces outward, so a toot pushes the raft the opposite way. To go forward, stand at the back. The arrow on the water shows where your toot will push.
 
 A lone hippo has the whole rim. In a crew of 2–4, each hippo owns an equal slice (shown in its colour on the raft ring) and stops at the edge of it, so nobody can wander into a teammate's spot. Slices are handed out in seat order and start at the back, so two hippos can always share the forward push.
+
+In a race, each raft has a colour and a shape (Red ▲, Yellow ●, Teal ■, Pink ◆) and its own crew of 1–4. Rafts bump off each other, a toot shoves any rival raft behind it, and snacks go to whoever gets there first. Once the first raft finishes, the rest have 30 seconds to cross the line. Newcomers start on the bench and hop onto a raft from the join sheet, even mid-race.
 
 What's in the game and how it's built: [OVERVIEW.md](OVERVIEW.md).
 

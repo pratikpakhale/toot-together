@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { COURSES, nextCourseId } from '../../sim/courses'
-import type { PlayerStats } from '../../sim/types'
+import type { PlayerStats, Results as RunResults } from '../../sim/types'
 import { audio } from '../audio/audio'
 import { leaveGame, playLevel } from '../game/controller'
 import { useShortScreen } from '../platform'
-import { SEAT_COLORS } from '../game/frame'
+import { seatColor, TEAMS } from '../game/frame'
+import type { GameSession, SessionInfo } from '../game/session'
 import { medalFor, recordOf, useProgress } from '../state/progress'
 import { useApp } from '../state/store'
-import { formatMedalTime, formatTime } from './format'
+import { formatMedalTime, formatTime, ordinal } from './format'
 import type { IconName } from './icons'
 import { MEDAL_ICON } from './LevelSelect'
 import { Modal } from './Modal'
 import { Icon } from './Icon'
+import { Refusal, startBlocker, TeamBadge, useRace, useRaftCount } from './Race'
 
 function rank(deaths: number) {
   if (deaths === 0) return { title: 'Flawless Flatulence', icon: 'trophy' as const }
@@ -44,6 +46,8 @@ function awards(players: PlayerStats[]): Award[] {
     const quiet = [...players].sort((a, b) => a.fartTime - b.fartTime)[0]
     if (quiet !== toxic && toxic.fartTime > 0) list.push({ icon: 'sneaky', title: 'Silent But Deadly', who: quiet, detail: `only ${quiet.fartTime.toFixed(1)}s` })
   }
+  const sniper = top('snipes')
+  if (sniper.snipes > 0) list.unshift({ icon: 'target', title: 'Gas Assassin', who: sniper, detail: `sniped ${plural(sniper.snipes, 'raft')}` })
   const burst = top('bursts')
   if (burst.bursts > 0) list.push({ icon: 'burst', title: 'Burst Boss', who: burst, detail: plural(burst.bursts, 'burst') })
   const snack = top('pickups')
@@ -63,7 +67,9 @@ export function Results() {
   const records = useProgress((s) => s.records)
   const [shared, setShared] = useState(false)
   const short = useShortScreen()
+  const race = useRace()
   if (!results || !info) return null
+  if (race && session) return <RaceResults results={results} info={info} session={session} short={short} />
   const def = COURSES[info.courseId]
   const r = rank(results.deaths)
   const list = awards(results.players).slice(0, short ? 4 : undefined)
@@ -133,22 +139,7 @@ export function Results() {
           )}
         </div>
         <div className="contents short:flex short:flex-col">
-          {list.length > 0 && (
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 short:mt-0 short:grid-cols-1 short:gap-1">
-              {list.map((a, i) => (
-                <div key={a.title} className="flex items-center gap-2.5 rounded-2xl border-[3px] border-ink bg-white px-3 py-1.5 anim-rise short:py-1 short:pl-2" style={{ animationDelay: `${i * 90}ms` }}>
-                  <Icon name={a.icon} size={short ? 28 : 34} />
-                  <div className="min-w-0 flex-1 short:flex short:items-baseline short:gap-2">
-                    <div className="font-display truncate text-base leading-tight short:shrink-0">{a.title}</div>
-                    <div className="truncate text-xs font-extrabold text-ink/60">{a.detail}</div>
-                  </div>
-                  <span className="name-tag max-w-[45%] truncate !text-xs" style={{ ['--tag' as string]: SEAT_COLORS[a.who.seat] }}>
-                    {a.who.name}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          {list.length > 0 && <AwardList list={list} short={short} />}
           {session?.spectating ? (
             <button className="btn btn-pink mt-5 w-full text-xl short:mt-3 short:py-2" onClick={() => (audio.click(), leaveGame())}>
               Back to rooms
@@ -183,6 +174,153 @@ export function Results() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function AwardList({ list, short }: { list: Award[]; short: boolean }) {
+  return (
+    <div className="mt-4 grid gap-2 sm:grid-cols-2 short:mt-0 short:grid-cols-1 short:gap-1">
+      {list.map((a, i) => (
+        <div key={a.title} className="flex items-center gap-2.5 rounded-2xl border-[3px] border-ink bg-white px-3 py-1.5 anim-rise short:py-1 short:pl-2" style={{ animationDelay: `${i * 90}ms` }}>
+          <Icon name={a.icon} size={short ? 28 : 34} />
+          <div className="min-w-0 flex-1 short:flex short:items-baseline short:gap-2">
+            <div className="font-display truncate text-base leading-tight short:shrink-0">{a.title}</div>
+            <div className="truncate text-xs font-extrabold text-ink/60">{a.detail}</div>
+          </div>
+          <span className="name-tag max-w-[45%] truncate !text-xs" style={{ ['--tag' as string]: seatColor(a.who.seat) }}>
+            {a.who.name}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** A race: who won, every raft's place, the awards, and what's next. */
+function RaceResults({ results, info, session, short }: { results: RunResults; info: SessionInfo; session: GameSession; short: boolean }) {
+  const setOverlay = useApp((s) => s.setOverlay)
+  const rafts = useRaftCount()
+  const roster = info.roster
+  const myId = session.localPlayers[0]?.id
+  const me = roster.find((p) => p.id === myId)
+  const def = COURSES[info.courseId]
+  const next = nextCourseId(info.courseId)
+  const host = session.isHost()
+  const hostName = roster.find((p) => p.host)?.name ?? 'The host'
+  const winner = results.standings[0]
+  const ran = results.players.filter((p) => p.raft !== null)
+  const list = awards(ran).slice(0, short ? 3 : 4)
+  const mine = results.standings.find((st) => myId !== undefined && st.ids.includes(myId))
+  const nameOf = (id: number) => results.players.find((p) => p.id === id)?.name ?? '?'
+  const racers = roster.filter((p) => p.raft !== null && !p.away)
+  const ready = racers.filter((p) => p.ready).length
+  const blocker = startBlocker(roster, rafts)
+  const click = (fn: () => void) => () => (audio.click(), fn())
+
+  const title = winner?.place ? `${TEAMS[winner.raft].name.toUpperCase()} WINS!` : 'NOBODY MADE IT!'
+  const sub = mine ? (mine.place ? `your crew came ${ordinal(mine.place)}` : 'your crew ran out of time') : 'you sat this one out'
+
+  const head = (
+    <div className="text-center">
+      <Icon name={winner?.place ? 'trophy' : 'hippoOops'} size={short ? 36 : 64} className="anim-wobble" />
+      <div className="font-display text-5xl leading-none short:text-3xl">{title}</div>
+      <div className="font-display mt-1 text-lg text-ink/60 short:mt-0.5 short:text-sm">
+        {def?.name} · {sub}
+      </div>
+    </div>
+  )
+
+  const standings = (
+    <div className="mt-4 flex flex-col gap-2 short:mt-2 short:gap-1">
+      {results.standings.map((st, k) => (
+        <div
+          key={st.raft}
+          className="flex items-center gap-2.5 rounded-2xl border-[3px] border-ink px-3 py-1.5 anim-rise short:gap-1.5 short:px-2 short:py-0.5"
+          style={{ background: st === mine ? '#fff6d6' : '#fff', animationDelay: `${k * 90}ms` }}
+        >
+          <span className="font-display w-7 text-center text-3xl short:w-5 short:text-xl">{st.place ?? '–'}</span>
+          <TeamBadge raft={st.raft} size={short ? 18 : 24} />
+          <span className="min-w-0 flex-1 truncate text-[15px] font-extrabold short:text-xs">{st.ids.map(nameOf).join(', ') || TEAMS[st.raft].name}</span>
+          <span className={`font-display text-xl tabular-nums short:text-[15px] ${st.time === null ? 'text-berry' : ''}`}>{st.time === null ? 'DNF' : formatTime(st.time)}</span>
+          <span className="flex items-center gap-0.5 text-sm font-extrabold text-ink/50 short:text-xs">
+            <Icon name="skull" size="1.1em" />
+            {st.deaths}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+
+  const buttons = session.spectating ? (
+    <button className="btn btn-pink mt-5 w-full text-xl short:mt-3 short:py-2" onClick={click(leaveGame)}>
+      Back to rooms
+    </button>
+  ) : host ? (
+    <div className="mt-5 flex flex-col gap-3 short:mt-3 short:gap-2 short:[&_.btn]:py-1.5">
+      <button className="btn btn-green flex items-center justify-center gap-2 text-2xl short:text-lg" disabled={!!blocker} title={blocker ?? undefined} onClick={click(() => session.act({ type: 'start' }))}>
+        <Icon name="replay" size="1.1em" /> Rematch
+      </button>
+      {blocker && <p className="-mt-1.5 text-center text-xs font-extrabold text-ink/55">{blocker}</p>}
+      <div className="flex gap-3 short:gap-2 short:[&_.btn]:px-2 short:[&_.btn]:text-sm">
+        {next && (
+          <button className="btn btn-blue flex flex-1 items-center justify-center gap-1.5 text-base" onClick={click(() => playLevel(next))}>
+            Next river <Icon name="next" size="1em" />
+          </button>
+        )}
+        <button
+          className="btn btn-cream flex-1 text-base"
+          onClick={click(() => {
+            session.restart()
+            setOverlay('crews')
+          })}
+        >
+          Change crews
+        </button>
+        <button className="btn btn-cream text-base" onClick={click(leaveGame)}>
+          Menu
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div className="mt-5 flex flex-col gap-2 short:mt-3">
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs font-extrabold text-ink/55">
+        <Icon name="crown" size={16} /> {hostName} (host) picks what's next, or it starts once everyone's ready.
+      </p>
+      <div className="flex gap-3 short:gap-2 short:[&_.btn]:py-1.5">
+        {me && me.raft !== null ? (
+          <button className={`btn ${me.ready ? 'btn-cream' : 'btn-green'} flex flex-1 items-center justify-center gap-2 text-xl short:text-base`} onClick={click(() => session.act({ type: 'ready', on: !me.ready }))}>
+            {me.ready && <Icon name="check" size="1em" />}
+            {me.ready ? 'Ready!' : 'Ready for rematch'}
+            <span className="text-sm opacity-80">
+              {ready}/{racers.length}
+            </span>
+          </button>
+        ) : (
+          <button className="btn btn-blue flex-1 text-xl short:text-base" onClick={click(() => setOverlay('join'))}>
+            Join a raft
+          </button>
+        )}
+        <button className="btn btn-cream text-base" onClick={click(leaveGame)}>
+          Leave
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <Modal width={620} shortWidth={820} onClose={() => setOverlay(null)}>
+      <div className="contents short:grid short:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] short:items-center short:gap-5">
+        <div className="contents short:block">
+          {head}
+          {standings}
+        </div>
+        <div className="contents short:flex short:flex-col">
+          {list.length > 0 && <AwardList list={list} short={short} />}
+          <Refusal className="mt-2" />
+          {buttons}
         </div>
       </div>
     </Modal>

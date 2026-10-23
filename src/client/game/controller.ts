@@ -10,10 +10,12 @@ import { type GameSession, LocalSession, NetSession, type SessionInfo } from './
 
 let unsubscribe: (() => void) | null = null
 let courseShown: string | null = null
+let refusalShown = 0
 
 function resetPresentation() {
   frame.view = null
   frame.localFart.clear()
+  frame.watch = null
   frame.cameraCuts++
   fx.clear()
   audio.stopAllFarts()
@@ -24,6 +26,7 @@ export function adopt(session: GameSession) {
   frame.session?.dispose()
   frame.session = session
   courseShown = session.info.courseId
+  refusalShown = 0
   resetPresentation()
   const app = useApp.getState()
   app.setSession(session)
@@ -42,8 +45,15 @@ function onInfo(session: GameSession) {
     app.setResults(null)
     if (app.overlay === 'results') app.setOverlay(null)
   }
+  const refused = session.info.refused
+  if (refused && refused.key !== refusalShown) {
+    refusalShown = refused.key
+    // Menus that send crew actions say why inline instead.
+    if (app.overlay === null) app.pushToast({ text: refused.reason, tone: 'bad' }, 2200)
+  }
   const err = session.info.error
   if (err && (session.info.status === 'error' || session.info.status === 'closed')) {
+    if (err.code === 'outdated' && reloadForUpdate()) return
     if (session.spectating) {
       showHippocam()
       return
@@ -62,6 +72,26 @@ const ERROR_TITLES: Partial<Record<NonNullable<SessionInfo['error']>['code'], st
   rate_limited: 'Slow down!',
   expired: 'Seat expired',
   unreachable: "Can't reach the server",
+  outdated: 'New version!',
+}
+
+const RELOADED_KEY = 'toot-together:reloaded-for-update'
+
+/**
+ * The server runs a newer game than this page: reload once (the room stays in the URL, the seat
+ * token in the tab). A second refusal soon after means the new version isn't reachable yet, so
+ * fall back to telling the player.
+ */
+function reloadForUpdate() {
+  try {
+    const last = Number(sessionStorage.getItem(RELOADED_KEY) ?? 0)
+    if (Date.now() - last < 60_000) return false
+    sessionStorage.setItem(RELOADED_KEY, String(Date.now()))
+  } catch {
+    return false
+  }
+  location.reload()
+  return true
 }
 
 const ATTRACT_CREW = ['Bubbles', 'Gassy', 'Pudding']
@@ -119,9 +149,10 @@ export function startLocal(players: { name: string; device: DeviceId }[], course
   track('game_started', { mode: players.length > 1 ? 'couch' : 'solo', course: courseId, players: players.length })
 }
 
-export function createRoom(courseId: string) {
+/** `rafts`: 1 for co-op, 2–4 for a race. */
+export function createRoom(courseId: string, rafts = 1) {
   useProgress.getState().select(courseId)
-  joinOnline(null, courseId)
+  joinOnline(null, courseId, rafts)
 }
 
 export function playLevel(courseId: string) {
@@ -141,13 +172,13 @@ export function joinRoom(code: string) {
   joinOnline(room)
 }
 
-function joinOnline(room: string | null, courseId?: string) {
+function joinOnline(room: string | null, courseId?: string, rafts = 1) {
   const { settings } = useApp.getState()
-  const session = new NetSession(settings.name, room, courseId)
+  const session = new NetSession(settings.name, room, courseId, false, rafts)
   adopt(session)
   enterGame()
   setPlayerName(settings.name)
-  track('game_started', { mode: 'online', room: room ? 'join' : 'create', course: session.info.courseId })
+  track('game_started', { mode: 'online', room: room ? 'join' : 'create', course: session.info.courseId, ...(room ? {} : { rafts }) })
   const stop = session.subscribe(() => {
     if (session.info.roomCode) {
       setRoomInUrl(session.info.roomCode)
