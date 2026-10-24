@@ -127,7 +127,15 @@ export function GuidePage() {
           Play now
         </a>
         <p className="text-[15px] font-semibold">
-          Made by Pratik Pakhale. Open source on <a className="underline" href="https://github.com/pratikpakhale/toot-together">GitHub</a>.
+          Made with <Icon name="heart" size="1.2em" label="love" className="align-[-0.25em]" /> by{' '}
+          <a className="underline" href="https://x.com/_pratikpakhale">
+            Pratik
+          </a>
+          . Inspired by{' '}
+          <a className="underline" href="https://store.steampowered.com/app/5117550/">
+            Fart Together
+          </a>
+          . Open source on <a className="underline" href="https://github.com/pratikpakhale/toot-together">GitHub</a>.
         </p>
       </footer>
     </div>

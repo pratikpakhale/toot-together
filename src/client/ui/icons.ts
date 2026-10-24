@@ -316,6 +316,9 @@ export const ICONS = {
     `<path d="M28 13l4-4 4 4M28 51l4 4 4-4M13 28l-4 4 4 4M51 28l4 4-4 4" fill="none" ${O3}/>` +
     `<circle cx="32" cy="32" r="12" fill="#fff" ${O}/><circle cx="32" cy="32" r="6" fill="#dfe6ef"/>`,
 
+  heart:
+    `<path d="M32 56C15 44 6 35 6 23a13 13 0 0 1 26-6 13 13 0 0 1 26 6c0 12-9 21-26 33z" fill="#ff5b8a" ${O}/>` +
+    shine(18, 22, 6, 3.5),
   lock:
     `<path d="M21 30v-8a11 11 0 0 1 22 0v8" fill="none" stroke="${INK}" stroke-width="11"/><path d="M21 30v-8a11 11 0 0 1 22 0v8" fill="none" stroke="#dfe6ef" stroke-width="4.5"/>` +
     `<rect x="12" y="28" width="40" height="30" rx="7" fill="#ffcf3f" ${O}/>` +
