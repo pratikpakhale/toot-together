@@ -15,11 +15,14 @@ import {
   SEAT_HOLD_MS,
   type ServerMsg,
 } from '../../sim/protocol'
+import { type Region, REGIONS, regionOfCode } from '../../sim/regions'
+import { rimSector, walkRim } from '../../sim/sectors'
 import { Sim } from '../../sim/sim'
 import type { BakedCourse } from '../../sim/track'
 import {
   BUFF_CODE,
   EMPTY_INPUT,
+  type Phase,
   type PlayerInput,
   RAFT_STATE,
   type Results,
@@ -27,6 +30,7 @@ import {
   type SimEvent,
   type Snapshot,
 } from '../../sim/types'
+import { socketUrl } from '../regions'
 import { SnapshotClock } from './clock'
 import { cloneSnapshot, extrapolate, interpolate } from './interp'
 import type { DeviceId } from './input'
@@ -235,6 +239,7 @@ const SNAPSHOT_BUFFER = 40
 const EVENT_BACKLOG_MAX = 200
 const EVENT_BACKLOG_KEEP = 50
 const AIM_RESEND_DELTA = 0.03
+const aimMoved = (a: number | null, b: number | null) => (a === null) !== (b === null) || (a !== null && b !== null && Math.abs(a - b) > AIM_RESEND_DELTA)
 const PING_EVERY_MS = 1000
 const PING_SAMPLES = 5
 const LATE_AVERAGE_TIME = 3
@@ -242,6 +247,10 @@ const PREDICTED_BURST_MS = 1000
 const STALE_EVENT_AGE = 1
 const EVENT_TIME_EPSILON = 0.001
 const FUTURE_EVENT_LIMIT = 1
+/** How long after the last change of input the server has surely seen it, on top of ping and buffer. */
+const OWN_SETTLE_MARGIN_MS = 80
+/** How quickly your own hippo eases onto where the server has it once it has caught up. */
+const OWN_SETTLE_TIME = 0.15
 const STATEFUL_EVENTS = new Set<SimEvent['type']>(['finish', 'restart'])
 
 function advanceRenderTime(current: number, target: number, dt: number) {
@@ -333,6 +342,12 @@ export class NetSession extends BaseSession implements GameSession {
   private pings: number[] = []
   private pingTimer = 0
   private predictedBursts: number[] = []
+  /** What this player asks for right now, sent or not yet. */
+  private input: PlayerInput = { ...EMPTY_INPUT }
+  private inputAtChange: PlayerInput = { ...EMPTY_INPUT }
+  private inputChangedAt = 0
+  /** Your own hippo, walked round the rim here instead of a round trip later. */
+  private own: { raft: number; crew: string; phase: Phase; rim: number } | null = null
   private chatTimes: number[] = []
   private chatKey = 0
   private disposed = false
@@ -344,6 +359,8 @@ export class NetSession extends BaseSession implements GameSession {
     readonly spectating = false,
     /** Rafts for a room this session creates: 1 = co-op, 2–4 = race. */
     private readonly rafts = 1,
+    /** Where a room this session creates goes; a room code names its own. */
+    private readonly region: Region = REGIONS[0],
   ) {
     super(courseId)
     this.canChat = !spectating
@@ -380,8 +397,8 @@ export class NetSession extends BaseSession implements GameSession {
   }
 
   private connect() {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    const ws = new WebSocket(`${proto}://${location.host}/ws`)
+    const code = this.info.roomCode ?? this.room
+    const ws = new WebSocket(socketUrl((code && regionOfCode(code)) || this.region))
     this.ws = ws
     ws.onopen = () => {
       const name = sanitizeName(this.name)
@@ -556,6 +573,7 @@ export class NetSession extends BaseSession implements GameSession {
     this.net.bufferMs = this.clock.delay * 1000
     this.net.lateFraction += ((this.extrapolatedFrom ? 1 : 0) - this.net.lateFraction) * (1 - Math.exp(-dt / LATE_AVERAGE_TIME))
     this.applyCorrections(rafts, t, dt)
+    this.predictOwnHippo(this.view, Math.min(dt, MAX_FRAME_DT), nowMs)
 
     if (this.pending.length) {
       const keep: SimEvent[] = []
@@ -566,6 +584,37 @@ export class NetSession extends BaseSession implements GameSession {
       this.pending = keep
     }
     return this.view
+  }
+
+  /**
+   * Walks your own hippo with the same step as the sim, so it moves the moment you ask. Once the server
+   * has had time to see your latest input, it eases onto where the server has it. A new crew, a
+   * restart or a countdown (which put hippos back at home) take the server's spot at once.
+   */
+  private predictOwnHippo(view: Snapshot, dt: number, nowMs: number) {
+    const id = this.localPlayers[0]?.id
+    const me = view.players.find((p) => p.id === id)
+    if (!me) {
+      this.own = null
+      return
+    }
+    const ords = view.players
+      .filter((p) => p.raft === me.raft && (p.id === me.id || !this.info.roster.some((r) => r.id === p.id && r.away)))
+      .map((p) => p.ord)
+    const crew = ords.join()
+    let own = this.own
+    if (!own || own.raft !== me.raft || own.crew !== crew || (own.phase !== view.phase && (view.phase === 'pond' || view.phase === 'countdown'))) {
+      own = this.own = { raft: me.raft, crew, phase: view.phase, rim: me.rim }
+    }
+    own.phase = view.phase
+    const step = walkRim(own.rim, this.input, view.rafts[me.raft].a, rimSector(me.ord, ords), dt)
+    own.rim = step.rim
+    const seenBy = (this.net.pingMs ?? 0) + this.clock.delay * 1000 + OWN_SETTLE_MARGIN_MS
+    if (this.input.walk === 0 && nowMs - this.inputChangedAt > seenBy) {
+      own.rim = wrapAngle(own.rim + angleDiff(own.rim, me.rim) * (1 - Math.exp(-dt / OWN_SETTLE_TIME)))
+    }
+    me.rim = own.rim
+    me.walk = step.walk
   }
 
   private absorbExtrapolationError(latest: Snapshot) {
@@ -640,6 +689,12 @@ export class NetSession extends BaseSession implements GameSession {
   }
 
   setInput(_id: number, input: PlayerInput) {
+    const was = this.inputAtChange
+    if (was.walk !== input.walk || aimMoved(was.aim, input.aim)) {
+      this.inputAtChange = { ...input }
+      this.inputChangedAt = performance.now()
+    }
+    this.input = { ...input }
     const l = this.lastInput
     if (this.baselineSent && input.burst > l.burst) this.predictBurst()
     if (l.fart !== input.fart || l.burst !== input.burst || l.walk !== input.walk) {
@@ -648,8 +703,7 @@ export class NetSession extends BaseSession implements GameSession {
       this.flushInput()
       return
     }
-    const aimChanged =
-      (l.aim === null) !== (input.aim === null) || (l.aim !== null && input.aim !== null && Math.abs(l.aim - input.aim) > AIM_RESEND_DELTA)
+    const aimChanged = aimMoved(l.aim, input.aim)
     if (!aimChanged) this.pendingInput = null
     else if (performance.now() - this.lastSentAt < INPUT_MIN_INTERVAL_MS) this.pendingInput = { ...input }
     else {

@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { MAX_RAFTS } from '../../sim/constants'
 import { COURSE_LIST } from '../../sim/courses'
+import { type Region, REGIONS } from '../../sim/regions'
 import { type CourseDef, MAX_DIFFICULTY } from '../../sim/track'
 import { audio } from '../audio/audio'
 import { createRoom, startSolo } from '../game/controller'
+import { fastestRegion, useRegionPings } from '../regions'
 import { THEMES } from '../scene/themes'
 import { isUnlocked, type Medal, recordOf, useProgress } from '../state/progress'
 import { useApp } from '../state/store'
@@ -101,6 +103,7 @@ export function LevelSelect() {
   const mode = useApp((s) => s.levelMode)
   const setOverlay = useApp((s) => s.setOverlay)
   const [rafts, setRafts] = useState(1)
+  const [server, setServer] = useState<Region | null>(null)
   const close = () => setOverlay(null)
   const online = mode === 'online'
   const pick = (n: number) => () => {
@@ -137,6 +140,7 @@ export function LevelSelect() {
               )
             })}
           </div>
+          {REGIONS.length > 1 && <ServerPicker chosen={server} onPick={setServer} />}
           {rafts > 1 && (
             <div role="radiogroup" aria-label="Rafts" className="flex items-center gap-1.5">
               <span className="font-display text-sm text-ink/55">RAFTS</span>
@@ -164,10 +168,39 @@ export function LevelSelect() {
       </p>
       <LevelCards
         onPick={(id) => {
-          if (online) createRoom(id, rafts)
+          if (online) createRoom(id, rafts, server ?? fastestRegion(useRegionPings.getState()))
           else startSolo(id)
         }}
       />
     </Modal>
+  )
+}
+
+/** Which server a new room goes on: the nearest unless the host picks another (for friends far away). */
+function ServerPicker({ chosen, onPick }: { chosen: Region | null; onPick: (region: Region) => void }) {
+  const pings = useRegionPings()
+  const shown = chosen ?? fastestRegion(pings)
+  return (
+    <div role="radiogroup" aria-label="Server" className="flex items-center gap-1.5">
+      <span className="font-display text-sm text-ink/55">SERVER</span>
+      {REGIONS.map((r) => {
+        const ms = pings[r.id]
+        return (
+          <button
+            key={r.id}
+            role="radio"
+            aria-checked={shown.id === r.id}
+            className={`btn ${shown.id === r.id ? 'btn-purple' : 'btn-cream'} rounded-xl px-3 py-0.5 text-base shadow-[0_3px_0_var(--color-ink)]`}
+            onClick={() => {
+              audio.click()
+              onPick(r)
+            }}
+          >
+            {r.name}
+            <span className="ml-1.5 text-sm normal-case opacity-70">{ms === undefined ? '…' : ms === null ? 'down' : `${ms} ms`}</span>
+          </button>
+        )
+      })}
+    </div>
   )
 }

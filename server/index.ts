@@ -25,7 +25,7 @@ import {
   normalizeRoomCode,
   PROTOCOL_VERSION,
   ROOM_CODE_ALPHABET,
-  ROOM_CODE_LENGTH,
+  ROOM_CODE_RANDOM,
   quantizeSnapshot,
   type RoomSummary,
   mayRestart,
@@ -35,11 +35,18 @@ import {
   type ServerMsg,
   type ServerStats,
 } from '../src/sim/protocol'
+import { REGIONS, regionById } from '../src/sim/regions'
 import { type Refusal, Sim } from '../src/sim/sim'
 import type { Results, RosterEntry } from '../src/sim/types'
 
 const PORT = Number(process.env.PORT ?? 2567)
 const HOST = process.env.HOST
+/** Which server in regions.json this is. Production must say once there are several; development runs as the first. */
+const REGION = process.env.REGION ?? (process.env.NODE_ENV === 'production' && REGIONS.length > 1 ? '' : REGIONS[0].id)
+if (!regionById(REGION)) {
+  console.error(`Set REGION to one of ${REGIONS.map((r) => r.id).join(', ')} (from regions.json).`)
+  process.exit(1)
+}
 const TICK_MS = DT * 1000
 const MAX_CATCHUP_TICKS = 8
 const EMPTY_ROOM_TTL_MS = 60_000
@@ -403,8 +410,8 @@ const rooms = new Map<string, Room>()
 
 function newRoomCode() {
   for (;;) {
-    let code = ''
-    for (let i = 0; i < ROOM_CODE_LENGTH; i++) code += ROOM_CODE_ALPHABET[Math.floor(Math.random() * ROOM_CODE_ALPHABET.length)]
+    let code = REGION
+    for (let i = 0; i < ROOM_CODE_RANDOM; i++) code += ROOM_CODE_ALPHABET[Math.floor(Math.random() * ROOM_CODE_ALPHABET.length)]
     if (!rooms.has(code)) return code
   }
 }
@@ -480,7 +487,13 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost')
   if (url.pathname === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ ok: true, rooms: rooms.size, sockets: wss.clients.size, server: stats }))
+    res.end(JSON.stringify({ ok: true, region: REGION, protocol: PROTOCOL_VERSION, rooms: rooms.size, sockets: wss.clients.size, server: stats }))
+    return
+  }
+  // Pages time this to pick the nearest server for a new room, from whichever origin they were loaded.
+  if (url.pathname === '/ping') {
+    res.writeHead(204, { 'access-control-allow-origin': '*', 'cache-control': 'no-store' })
+    res.end()
     return
   }
   if (!existsSync(distDir)) {
@@ -752,7 +765,7 @@ setInterval(() => {
 }, RATE_WINDOW_MS)
 
 server.listen(PORT, HOST, () => {
-  console.log(`Toot Together server on http://localhost:${PORT} (ws path /ws)`)
+  console.log(`Toot Together server on http://localhost:${PORT} (ws path /ws, region ${REGION})`)
 })
 
 function parkRooms() {

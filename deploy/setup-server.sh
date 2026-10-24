@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Extra domains (www, domains the game moved from) redirect to the main one.
-DOMAIN=${1:?usage: setup-server.sh <domain> [redirect-from-domain ...]}
-shift
+# REGION is this box's id in regions.json. Extra domains (www, domains the game moved from) redirect to the main one.
+USAGE='usage: setup-server.sh <region> <domain> [redirect-from-domain ...]'
+REGION=${1:?$USAGE}
+[[ $REGION =~ ^[A-Z]{2}$ ]] || { echo "$USAGE (region is its two-letter id in regions.json)" >&2; exit 1; }
+DOMAIN=${2:?$USAGE}
+shift 2
 REDIRECT_FROM="$*"
 HERE=$(cd "$(dirname "$0")" && pwd)
 APP_DIR=/opt/toot-together
@@ -41,6 +44,8 @@ id toot >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/n
 install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$APP_DIR" "$APP_DIR/releases"
 
 install -m 644 "$HERE/toot-together.service" /etc/systemd/system/toot-together.service
+install -d /etc/systemd/system/toot-together.service.d
+printf '[Service]\nEnvironment=REGION=%s\n' "$REGION" >/etc/systemd/system/toot-together.service.d/region.conf
 {
   cat "$HERE/Caddyfile"
   if [ -n "$REDIRECT_FROM" ]; then cat "$HERE/Caddyfile.redirect"; fi
@@ -53,4 +58,4 @@ systemctl reload-or-restart caddy
 echo "$DEPLOY_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart toot-together" >/etc/sudoers.d/toot-together
 chmod 440 /etc/sudoers.d/toot-together
 
-echo "Provisioned for https://$DOMAIN${REDIRECT_FROM:+ (redirecting $REDIRECT_FROM)}"
+echo "Provisioned region $REGION for https://$DOMAIN${REDIRECT_FROM:+ (redirecting $REDIRECT_FROM)}"

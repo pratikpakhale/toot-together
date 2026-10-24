@@ -38,7 +38,7 @@ src/sim/        Deterministic, framework-free game simulation (runs in browser A
                   (co-op is simply a race with one raft)
   sectors.ts      Which slice of the rim each hippo in a crew may stand on
   protocol.ts     Client/server message types
-server/index.ts   ws rooms with 4-letter codes, 60 Hz authoritative sim, 60 Hz snapshots
+server/index.ts   ws rooms with region-prefixed codes (INBEAN), 60 Hz authoritative sim, 60 Hz snapshots
 src/client/
   game/           Sessions (local vs online), interpolation, input devices, events
   scene/          React Three Fiber scene: track mesh builder, water shader, hippos, FX, per-river themes
@@ -52,7 +52,8 @@ tests/            Vitest: every course is intact and finishable by bots with haz
 trailer/          The launch trailer: shot list, title cards and the frame-by-frame recorder
 ```
 
-- **Multiplayer**: the server owns the only simulation, clients send inputs (where to stand, toot, burst), and the server broadcasts snapshots that clients render slightly in the past with interpolation (one snapshot interval plus the jitter they measure, at most 250 ms). Obstacles are pure functions of the shared clock, so they cost no bandwidth. Your own toots play sound and particles instantly, before the server confirms them.
+- **Multiplayer**: the server owns the only simulation, clients send inputs (where to stand, toot, burst), and the server broadcasts snapshots that clients render slightly in the past with interpolation (one snapshot interval plus the jitter they measure, at most 250 ms). Obstacles are pure functions of the shared clock, so they cost no bandwidth. Your own toots play sound and particles instantly, before the server confirms them, and your own hippo walks round the rim at once (the same step as the sim), easing onto the server's spot once it has caught up.
+- **Regions**: `regions.json` lists the game servers. A room code starts with its server's id (`INBEAN`), so a code or invite link alone says where to connect. New rooms go to the server with the shortest round trip unless the host picks another, and `/hippocam` has a tab per server.
 - **Solo and couch** run the exact same `Sim` in the browser, so every mode shares one code path.
 - **Course authoring**: a course is a list of pieces (`len`, `turn`, `drop`, `width`, `left`/`right` edge: `wall | spikes | open`, `flow`, `ice`, `items`). Baking produces samples used by both physics and rendering. `pnpm test` checks that a course never folds back onto itself and that the autopilot can finish it.
 - **Trailer**: the real game scene, steered by the autopilot from a shot list (`trailer/director.ts`) with scripted chat. `pnpm trailer` steps it frame by frame in headless Chromium on a fake clock while the game's synth renders into an `OfflineAudioContext`, so every frame and sound lands on time and each render comes out identical. `pnpm trailer:dryrun` plays the shots in Node and prints what happens in each. It needs ffmpeg and `pnpm exec playwright install chromium-headless-shell`.

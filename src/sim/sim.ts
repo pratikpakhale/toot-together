@@ -41,14 +41,13 @@ import {
   SYNC_BONUS,
   SYNC_DURATION,
   SYNC_WINDOW,
-  WALK_SPEED,
   WALL_RESTITUTION,
   WALL_SPIN,
   WATER_DRAG,
 } from './constants'
 import { angleDiff, clamp, createRng, type Rng, wrapAngle } from './math'
 import { collideItem, FIELD_KINDS, fieldAt, type KillCause } from './obstacles'
-import { homeRim, type RimSector, rimSector, sectorOffset } from './sectors'
+import { homeRim, type RimSector, rimSector, walkRim } from './sectors'
 import { type BakedCourse, EDGE_CODE, type PickupKind, pointAt, queryTrack, type TrackQuery } from './track'
 import {
   BUFF_CODE,
@@ -104,7 +103,6 @@ interface Player {
 const NO_BURST_BASELINE = -1
 const awaitingBurstBaseline = (p: Player) => p.burstSeen < 0
 
-const OPPOSITE_AIM_BAND = 0.35
 /** Blame (recent push) above which a hippo counts as having pushed its raft into a bump. */
 const PUSHING = 0.3
 
@@ -602,7 +600,9 @@ export class Sim {
       const floating = raft.state === RAFT_STATE.float
       const scoring = this.scoring(p.raft)
       const n = crew.length
-      this.walkRim(p, raft, p.away ? null : rimSector(p.ord, ords[p.raft]), dt)
+      const step = walkRim(p.rim, p.input, raft.a, p.away ? null : rimSector(p.ord, ords[p.raft]), dt)
+      p.rim = step.rim
+      p.walk = step.walk
 
       if (p.buff && this.t >= p.buffUntil) p.buff = null
 
@@ -661,34 +661,6 @@ export class Sim {
 
       p.blame *= Math.exp(-dt / 1.1)
     }
-  }
-
-  private walkRim(p: Player, raft: Raft, sector: RimSector | null, dt: number) {
-    const maxStep = WALK_SPEED * dt
-    if (!sector) {
-      if (p.input.walk !== 0) {
-        p.rim = wrapAngle(p.rim + p.input.walk * maxStep)
-        p.walk = p.input.walk
-      } else if (p.input.aim !== null) {
-        const diff = angleDiff(p.rim, p.input.aim - raft.a)
-        p.rim = wrapAngle(p.rim + clamp(diff, -maxStep, maxStep))
-        p.walk = Math.abs(diff) > 0.03 ? (Math.sign(diff) as WalkDir) : 0
-      } else {
-        p.walk = 0
-      }
-      return
-    }
-    const u = sectorOffset(sector, p.rim)
-    let goal = u
-    if (p.input.walk !== 0) goal = u + p.input.walk * maxStep
-    else if (p.input.aim !== null) {
-      goal = sectorOffset(sector, p.input.aim - raft.a)
-      if (Math.abs(goal) > Math.PI - OPPOSITE_AIM_BAND) goal = u >= 0 ? Math.PI : -Math.PI
-    }
-    goal = clamp(goal, -sector.half, sector.half)
-    const diff = goal - u
-    p.rim = wrapAngle(sector.center + u + clamp(diff, -maxStep, maxStep))
-    p.walk = Math.abs(diff) > (p.input.walk !== 0 ? 1e-6 : 0.03) ? (Math.sign(diff) as WalkDir) : 0
   }
 
   private onFartStart(p: Player, raft: Raft, crew: Player[]) {

@@ -9,6 +9,7 @@
     "dev:web": "vite",
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc --noEmit && vite build && vite build --ssr server/index.ts --outDir dist-server --emptyOutDir",
+    "build:deploy": "tsc --noEmit && vite build --mode deploy && vite build --ssr server/index.ts --outDir dist-server --emptyOutDir",
     "start": "NODE_ENV=production node dist-server/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

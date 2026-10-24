@@ -14,7 +14,7 @@ This directory is the maintained source for verifying what a Toot Together playe
 
 - Act through the UI: clicks/taps on ARIA roles and names, keys sent to the page. `window.__toot.useApp.getState()` is for reading state only.
 - Other people are `$T bot` processes or extra browser contexts. Run a bot in the background when it must stay present while you drive.
-- Room codes are random 4-letter codes. Read the code from the URL (`?room=CODE`) or the HUD `ROOM` chip after creating; never hard-code one.
+- Room codes are the region id (`IN` locally) and then 4 random letters. Read the code from the URL (`?room=CODE`) or the HUD `ROOM` chip after creating; never hard-code one.
 - Wait on UI state (`locator.waitFor`, `waitForURL`), not fixed sleeps, except where a feature file says a delay is part of the behaviour.
 - Close extra browser contexts and `browser_navigate about:blank` before `$T down`.
 

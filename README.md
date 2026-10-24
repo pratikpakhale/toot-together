@@ -19,7 +19,7 @@ Open the URL, pick a name, and choose a mode:
 | --- | --- |
 | **Play solo** | One hippo, keyboard / gamepad / touch. |
 | **Couch party** | Up to 4 hippos on one screen: WASD + Space, Arrows + Enter, and gamepads (press A to join). |
-| **Online** | **Create room**, pick a river, then share the 4-letter code or the invite link from the HUD. Friends hit **Join**. |
+| **Online** | **Create room**, pick a river, then share the 6-letter code (like `INBEAN`) or the invite link from the HUD. Friends hit **Join**. |
 | **Race** (online) | **Create room**, switch the river picker to **Race** and choose 2–4 rafts. Everyone picks a raft, readies up, and the start gate drops on GO. First raft to the finish wins. |
 
 To play online on your LAN, friends open `http://<your-ip>:5173` (Vite prints it as "Network").
@@ -31,18 +31,19 @@ pnpm build
 pnpm start          # serves the built game + WebSocket rooms on one port ($PORT, default 2567)
 ```
 
-Any Node host that supports WebSockets will run it (a VPS, Render, Railway, …). It is a single process with no database. Rooms live in memory, so run exactly **one** instance. Behind a reverse proxy, set `TRUST_PROXY_HEADER` to the header that carries the client's IP (say `x-forwarded-for`), or every player counts as the proxy's IP for the rate limits. Set `ROOMS_FILE` (or systemd's `STATE_DIRECTORY`) to keep rooms across a restart.
+Any Node host that supports WebSockets will run it (a VPS, Render, Railway, …). It is a single process with no database. Rooms live in memory, so run exactly **one** instance per region. A page built with `pnpm build` talks to the server it was loaded from. Deploy builds (`pnpm build:deploy`, which `scripts/deploy.sh` runs) instead find the servers through `regions.json`: an id (two capital letters, which start every room code there), a name, and the server's URL. Put your own servers in it before deploying. In production, a server needs `REGION` set to its id once more than one region is listed. Behind a reverse proxy, set `TRUST_PROXY_HEADER` to the header that carries the client's IP (say `x-forwarded-for`), or every player counts as the proxy's IP for the rate limits. Set `ROOMS_FILE` (or systemd's `STATE_DIRECTORY`) to keep rooms across a restart.
 
 ### Self-hosting
 
 The repo ships everything for a small VM: Caddy in front for HTTPS and the WebSocket proxy, and the Node server running as the `toot-together` systemd service.
 
 1. Point a domain's A record at a fresh Ubuntu 24.04 VM, and open TCP 80 and 443 in your cloud provider's firewall.
-2. Copy `deploy/` to the box and run `sudo bash setup-server.sh <domain> [other domains…]` there. It opens 80/443 in the VM firewall and adds swap, then installs Node 24, pnpm and Caddy. Any other domains (say `www.<domain>`, or one the game moved from) permanently redirect to `<domain>`. It is safe to re-run.
-3. Copy `.env.example` to `.env.local` and fill in `DEPLOY_HOST` and `DEPLOY_URL`. `VITE_POSTHOG_KEY` is optional: without it, analytics stay off.
+2. Add the box to `regions.json`, then copy `deploy/` to the box and run `sudo bash setup-server.sh <region id> <domain> [other domains…]` there. It opens 80/443 in the VM firewall and adds swap, then installs Node 24, pnpm and Caddy. Any other domains (say `www.<domain>`, or one the game moved from) permanently redirect to `<domain>`. It is safe to re-run.
+3. Copy `.env.example` to `.env.local` and fill in `DEPLOY_HOST_<region id>` for each box. `VITE_POSTHOG_KEY` is optional: without it, analytics stay off.
 
 ```bash
-scripts/deploy.sh                                     # builds locally, uploads a release, restarts, checks /health
+scripts/deploy.sh IN                                  # one region's server: builds locally, uploads a release, restarts, checks /health
+scripts/deploy.sh web                                 # the page, to Vercel (vercel link once); servers first after a protocol change
 ssh <deploy host> journalctl -u toot-together -f         # logs
 ```
 

@@ -20,7 +20,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,webp}', '**/*-latin-[0-9]*.woff2'],
         maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/ws/, /^\/health/],
+        navigateFallbackDenylist: [/^\/ws/, /^\/health/, /^\/ping/],
         runtimeCaching: [{ urlPattern: /\/assets\/.+\.woff2$/, handler: 'CacheFirst', options: { cacheName: 'fonts' } }],
       },
     }),

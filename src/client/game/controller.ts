@@ -1,4 +1,5 @@
 import { normalizeRoomCode, ROOM_CODE_LENGTH } from '../../sim/protocol'
+import { type Region, regionOfCode } from '../../sim/regions'
 import { setPlayerName, track } from '../analytics'
 import { audio } from '../audio/audio'
 import { fx } from '../scene/Fx'
@@ -158,9 +159,9 @@ export function startLocal(players: { name: string; device: DeviceId }[], course
 }
 
 /** `rafts`: 1 for co-op, 2–4 for a race. */
-export function createRoom(courseId: string, rafts = 1) {
+export function createRoom(courseId: string, rafts: number, region: Region) {
   useProgress.getState().select(courseId)
-  joinOnline(null, courseId, rafts)
+  joinOnline(null, courseId, rafts, region)
 }
 
 export function playLevel(courseId: string) {
@@ -173,20 +174,28 @@ export function playLevel(courseId: string) {
 
 export function joinRoom(code: string) {
   const room = normalizeRoomCode(code)
-  if (room.length !== ROOM_CODE_LENGTH) {
-    useApp.getState().setNotice({ title: 'Check the code', message: 'Room codes are 4 letters, like BEAN.' })
+  if (!isRoomCode(room)) {
+    useApp.getState().setNotice({ title: 'Check the code', message: `Room codes are ${ROOM_CODE_LENGTH} letters, like INBEAN.` })
     return
   }
   joinOnline(room)
 }
 
-function joinOnline(room: string | null, courseId?: string, rafts = 1) {
+const isRoomCode = (code: string) => code.length === ROOM_CODE_LENGTH && regionOfCode(code) !== null
+
+function joinOnline(room: string | null, courseId?: string, rafts = 1, region?: Region) {
   const { settings } = useApp.getState()
-  const session = new NetSession(settings.name, room, courseId, false, rafts)
+  const session = new NetSession(settings.name, room, courseId, false, rafts, region)
   adopt(session)
   enterGame()
   setPlayerName(settings.name)
-  track('game_started', { mode: 'online', room: room ? 'join' : 'create', course: session.info.courseId, ...(room ? {} : { rafts }) })
+  track('game_started', {
+    mode: 'online',
+    room: room ? 'join' : 'create',
+    region: (room ? regionOfCode(room) : region)?.id,
+    course: session.info.courseId,
+    ...(room ? {} : { rafts }),
+  })
   const stop = session.subscribe(() => {
     if (session.info.roomCode) {
       setRoomInUrl(session.info.roomCode)
@@ -262,7 +271,7 @@ function setRoomInUrl(code: string | null) {
 
 export function roomFromUrl(): string | null {
   const code = normalizeRoomCode(new URL(location.href).searchParams.get('room'))
-  return code.length === ROOM_CODE_LENGTH ? code : null
+  return isRoomCode(code) ? code : null
 }
 
 export function inviteLink(code: string) {

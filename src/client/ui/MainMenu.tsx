@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { ROOM_CODE_LENGTH } from '../../sim/protocol'
 import { audio } from '../audio/audio'
 import { joinRoom } from '../game/controller'
 import { useShortScreen } from '../platform'
+import { measureRegions } from '../regions'
 import { useApp } from '../state/store'
 import { FullscreenButton } from './FullscreenButton'
 import { Logo } from './Logo'
@@ -19,6 +21,10 @@ export function MainMenu() {
     audio.unlock()
     audio.click()
     fn()
+  }
+  const pickRiverForRoom = () => {
+    measureRegions()
+    openLevels('online')
   }
 
   const name = (
@@ -42,7 +48,7 @@ export function MainMenu() {
   const online = (
     <div className="panel flex flex-col gap-3 p-4 short:gap-2 short:p-3">
       <div className="font-display flex items-center gap-2 text-xl short:text-base"><Icon name="globe" size="1.3em" /> PLAY ONLINE WITH FRIENDS</div>
-      <button className="btn btn-blue text-xl short:py-2" onClick={click(() => openLevels('online'))} onMouseEnter={() => audio.hover()}>
+      <button className="btn btn-blue text-xl short:py-2" onClick={click(pickRiverForRoom)} onMouseEnter={() => audio.hover()}>
         Create room
       </button>
       <form
@@ -59,7 +65,7 @@ export function MainMenu() {
           placeholder="CODE"
           aria-label="Room code"
           value={code}
-          maxLength={4}
+          maxLength={ROOM_CODE_LENGTH}
           onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
           spellCheck={false}
           autoCapitalize="characters"
@@ -67,7 +73,7 @@ export function MainMenu() {
           autoCorrect="off"
           enterKeyHint="go"
         />
-        <button className="btn btn-purple text-xl short:py-1.5" type="submit" disabled={code.length !== 4}>
+        <button className="btn btn-purple text-xl short:py-1.5" type="submit" disabled={code.length !== ROOM_CODE_LENGTH}>
           Join
         </button>
       </form>

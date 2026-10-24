@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { MAX_RAFTS } from '../../sim/constants'
 import { COURSES } from '../../sim/courses'
 import { PROTOCOL_VERSION, type RoomSummary, type ServerMsg, type ServerStats } from '../../sim/protocol'
+import { type Region, REGIONS } from '../../sim/regions'
 import { audio } from '../audio/audio'
 import { showMenu, watchRoom } from '../game/controller'
 import { seatColor, TEAMS } from '../game/frame'
+import { socketUrl } from '../regions'
 import { formatTime } from './format'
 import { Icon } from './Icon'
 import { TeamBadge } from './Race'
@@ -14,7 +16,7 @@ type Feed =
   | { status: 'error'; message: string }
   | { status: 'live'; rooms: RoomSummary[]; server: ServerStats; stale: boolean }
 
-function useRoomFeed(): Feed {
+function useRoomFeed(region: Region): Feed {
   const [feed, setFeed] = useState<Feed>({ status: 'connecting' })
   // react-doctor-disable-next-line react-doctor/effect-needs-cleanup -- the cleanup closes the socket and clears the retry timer
   useEffect(() => {
@@ -22,7 +24,7 @@ function useRoomFeed(): Feed {
     let retry = 0
     let stopped = false
     const connect = () => {
-      ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
+      ws = new WebSocket(socketUrl(region))
       ws.onopen = () => ws.send(JSON.stringify({ type: 'watch', v: PROTOCOL_VERSION }))
       ws.onmessage = (e) => {
         const msg = JSON.parse(String(e.data)) as ServerMsg
@@ -44,7 +46,7 @@ function useRoomFeed(): Feed {
       window.clearTimeout(retry)
       ws.close()
     }
-  }, [])
+  }, [region])
   return feed
 }
 
@@ -65,7 +67,7 @@ function leave() {
 }
 
 export function SpyRooms() {
-  const feed = useRoomFeed()
+  const [region, setRegion] = useState(REGIONS[0])
 
   return (
     <div className="safe-area pointer-events-none flex flex-col gap-4 overflow-y-auto overscroll-contain p-4 sm:p-8">
@@ -73,11 +75,39 @@ export function SpyRooms() {
         <div className="font-display stroke-text flex items-center gap-2 text-4xl text-white">
           <Icon name="eye" size="1.1em" /> HIPPOCAM
         </div>
+        {REGIONS.length > 1 && (
+          <div role="tablist" aria-label="Server" className="flex rounded-[18px] border-[3px] border-ink bg-white p-1">
+            {REGIONS.map((r) => (
+              <button
+                key={r.id}
+                role="tab"
+                aria-selected={r.id === region.id}
+                className={`font-display rounded-[12px] px-4 py-1 text-lg ${r.id === region.id ? 'bg-toot text-ink' : 'text-ink/55'}`}
+                onClick={() => {
+                  audio.click()
+                  setRegion(r)
+                }}
+              >
+                {r.name}
+              </button>
+            ))}
+          </div>
+        )}
         <button className="btn btn-cream ml-auto px-4 py-1.5 text-base" onClick={leave}>
           Back to the game
         </button>
       </div>
 
+      <RegionRooms key={region.id} region={region} />
+    </div>
+  )
+}
+
+/** One server's rooms, live. */
+function RegionRooms({ region }: { region: Region }) {
+  const feed = useRoomFeed(region)
+  return (
+    <>
       {feed.status === 'connecting' && <div className="panel pointer-events-auto self-start px-5 py-3 font-display text-xl">Tuning in…</div>}
 
       {feed.status === 'error' && (
@@ -103,7 +133,7 @@ export function SpyRooms() {
           )}
         </>
       )}
-    </div>
+    </>
   )
 }
 

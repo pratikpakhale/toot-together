@@ -58,7 +58,7 @@ While a thumb aims, the wheel ignores touches (`pointer-events: none`), so the o
 Preconditions:
 
 - Baseline preconditions from the README.
-- The browser player has created a room: `Create room` -> `getByRole('button', { name: /^1 Lazy River/ })` -> `waitForURL(/\?room=[A-Z]{4}/)`. Call the code `CODE` and the evidence folder `EV`.
+- The browser player has created a room: `Create room` -> `getByRole('button', { name: /^1 Lazy River/ })` -> `waitForURL(/\?room=[A-Z]{6}/)`. Call the code `CODE` and the evidence folder `EV`.
 - The room has at most 1 other player (4 is the cap, and departed bots hold seats for 30 s).
 
 - **Receive.** Start a bot in the background: `$T bot --room CODE --name Bubbles --say "hello from the bot" --stay 60 --out EV/chat-bot.jsonl`. In the browser `getByText('hello from the bot').first().waitFor()`. The line shows bottom-left prefixed `Bubbles` and as a bubble over a hippo. Screenshot `chat-01-bot-line-received.png`.
