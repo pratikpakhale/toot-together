@@ -9,9 +9,11 @@ import { initAnalytics } from './analytics'
 import { isHippocamRoute } from './game/controller'
 import { installPlatformGuards } from './platform'
 import { ErrorBoundary, FatalScreen, hasWebGL } from './ui/Fatal'
+import { keepUpToDate } from './updates'
 
 installPlatformGuards()
 if (!isHippocamRoute()) initAnalytics()
+keepUpToDate()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

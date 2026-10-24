@@ -32,6 +32,9 @@ importers:
       three:
         specifier: ^0.186.1
         version: 0.186.1
+      workbox-window:
+        specifier: ^7.4.1
+        version: 7.4.1
       ws:
         specifier: ^8.22.0
         version: 8.22.0

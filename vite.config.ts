@@ -9,9 +9,14 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'script-defer',
+      // Registered from src/client/updates.ts, which decides when a new release reloads the page.
+      injectRegister: false,
       manifest: false,
       workbox: {
+        // A new release takes over at once; src/client/updates.ts then reloads the page when it's safe.
+        // (The plugin only sets these itself when it injects the registration.)
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,svg,png,webp}', '**/*-latin-[0-9]*.woff2'],
         maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
         navigateFallback: '/index.html',
