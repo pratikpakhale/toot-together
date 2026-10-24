@@ -21,6 +21,18 @@ Production is a single Ubuntu VM provisioned with `deploy/setup-server.sh`. Cadd
 
 Test with `pnpm test` (vitest; `tests/handoff.test.ts` spawns real servers), node scripts against `pnpm dev`, `pnpm typecheck`, and `pnpm react-doctor` (React Doctor: errors fail it, warnings are advisory; `--no-score` keeps results off react.doctor's servers).
 
+## Design
+
+Toot Together is a party game for friends, played on phones held in landscape (both thumbs busy with the joystick and TOOT) and on laptops (hands on WASD and Space). It works when a room of friends is laughing together, so the UI should stay out of the way of the run and make talking, picking a raft and starting again effortless. Most UI is touched mid-run, so every in-game control has to work in under a second without looking away from the river.
+
+The look is chunky, cheeky and toy-like: thick ink outlines, candy colours, a bouncy display font, everything like a plastic toy you could pick up. References: Fall Guys (bubbly, colourful, readable at a glance) and the Valorant ping wheel (structure and speed of in-game comms).
+
+- **Never make a player look away.** In-game UI is glanceable, fixed in place and driven by muscle memory: the same thing always lives in the same spot.
+- **Thumbs and keys first.** Every action has a fast path for a held thumb and a held key; tapping through menus is the fallback.
+- **Use the game's own toy box.** The icon set, ink outlines and display font. Add to them rather than reaching for unicode arrows and checkmarks, default form widgets or flat, thin, SaaS-dashboard UI.
+- **Scale to a full room.** Anything listing players stays tidy with 16 hippos on 4 rafts; panels must not grow with player count and push the game out of view.
+- **Accessibility:** respect `prefers-reduced-motion`, tell rafts apart by shape as well as colour, make touch targets at least 44 px, and keep in-game text at 13 px or more.
+
 ## Agent files
 
 `AGENTS.md` and `.agents/skills/` are the source of truth for every agent. `.claude` is a symlink to `.agents` so Claude Code finds the skills; don't put content in it. Keep anything specific to the owner's machine or servers in `AGENTS.local.md`, never in committed files.
