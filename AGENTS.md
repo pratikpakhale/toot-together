@@ -19,7 +19,7 @@ Production is a single Ubuntu VM provisioned with `deploy/setup-server.sh`. Cadd
 
 ## Testing
 
-Test with `pnpm test` (vitest; `tests/handoff.test.ts` spawns real servers), node scripts against `pnpm dev`, and `pnpm typecheck`.
+Test with `pnpm test` (vitest; `tests/handoff.test.ts` spawns real servers), node scripts against `pnpm dev`, `pnpm typecheck`, and `pnpm doctor` (React Doctor: errors fail it, warnings are advisory; `--no-score` keeps results off react.doctor's servers).
 
 ## Agent files
 
