@@ -98,6 +98,10 @@ export interface ServerStats {
   cpu: number
   /** One-minute load average of the machine. */
   load: number
+  /** Share of the machine's CPU time the hypervisor took for other guests over the last second, in %; null off Linux. */
+  stealPct: number | null
+  /** Memory the machine could still hand out without swapping. */
+  memAvailableMb: number
   /** How late game ticks started over the last second, in ms. */
   tickLateAvg: number
   tickLateMax: number

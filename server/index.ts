@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { createReadStream, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage } from 'node:http'
-import { loadavg } from 'node:os'
+import { freemem, loadavg } from 'node:os'
 import { basename, extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -462,7 +462,7 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost')
   if (url.pathname === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ ok: true, rooms: rooms.size, sockets: wss.clients.size }))
+    res.end(JSON.stringify({ ok: true, rooms: rooms.size, sockets: wss.clients.size, server: stats }))
     return
   }
   if (!existsSync(distDir)) {
@@ -676,9 +676,21 @@ gameLoop()
 
 const RELEASE = basename(process.cwd())
 const round2 = (v: number) => Math.round(v * 100) / 100
-let stats: ServerStats = { release: RELEASE, uptime: 0, sockets: 0, rssMb: 0, heapMb: 0, cpu: 0, load: 0, tickLateAvg: 0, tickLateMax: 0 }
+let stats: ServerStats = { release: RELEASE, uptime: 0, sockets: 0, rssMb: 0, heapMb: 0, cpu: 0, load: 0, stealPct: null, memAvailableMb: 0, tickLateAvg: 0, tickLateMax: 0 }
 let lastCpu = process.cpuUsage()
 let lastStatsAt = performance.now()
+
+/** Total and stolen CPU time of the machine from /proc/stat, or null where there is none (macOS). */
+function machineCpuTimes(): { total: number; steal: number } | null {
+  try {
+    const fields = readFileSync('/proc/stat', 'utf8').split('\n', 1)[0].trim().split(/\s+/).slice(1).map(Number)
+    // user nice system idle iowait irq softirq steal; guest time is already counted in user.
+    return { total: fields.slice(0, 8).reduce((a, b) => a + b, 0), steal: fields[7] }
+  } catch {
+    return null
+  }
+}
+let lastMachineCpu = machineCpuTimes()
 
 function roomListMsg(): ServerMsg {
   return { type: 'rooms', rooms: [...rooms.values()].map((r) => r.summary()), server: stats }
@@ -689,6 +701,7 @@ setInterval(() => {
   const cpu = process.cpuUsage(lastCpu)
   lastCpu = process.cpuUsage()
   const mem = process.memoryUsage()
+  const machineCpu = machineCpuTimes()
   stats = {
     release: RELEASE,
     uptime: Math.round(process.uptime()),
@@ -697,10 +710,16 @@ setInterval(() => {
     heapMb: Math.round(mem.heapUsed / 2 ** 20),
     cpu: round2((cpu.user + cpu.system) / 1000 / (now - lastStatsAt)),
     load: round2(loadavg()[0]),
+    stealPct:
+      lastMachineCpu && machineCpu && machineCpu.total > lastMachineCpu.total
+        ? round2(((machineCpu.steal - lastMachineCpu.steal) / (machineCpu.total - lastMachineCpu.total)) * 100)
+        : null,
+    memAvailableMb: Math.round(freemem() / 2 ** 20),
     tickLateAvg: lateness.count ? round2(lateness.sum / lateness.count) : 0,
     tickLateMax: round2(lateness.max),
   }
   lastStatsAt = now
+  lastMachineCpu = machineCpu
   lateness.sum = lateness.max = lateness.count = 0
   if (!roomListWatchers.size) return
   const data = JSON.stringify(roomListMsg())
