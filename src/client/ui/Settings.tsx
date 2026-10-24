@@ -1,18 +1,26 @@
+import { useRef } from 'react'
 import { MAX_NAME_LENGTH } from '../../sim/protocol'
 import { audio } from '../audio/audio'
+import { renamePlayer } from '../game/controller'
 import { useApp } from '../state/store'
 import { Modal } from './Modal'
 
 export function NameInput({ className }: { className: string }) {
   const name = useApp((s) => s.settings.name)
   const update = useApp((s) => s.updateSettings)
+  const before = useRef(name)
   return (
     <input
       className={`field ${className}`}
       value={name}
       maxLength={MAX_NAME_LENGTH}
       onChange={(e) => update({ name: e.target.value })}
-      onBlur={(e) => update({ name: e.target.value.trim() || 'Hippo' })}
+      onFocus={(e) => (before.current = e.target.value)}
+      onBlur={(e) => {
+        const next = e.target.value.trim() || 'Hippo'
+        update({ name: next })
+        if (next !== before.current) renamePlayer(next)
+      }}
       onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
       enterKeyHint="done"
       autoComplete="off"

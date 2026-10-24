@@ -10,7 +10,7 @@ export function InstallPrompt() {
   if (!offer || busy) return null
   const ios = offer === 'ios'
   return (
-    <Modal width={420} onClose={dismissInstall}>
+    <Modal width={420} onClose={() => dismissInstall()}>
       <div className="text-center">
         <Icon name={ios ? 'share' : 'hippo'} size={72} />
         <div className="font-display mt-2 text-3xl">Install the game</div>
@@ -29,6 +29,9 @@ export function InstallPrompt() {
             </button>
           )}
         </div>
+        <button className="mt-2 min-h-11 w-full text-sm font-extrabold text-ink/55 underline decoration-2 underline-offset-2" onClick={() => (audio.click(), dismissInstall(true))}>
+          Don't ask again
+        </button>
       </div>
     </Modal>
   )

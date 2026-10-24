@@ -40,7 +40,7 @@ export function Refusal({ className = '' }: { className?: string }) {
 /** "Needs a second raft…" when the host can't start yet, else null. */
 export function startBlocker(roster: RosterEntry[], rafts: number) {
   let crewed = 0
-  for (let r = 0; r < rafts; r++) if (roster.some((p) => p.raft === r)) crewed++
+  for (let r = 0; r < rafts; r++) if (roster.some((p) => p.raft === r && !p.away)) crewed++
   return crewed < 2 ? 'Needs a second raft with a hippo on it.' : null
 }
 

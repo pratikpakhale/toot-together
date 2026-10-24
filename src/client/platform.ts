@@ -124,11 +124,14 @@ export const useInstallOffer = () =>
     return () => installListeners.delete(onChange)
   }, installOffer)
 
-export function dismissInstall() {
+/** Hides the offer for this visit; `forever` keeps it hidden on later visits too. */
+export function dismissInstall(forever = false) {
   installDismissed = true
-  try {
-    localStorage.setItem(INSTALL_DISMISSED_KEY, '1')
-  } catch {}
+  if (forever) {
+    try {
+      localStorage.setItem(INSTALL_DISMISSED_KEY, '1')
+    } catch {}
+  }
   emitInstall()
 }
 

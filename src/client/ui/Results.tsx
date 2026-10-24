@@ -74,9 +74,12 @@ export function Results() {
   const r = rank(results.deaths)
   const list = awards(results.players).slice(0, short ? 4 : undefined)
   const medal = finish?.medal ?? medalFor(info.courseId, results.time)
-  const best = recordOf(records, info.courseId).best
-  const next = nextCourseId(info.courseId)
-  const target = medal < 3 && def ? { medal: (medal + 1) as 1 | 2 | 3, time: def.medals[2 - medal] } : null
+  const watching = !!session?.spectating
+  // A spectator's own records have nothing to do with this crew's run.
+  const best = watching ? null : recordOf(records, info.courseId).best
+  // Online, another river is the host's call; anyone may go again.
+  const next = session?.kind === 'local' || session?.isHost() ? nextCourseId(info.courseId) : null
+  const target = !watching && medal < 3 && def ? { medal: (medal + 1) as 1 | 2 | 3, time: def.medals[2 - medal] } : null
 
   const share = async () => {
     audio.click()
@@ -96,12 +99,12 @@ export function Results() {
   }
 
   return (
-    <Modal width={580} shortWidth={820} onClose={() => setOverlay(null)}>
+    <Modal width={580} shortWidth={820}>
       <div className="contents short:grid short:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] short:items-center short:gap-5">
         <div className="contents short:block">
           <div className="text-center">
             <Icon name={medal ? MEDAL_ICON[medal] : r.icon} size={short ? 44 : 76} className="anim-wobble" />
-            <div className="font-display text-5xl leading-none short:text-4xl">YOU MADE IT!</div>
+            <div className="font-display text-5xl leading-none short:text-4xl">{watching ? 'THEY MADE IT!' : 'YOU MADE IT!'}</div>
             <div className="font-display mt-1 text-xl text-ink/60 short:mt-0.5 short:text-base">{def?.name}</div>
             <div className="font-display text-2xl text-toot-dark short:text-lg">{medal ? `${MEDAL_NAME[medal]} medal · ${r.title}` : r.title}</div>
           </div>
@@ -140,10 +143,8 @@ export function Results() {
         </div>
         <div className="contents short:flex short:flex-col">
           {list.length > 0 && <AwardList list={list} short={short} />}
-          {session?.spectating ? (
-            <button className="btn btn-pink mt-5 w-full text-xl short:mt-3 short:py-2" onClick={() => (audio.click(), leaveGame())}>
-              Back to rooms
-            </button>
+          {watching ? (
+            <WatchingButtons />
           ) : (
             <div className="mt-5 flex flex-col gap-3 short:mt-3 short:gap-2.5 short:[&_.btn]:py-2">
               {next && (
@@ -162,7 +163,7 @@ export function Results() {
                   }}
                 >
                   <Icon name="replay" size="1.1em" />
-                  Again
+                  {session?.kind === 'online' ? 'Again (everyone)' : 'Again'}
                 </button>
                 <button className="btn btn-cream flex flex-1 items-center justify-center gap-2 text-xl" onClick={share}>
                   <Icon name={shared ? 'check' : 'share'} size="1.1em" />
@@ -171,12 +172,39 @@ export function Results() {
                 <button className="btn btn-cream flex-1 text-xl" onClick={() => (audio.click(), leaveGame())}>
                   Menu
                 </button>
+                <HideButton />
               </div>
             </div>
           )}
         </div>
       </div>
     </Modal>
+  )
+}
+
+/** Results never close on a stray tap; this (or Esc) hides them, and the HUD's Results button brings them back. */
+function HideButton() {
+  const setOverlay = useApp((s) => s.setOverlay)
+  return (
+    <button
+      className="btn btn-cream flex min-h-11 w-12 shrink-0 items-center justify-center p-0"
+      aria-label="Hide results"
+      title="Hide results (Esc)"
+      onClick={() => (audio.click(), setOverlay(null))}
+    >
+      <Icon name="eye" size={26} />
+    </button>
+  )
+}
+
+function WatchingButtons() {
+  return (
+    <div className="mt-5 flex gap-3 short:mt-3">
+      <button className="btn btn-pink flex-1 text-xl short:py-2" onClick={() => (audio.click(), leaveGame())}>
+        Back to rooms
+      </button>
+      <HideButton />
+    </div>
   )
 }
 
@@ -223,14 +251,15 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
   const click = (fn: () => void) => () => (audio.click(), fn())
 
   const title = winner?.place ? `${TEAMS[winner.raft].name.toUpperCase()} WINS!` : 'NOBODY MADE IT!'
-  const sub = mine ? (mine.place ? `your crew came ${ordinal(mine.place)}` : 'your crew ran out of time') : 'you sat this one out'
+  const sub = session.spectating ? null : mine ? (mine.place ? `your crew came ${ordinal(mine.place)}` : 'your crew ran out of time') : 'you sat this one out'
 
   const head = (
     <div className="text-center">
       <Icon name={winner?.place ? 'trophy' : 'hippoOops'} size={short ? 36 : 64} className="anim-wobble" />
       <div className="font-display text-5xl leading-none short:text-3xl">{title}</div>
       <div className="font-display mt-1 text-lg text-ink/60 short:mt-0.5 short:text-sm">
-        {def?.name} · {sub}
+        {def?.name}
+        {sub && ` · ${sub}`}
       </div>
     </div>
   )
@@ -257,9 +286,7 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
   )
 
   const buttons = session.spectating ? (
-    <button className="btn btn-pink mt-5 w-full text-xl short:mt-3 short:py-2" onClick={click(leaveGame)}>
-      Back to rooms
-    </button>
+    <WatchingButtons />
   ) : host ? (
     <div className="mt-5 flex flex-col gap-3 short:mt-3 short:gap-2 short:[&_.btn]:py-1.5">
       <button className="btn btn-green flex items-center justify-center gap-2 text-2xl short:text-lg" disabled={!!blocker} title={blocker ?? undefined} onClick={click(() => session.act({ type: 'start' }))}>
@@ -284,6 +311,7 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
         <button className="btn btn-cream text-base" onClick={click(leaveGame)}>
           Menu
         </button>
+        <HideButton />
       </div>
     </div>
   ) : (
@@ -308,12 +336,13 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
         <button className="btn btn-cream text-base" onClick={click(leaveGame)}>
           Leave
         </button>
+        <HideButton />
       </div>
     </div>
   )
 
   return (
-    <Modal width={620} shortWidth={820} onClose={() => setOverlay(null)}>
+    <Modal width={620} shortWidth={820}>
       <div className="contents short:grid short:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] short:items-center short:gap-5">
         <div className="contents short:block">
           {head}

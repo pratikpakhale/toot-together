@@ -56,6 +56,25 @@ function shake(amount: number) {
 }
 
 let resultsTimer = 0
+let stopWaiting: (() => void) | null = null
+
+/** Opens the results, or, if Pause or another menu is up, waits for it to close. Dropped if the results go first. */
+function showResults() {
+  const app = useApp.getState()
+  if (!app.results || app.overlay === 'results') return
+  if (app.overlay === null) return app.setOverlay('results')
+  stopWaiting = useApp.subscribe((s) => {
+    if (s.results && s.overlay !== null && s.overlay !== 'results') return
+    cancelResults()
+    if (s.results && s.overlay === null && s.screen === 'game') s.setOverlay('results')
+  })
+}
+
+function cancelResults() {
+  window.clearTimeout(resultsTimer)
+  stopWaiting?.()
+  stopWaiting = null
+}
 
 function flash() {
   const el = document.getElementById('flash')
@@ -134,7 +153,7 @@ export function handleEvent(e: SimEvent, menu: boolean) {
       // A rematch pulls every raft back onto the grid.
       frame.cameraCuts++
       frame.watch = null
-      window.clearTimeout(resultsTimer)
+      cancelResults()
       fx.clear()
       app.setResults(null)
       if (app.overlay === 'results' || app.overlay === 'crews') app.setOverlay(null)
@@ -201,17 +220,15 @@ export function handleEvent(e: SimEvent, menu: boolean) {
           ping: s.net?.pingMs ?? null,
         })
       }
-      window.clearTimeout(resultsTimer)
-      resultsTimer = window.setTimeout(() => {
-        if (useApp.getState().results) useApp.getState().setOverlay('results')
-      }, 2600)
+      cancelResults()
+      resultsTimer = window.setTimeout(showResults, 2600)
       break
     }
     case 'restart':
       frame.cameraCuts++
       frame.watch = null
       flash()
-      window.clearTimeout(resultsTimer)
+      cancelResults()
       fx.clear()
       app.setResults(null)
       if (app.overlay === 'results') app.setOverlay(null)
@@ -274,9 +291,11 @@ export function handleEvent(e: SimEvent, menu: boolean) {
       const p = hippo(e.id)
       const r = p && v?.rafts[p.raft]
       if (r) fx.confetti(r.x, r.y + 1.5, r.z, 30)
-      if (!p || !own(p.raft)) break
-      audio.legendary()
-      toast({ text: 'LEGENDARY TOOT', sub: `by ${nameOf(e.id)}`, icon: 'sparkle', tone: 'gold' }, 2200)
+      if (!p) break
+      // Announced to the whole room; only your own raft's gets the fanfare.
+      const ours = own(p.raft)
+      if (ours) audio.legendary()
+      toast({ text: 'LEGENDARY TOOT', sub: ours ? `by ${nameOf(e.id)}` : `by ${nameOf(e.id)} (${team(p.raft)})`, icon: ours ? 'sparkle' : TEAMS[p.raft].icon, tone: 'gold' }, 2200)
       break
     }
     case 'exhausted': {

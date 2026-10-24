@@ -5,8 +5,9 @@ import { describe, expect, it } from 'vitest'
 import { botInput } from '../src/sim/bot'
 import { DT } from '../src/sim/constants'
 import { getCourse } from '../src/sim/courses'
-import { PROTOCOL_VERSION, type ServerMsg } from '../src/sim/protocol'
+import { LEAVE_CLOSE_CODE, PROTOCOL_VERSION, type ServerMsg } from '../src/sim/protocol'
 import { Sim, type SimState } from '../src/sim/sim'
+import type { Results } from '../src/sim/types'
 import { connect, freePort, health, startServer, stopServer } from './server'
 
 const course = getCourse('canyon-run')
@@ -20,8 +21,8 @@ async function withRoomsFile(run: (roomsFile: string) => Promise<void>) {
   }
 }
 
-function parkRoom(roomsFile: string, code: string, sim: SimState, savedAt = Date.now()) {
-  const room = { code, course: course.def.id, createdAt: Date.now(), nextId: 2, seats: [{ id: 1, token: 'x' }], chat: [], sim }
+function parkRoom(roomsFile: string, code: string, sim: SimState, savedAt = Date.now(), extra: object = {}) {
+  const room = { code, course: course.def.id, createdAt: Date.now(), nextId: 2, seats: [{ id: 1, token: 'x', awaySince: null }], chat: [], sim, ...extra }
   writeFileSync(roomsFile, JSON.stringify({ savedAt, rooms: [room] }))
 }
 
@@ -77,6 +78,30 @@ describe('saving and restoring a run', () => {
   })
 })
 
+describe('leaving', { timeout: 30_000 }, () => {
+  it('frees the seat at once when the page leaves on purpose, and holds it when the connection drops', async () => {
+    const port = await freePort()
+    await startServer(port)
+    const alice = await connect(port)
+    alice.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Alice' })
+    const { room } = await alice.next('welcome')
+    const join = async (name: string) => {
+      const c = await connect(port)
+      c.send({ type: 'join', v: PROTOCOL_VERSION, name, room })
+      return { c, id: (await c.next('welcome')).id }
+    }
+    const bob = await join('Bob')
+    bob.c.ws.close()
+    await alice.next('roster', (m) => m.players.find((p) => p.id === bob.id)?.away === true)
+    const carol = await join('Carol')
+    await alice.next('roster', (m) => m.players.some((p) => p.id === carol.id))
+    alice.inbox.length = 0
+    carol.c.ws.close(LEAVE_CLOSE_CODE)
+    const roster = await alice.next('roster', (m) => !m.players.some((p) => p.id === carol.id))
+    expect(roster.players.map((p) => p.id)).toContain(bob.id)
+  })
+})
+
 describe('restarting the server', { timeout: 30_000 }, () => {
   it('parks rooms on the way down and players pick up where they were', () =>
     withRoomsFile(async (roomsFile) => {
@@ -126,6 +151,35 @@ describe('restarting the server', { timeout: 30_000 }, () => {
       const bobBack = await connect(port)
       bobBack.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Bob', room: aliceIn.room, resume: bobIn.token })
       expect((await bobBack.next('welcome')).id).toBe(bobIn.id)
+    }))
+
+  it('sends late joiners the results everyone saw at the finish', () =>
+    withRoomsFile(async (roomsFile) => {
+      const sim = new Sim(course, 1)
+      sim.addPlayer(1, 'Solo', 0)
+      sim.phase = 'finished'
+      const results: Results = { time: 42, deaths: 3, players: [], standings: [] }
+      parkRoom(roomsFile, 'DONE', JSON.parse(JSON.stringify(sim.save())) as SimState, Date.now(), { results })
+      const port = await freePort()
+      await startServer(port, roomsFile)
+      const back = await connect(port)
+      back.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Solo', room: 'DONE', resume: 'x' })
+      expect((await back.next('welcome')).results).toEqual(results)
+      const late = await connect(port)
+      late.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Late', room: 'DONE' })
+      expect((await late.next('welcome')).results).toEqual(results)
+    }))
+
+  it('a restart leaves a dropped seat only what was left of its hold', () =>
+    withRoomsFile(async (roomsFile) => {
+      const savedAt = Date.now()
+      parkRoom(roomsFile, 'GONE', soloSave(), savedAt, { seats: [{ id: 1, token: 'x', awaySince: savedAt - 29_000 }] })
+      const port = await freePort()
+      await startServer(port, roomsFile)
+      await new Promise((r) => setTimeout(r, 1500))
+      const back = await connect(port)
+      back.send({ type: 'join', v: PROTOCOL_VERSION, name: 'Solo', room: 'GONE', resume: 'x' })
+      expect((await back.next('error')).code).toBe('expired')
     }))
 
   it('ignores parked rooms whose seats have already expired', () =>

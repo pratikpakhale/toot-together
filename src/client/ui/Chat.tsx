@@ -143,10 +143,18 @@ export function ChatDock() {
     if (on && fresh.some((l) => l.liveAt !== null && l.id !== myId && !muted.includes(l.id))) audio.chat()
   }, [chat, on, myId, muted])
 
+  // What was said before joining shows for a moment too, so a phone (whose text box has no room for it) sees it.
+  const [historyAt, setHistoryAt] = useState<number | null>(null)
+  if (historyAt === null && chat.some((l) => l.liveAt === null)) setHistoryAt(performance.now())
+  const shownAt = (l: ChatEntry) => l.liveAt ?? historyAt
+
   const boxOpen = panel === 'type' || panel === 'people'
   const lines = chat.filter((l) => !muted.includes(l.id))
   const now = performance.now()
-  const fresh = lines.filter((l) => l.liveAt !== null && now - l.liveAt < LOG_MS)
+  const fresh = lines.filter((l) => {
+    const at = shownAt(l)
+    return at !== null && now - at < LOG_MS
+  })
   useTicker(fresh.length > 0 && !boxOpen)
 
   if (!session || !on || (overlay !== null && overlay !== 'results')) return null
@@ -159,16 +167,23 @@ export function ChatDock() {
     <>
       <div className="safe-area pointer-events-none z-40 select-none">
         {/* On a phone the player list has no field to lose focus, so a tap anywhere else closes it. */}
-        {isTouch && panel === 'people' && <div className="pointer-events-auto absolute inset-0 bg-ink/25 anim-fade" onClick={() => setPanel(null)} />}
+        {(isTouch || !session.canChat) && panel === 'people' && <div className="pointer-events-auto absolute inset-0 bg-ink/25 anim-fade" onClick={() => setPanel(null)} />}
         <div
           className={`absolute left-3 flex gap-2 ${wide ? 'w-[min(680px,calc(100%-24px))]' : 'w-[min(480px,calc(100%-24px))]'} ${isTouch ? 'top-[110px] flex-col max-[620px]:top-[164px]' : 'bottom-[58px] flex-col-reverse'}`}
         >
-          {session.canChat && boxOpen && <TypePanel roster={roster} myId={myId} say={say} />}
+          {boxOpen && <TypePanel roster={roster} myId={myId} say={say} />}
           {shown.length > 0 && (
             <div className={`flex flex-col items-start gap-1 ${isTouch ? '' : 'justify-end'}`}>
               {shown.map((l) => {
+                // Seat colours repeat across rafts, so a race line also shows its raft (while the speaker is still here).
+                const raft = race ? roster.find((p) => p.id === l.id)?.raft : null
                 const content = (
                   <>
+                    {raft != null && (
+                      <span className="mr-1 inline-block align-[-0.2em]">
+                        <TeamBadge raft={raft} size="1.1em" />
+                      </span>
+                    )}
                     <span className="font-display mr-1.5" style={{ color: seatColor(l.seat), WebkitTextStroke: '0.5px var(--color-ink)' }}>
                       {l.name}
                     </span>
@@ -176,12 +191,13 @@ export function ChatDock() {
                   </>
                 )
                 const look = 'max-w-full rounded-xl border-2 border-ink/20 bg-white/85 px-2 py-0.5 text-sm font-extrabold leading-snug break-words text-ink'
-                return panel === 'type' || l.liveAt === null ? (
+                const at = shownAt(l)
+                return panel === 'type' || at === null ? (
                   <div key={l.key} className={look}>
                     {content}
                   </div>
                 ) : (
-                  <Life key={l.key} at={l.liveAt} life={LOG_MS} className={look}>
+                  <Life key={l.key} at={at} life={LOG_MS} className={look}>
                     {content}
                   </Life>
                 )
@@ -197,7 +213,7 @@ export function ChatDock() {
 }
 
 /**
- * Sends a line and closes the chat. When the flood limit says no, a toast explains and the wheel or text box stays
+ * Sends a line and closes the chat. When the flood limit says no, or the room is reconnecting, a toast explains and the wheel or text box stays
  * open to try again, except a released hold, which has nothing left holding it open.
  */
 function useSay() {
@@ -206,13 +222,18 @@ function useSay() {
   const pushToast = useApp((s) => s.pushToast)
   return (line: string) => {
     const result = session?.sendChat(line)
-    if (result === 'limited') {
-      pushToast({ text: 'Easy there!', sub: 'Chat cools down in a few seconds.', tone: 'bad', icon: 'chat' })
+    if (result === 'limited' || result === 'offline') {
+      pushToast(
+        result === 'limited'
+          ? { text: 'Easy there!', sub: 'Chat cools down in a few seconds.', tone: 'bad', icon: 'chat' }
+          : { text: 'Not sent', sub: 'Reconnecting… try again in a moment.', tone: 'bad', icon: 'chat' },
+      )
       if (useApp.getState().chatPanel === 'aim') setPanel(null)
-      return
+      return result
     }
     if (result === 'sent') audio.click()
     setPanel(null)
+    return result
   }
 }
 
@@ -243,13 +264,30 @@ interface WheelProps {
   say: (line: string) => void
 }
 
-/** Desktop: `Q Chat` next to Menu and Respawn opens the wheel. Phones get `ChatThumb` instead. */
+/**
+ * Desktop: `Q Chat` next to Menu and Respawn opens the wheel. Phones get `ChatThumb` instead. A spectator can't talk,
+ * so theirs (on any device) opens the player list, to mute.
+ */
 export function ChatButton() {
-  const canChat = useApp((s) => s.session?.canChat)
+  const session = useApp((s) => s.session)
   const on = useApp((s) => s.settings.chat)
   const panel = useApp((s) => s.chatPanel)
   const setPanel = useApp((s) => s.setChatPanel)
-  if (!canChat || !on) return null
+  if (!session || !on) return null
+  if (!session.canChat) {
+    if (!session.spectating) return null
+    return (
+      <button
+        tabIndex={-1}
+        className="btn btn-cream flex items-center gap-1 px-3 py-1 text-sm"
+        onClick={() => (audio.click(), setPanel(panel ? null : 'people'))}
+        aria-expanded={!!panel}
+      >
+        <Icon name="people" size="1.5em" />
+        Players
+      </button>
+    )
+  }
   return (
     <button
       tabIndex={-1}
@@ -373,11 +411,15 @@ function Wheel({ aimed, setAimed, calls, say }: WheelProps) {
       } else if (aimed !== null) say(calls[aimed].line)
       else setPanel(null)
     }
+    // Q let go in another window never comes back as a keyup.
+    const onBlur = () => useApp.getState().chatPanel === 'aim' && setPanel(null)
     window.addEventListener('keydown', onDown)
     window.addEventListener('keyup', onUp)
+    window.addEventListener('blur', onBlur)
     return () => {
       window.removeEventListener('keydown', onDown)
       window.removeEventListener('keyup', onUp)
+      window.removeEventListener('blur', onBlur)
     }
   }, [opened, setAimed, setPanel])
 
@@ -540,8 +582,9 @@ function Reactions({ say }: { say: (line: string) => void }) {
  * on a tap elsewhere, and on a phone when the keyboard goes away, keeping what was typed for next time. PLAYERS
  * opens the list of players to mute: above the field on desktop, instead of it on a phone (the keyboard drops).
  */
-function TypePanel({ roster, myId, say }: { roster: RosterEntry[]; myId: number | undefined; say: (line: string) => void }) {
+function TypePanel({ roster, myId, say }: { roster: RosterEntry[]; myId: number | undefined; say: ReturnType<typeof useSay> }) {
   const panel = useApp((s) => s.chatPanel)
+  const canChat = useApp((s) => !!s.session?.canChat)
   const muted = useApp((s) => s.muted)
   const setPanel = useApp((s) => s.setChatPanel)
   const [text, setText] = useState(draft)
@@ -575,8 +618,7 @@ function TypePanel({ roster, myId, say }: { roster: RosterEntry[]; myId: number 
       className="flex gap-2"
       onSubmit={(e) => {
         e.preventDefault()
-        if (text.trim()) draft = ''
-        say(text)
+        if (say(text) === 'sent') draft = ''
       }}
     >
       <input
@@ -633,7 +675,7 @@ function TypePanel({ roster, myId, say }: { roster: RosterEntry[]; myId: number 
       // Buttons in here mustn't take focus from the field: that would close the box before their click lands.
       onMouseDown={(e) => e.target !== typeField.current && e.preventDefault()}
     >
-      {isTouch && people ? (
+      {(isTouch || !canChat) && people ? (
         <>
           <div className="flex items-center gap-2">
             <Icon name="people" size={26} />

@@ -7,7 +7,27 @@ export function TouchControls() {
   const knob = useRef<HTMLDivElement>(null)
   const stick = useRef<{ id: number; x: number; y: number; restX: number; restY: number; r: number } | null>(null)
   const toots = useRef(new Set<number>())
+  const toot = useRef<HTMLButtonElement>(null)
   useEffect(() => () => input.resetTouch(), [])
+
+  // Switching apps can skip pointercancel, which would leave the stick or TOOT held.
+  useEffect(() => {
+    const reset = () => {
+      stick.current = null
+      toots.current.clear()
+      input.resetTouch()
+      ring.current?.style.removeProperty('transform')
+      ring.current?.removeAttribute('data-active')
+      knob.current?.style.removeProperty('transform')
+      toot.current?.removeAttribute('data-down')
+    }
+    window.addEventListener('blur', reset)
+    document.addEventListener('visibilitychange', reset)
+    return () => {
+      window.removeEventListener('blur', reset)
+      document.removeEventListener('visibilitychange', reset)
+    }
+  }, [])
 
   const drag = (e: React.PointerEvent) => {
     const s = stick.current
@@ -71,6 +91,7 @@ export function TouchControls() {
         </div>
       </div>
       <button
+        ref={toot}
         tabIndex={-1}
         className="btn btn-green pointer-events-auto absolute bottom-6 right-6 size-(--toot) rounded-full p-0 text-[calc(var(--toot)*0.2)]"
         onPointerDown={(e) => {

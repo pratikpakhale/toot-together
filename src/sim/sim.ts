@@ -78,7 +78,7 @@ interface Player {
   /** Sort key for its spot around the rim, unique on its raft. */
   ord: number
   ready: boolean
-  /** Connection dropped; it still counts as crew but can't hold up a race start. */
+  /** Connection dropped: keeps its spot, but doesn't crew the raft, hold up a start, push or take snacks. */
   away: boolean
   input: PlayerInput
   rim: number
@@ -238,10 +238,15 @@ export class Sim {
     return out
   }
 
-  /** How many rafts have anyone on them. */
+  /** The crew minus anyone whose connection dropped. */
+  liveCrew(raft: number): Player[] {
+    return this.crew(raft).filter((p) => !p.away)
+  }
+
+  /** How many rafts have a connected hippo on them. */
   crewedRafts() {
     let n = 0
-    for (let r = 0; r < this.rafts.length; r++) if (this.crew(r).length) n++
+    for (let r = 0; r < this.rafts.length; r++) if (this.liveCrew(r).length) n++
     return n
   }
 
@@ -308,6 +313,15 @@ export class Sim {
     if (this.players.delete(id)) this.rosterVersion++
   }
 
+  /** `name` must already be cleaned. */
+  rename(id: number, name: string) {
+    const p = this.players.get(id)
+    if (!p || p.name === name) return
+    p.name = name
+    p.stats.name = name
+    this.rosterVersion++
+  }
+
   roster(): RosterEntry[] {
     return [...this.players.values()].map((p) => ({ id: p.id, name: p.name, raft: p.raft, seat: p.seat, ord: p.ord, ready: p.ready }))
   }
@@ -355,13 +369,14 @@ export class Sim {
     if (!p) return 'You are not in this room.'
     if (raft === null) {
       if (!this.race) return 'Co-op has no bench.'
+      if (this.phase === 'countdown') return 'The race is about to start.'
       if (!this.lobby) return 'Sit out once this race is over.'
       if (p.raft !== null) this.seat(p, null)
       return null
     }
     if (!Number.isInteger(raft) || raft < 0 || raft >= this.rafts.length) return 'There is no such raft.'
     if (!this.lobby) {
-      if (p.raft !== null) return 'You can switch rafts once this race is over.'
+      if (p.raft !== null) return this.phase === 'countdown' ? 'The race is about to start.' : 'You can switch rafts once this race is over.'
       const r = this.rafts[raft]
       const inIt = this.phase === 'countdown' ? this.crew(raft).length > 0 : r.entered && r.result === RAFT_RESULT.none
       if (!inIt) return 'That raft is not in this race.'
@@ -375,7 +390,9 @@ export class Sim {
   setReady(id: number, ready: boolean): Refusal {
     const p = this.players.get(id)
     if (!p || p.raft === null) return 'Hop on a raft first.'
-    if (!this.race || !this.lobby) return null
+    if (!this.race) return null
+    if (this.phase === 'countdown') return 'The race is about to start.'
+    if (!this.lobby) return 'A race is already on.'
     if (p.ready !== ready) {
       p.ready = ready
       this.rosterVersion++
@@ -404,17 +421,17 @@ export class Sim {
     return this.pick(id, raft)
   }
 
-  /** Host: deals everyone out evenly over the rafts, in a random order. */
+  /** Host: deals everyone on a raft out evenly, in a random order. The bench and dropped hippos stay put. */
   shuffle(): Refusal {
     if (!this.race) return 'Shuffle needs two or more rafts.'
     if (!this.lobby) return 'Shuffle between races.'
-    const list = [...this.players.values()]
+    const list = [...this.players.values()].filter((p) => p.raft !== null && !p.away)
     for (let i = list.length - 1; i > 0; i--) {
       const j = Math.floor(this.rng.next() * (i + 1))
       ;[list[i], list[j]] = [list[j], list[i]]
     }
     for (const p of list) p.raft = null
-    list.forEach((p, i) => this.seat(p, i % this.rafts.length))
+    for (const p of list) this.seat(p, this.emptiestRaft())
     return null
   }
 
@@ -561,7 +578,7 @@ export class Sim {
   }
 
   private updatePlayers(dt: number) {
-    const crews = this.rafts.map((_, r) => this.crew(r))
+    const crews = this.rafts.map((_, r) => this.liveCrew(r))
     const ords = crews.map((crew) => crew.map((p) => p.ord))
 
     for (const p of this.players.values()) {
@@ -569,8 +586,9 @@ export class Sim {
       const raft = this.rafts[p.raft]
       const crew = crews[p.raft]
       const floating = raft.state === RAFT_STATE.float
+      const scoring = this.scoring(p.raft)
       const n = crew.length
-      this.walkRim(p, raft, rimSector(p.ord, ords[p.raft]), dt)
+      this.walkRim(p, raft, p.away ? null : rimSector(p.ord, ords[p.raft]), dt)
 
       if (p.buff && this.t >= p.buffUntil) p.buff = null
 
@@ -580,7 +598,7 @@ export class Sim {
           p.pruneOn = !p.pruneOn
           p.pruneFlipAt = this.t + (p.pruneOn ? this.rng.range(0.25, 0.7) : this.rng.range(0.2, 0.55))
         }
-        want = p.pruneOn
+        want = p.pruneOn && !p.away
       }
 
       const freeGas = p.buff === 'chili' || p.buff === 'prune'
@@ -591,7 +609,7 @@ export class Sim {
       if (p.farting) {
         if (!wasFarting) this.onFartStart(p, raft, crew)
         p.restT = 0
-        p.stats.fartTime += dt
+        if (scoring) p.stats.fartTime += dt
         if (!freeGas) {
           p.stamina -= STAMINA_DRAIN * dt
           if (p.stamina <= 0) {
@@ -621,7 +639,7 @@ export class Sim {
           raft.vz += Math.sin(a) * dv
           raft.av += (this.rng.next() - 0.5) * 1.6
           p.blame += dv
-          p.stats.bursts++
+          if (scoring) p.stats.bursts++
           if (this.race) this.blastRivals(p, dv * BURST_RIVAL)
           this.emit({ type: 'burst', t: this.t, id: p.id })
         }
@@ -679,9 +697,14 @@ export class Sim {
     for (const g of group) {
       g.syncUntil = this.t + SYNC_DURATION
       g.syncCooldownUntil = this.t + 1.2
-      g.stats.syncs++
+      if (this.scoring(g.raft)) g.stats.syncs++
     }
     this.emit({ type: 'sync', t: this.t, ids: group.map((g) => g.id) })
+  }
+
+  /** Whether `raft`'s crew still earns award stats: the run is on and the raft is still in it. */
+  private scoring(raft: number | null) {
+    return this.phase !== 'finished' && raft !== null && this.rafts[raft].result === RAFT_RESULT.none
   }
 
   private thrustMultiplier(p: Player) {
@@ -740,7 +763,7 @@ export class Sim {
     const c = this.course
     const raft = this.rafts[r]
     const crew = this.crew(r)
-    const scale = crewScale(crew.length)
+    const scale = crewScale(this.liveCrew(r).length)
 
     let ax = 0
     let az = 0
@@ -938,7 +961,7 @@ export class Sim {
   private collectPickup(itemIndex: number, r: number) {
     const slot = this.pickupItems.indexOf(itemIndex)
     const item = this.course.items[itemIndex]
-    const crew = this.crew(r)
+    const crew = this.liveCrew(r)
     if (item.def.kind !== 'pickup' || crew.length === 0) return
     this.pickupReadyAt[slot] = this.t + PICKUP_RESPAWN
     const raft = this.rafts[r]
@@ -960,7 +983,7 @@ export class Sim {
     best.exhausted = false
     best.pruneOn = false
     best.pruneFlipAt = this.t + 0.2
-    best.stats.pickups++
+    if (this.scoring(r)) best.stats.pickups++
     this.emit({ type: 'pickup', t: this.t, raft: r, id: best.id, item: kind, index: slot })
   }
 
@@ -1141,7 +1164,9 @@ export class Sim {
     for (let r = 0; r < this.rafts.length; r++) {
       const raft = this.rafts[r]
       raft.deaths = 0
-      raft.entered = this.crew(r).length > 0
+      raft.entered = this.liveCrew(r).length > 0
+      // A raft nobody connected is on sits this race out; its dropped hippos wait on the bench.
+      if (!raft.entered) for (const p of this.crew(r)) this.seat(p, null)
     }
     for (const p of this.players.values()) p.stats = freshStats(p)
     this.emit({ type: 'go', t: this.t })
@@ -1178,7 +1203,7 @@ export class Sim {
     if (raft.shovedBy !== null && this.t <= raft.shovedUntil) {
       const rival = this.players.get(raft.shovedBy)
       if (rival && rival.raft !== r) {
-        rival.stats.snipes++
+        if (this.scoring(rival.raft)) rival.stats.snipes++
         return { id: rival.id, rival: true }
       }
     }
@@ -1191,7 +1216,7 @@ export class Sim {
       if (!top || p.blame > top.blame) top = p
     }
     if (!top || total < 1.5 || top.blame / total < 0.45) return { id: null, rival: false }
-    top.stats.blamed++
+    if (this.scoring(r)) top.stats.blamed++
     return { id: top.id, rival: false }
   }
 

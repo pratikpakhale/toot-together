@@ -191,18 +191,20 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
 
     const bySeat: (PlayerSnap | undefined)[] = []
     for (const p of crew) bySeat[p.seat] = p
-    const ords = crew.map((p) => p.ord)
-    const sliceGeo = hullKit.slices[crew.length]
+    // The rim is split among the hippos who are connected, as the sim does.
+    const live = crew.filter((p) => !roster.some((e) => e.id === p.id && e.away))
+    const ords = live.map((p) => p.ord)
+    const sliceGeo = hullKit.slices[live.length]
 
     for (let seat = 0; seat < CREW_SIZE; seat++) {
       const p = bySeat[seat]
       const slice = slices.current[seat]
-      const sector = p && sliceGeo && showSlices ? rimSector(p.ord, ords) : null
+      const sector = p && sliceGeo && showSlices && live.includes(p) ? rimSector(p.ord, ords) : null
       if (slice) {
         slice.visible = !!sector
         if (sector && sliceGeo) {
           slice.geometry = sliceGeo
-          slice.rotation.set(Math.PI / 2, 0, sector.center - ((Math.PI * 2) / crew.length - SLICE_GAP) / 2)
+          slice.rotation.set(Math.PI / 2, 0, sector.center - ((Math.PI * 2) / live.length - SLICE_GAP) / 2)
         }
       }
       const holder = holders.current[seat]

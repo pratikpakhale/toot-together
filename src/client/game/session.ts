@@ -7,6 +7,7 @@ import {
   type ChatLine,
   type ClientMsg,
   type JoinError,
+  LEAVE_CLOSE_CODE,
   mayRestart,
   PROTOCOL_VERSION,
   sanitizeChat,
@@ -83,7 +84,10 @@ export interface GameSession {
   act(action: CrewAction): void
   isHost(): boolean
   setPaused(paused: boolean): void
-  sendChat(text: string): 'sent' | 'empty' | 'limited'
+  /** `offline`: the connection is down, so nothing was sent. */
+  sendChat(text: string): 'sent' | 'empty' | 'limited' | 'offline'
+  /** Renames this device's player: solo or online. Couch hippos keep the names they joined with. */
+  rename(name: string): void
   subscribe(fn: () => void): () => void
   dispose(): void
 }
@@ -210,6 +214,12 @@ export class LocalSession extends BaseSession implements GameSession {
     return 'empty' as const
   }
 
+  rename(name: string) {
+    if (this.localPlayers.length !== 1) return
+    this.sim.rename(this.localPlayers[0].id, sanitizeName(name))
+    this.setInfo({ roster: this.sim.roster() })
+  }
+
   dispose() {}
 }
 
@@ -260,6 +270,33 @@ function saveSeat(seat: { room: string; token: string } | null) {
   } catch {}
 }
 
+/**
+ * A duplicated tab inherits the original's sessionStorage, seat token included. Before resuming a stored seat,
+ * ask the other tabs whether one of them is still playing it.
+ */
+const SEAT_CHECK_MS = 200
+const seatChannel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('toot-together:seats')
+const liveTokens = new Set<string>()
+seatChannel?.addEventListener('message', (e: MessageEvent<{ ask?: string; held?: string }>) => {
+  if (e.data.ask && liveTokens.has(e.data.ask)) seatChannel.postMessage({ held: e.data.ask })
+})
+
+function seatHeldElsewhere(token: string) {
+  const channel = seatChannel
+  if (!channel) return Promise.resolve(false)
+  return new Promise<boolean>((resolve) => {
+    const onMessage = (e: MessageEvent<{ held?: string }>) => e.data.held === token && done(true)
+    const timer = window.setTimeout(() => done(false), SEAT_CHECK_MS)
+    const done = (held: boolean) => {
+      window.clearTimeout(timer)
+      channel.removeEventListener('message', onMessage)
+      resolve(held)
+    }
+    channel.addEventListener('message', onMessage)
+    channel.postMessage({ ask: token })
+  })
+}
+
 interface CatchUp {
   lastPhase: Snapshot['phase'] | null
   results: Results | null
@@ -270,7 +307,7 @@ export class NetSession extends BaseSession implements GameSession {
   readonly net: NetStats = { pingMs: null, bufferMs: 0, lateFraction: 0 }
   readonly canChat: boolean
   localPlayers: LocalPlayer[] = []
-  private ws!: WebSocket
+  private ws: WebSocket | null = null
   private token: string | null = null
   private reconnectUntil = 0
   private retryTimer = 0
@@ -301,7 +338,7 @@ export class NetSession extends BaseSession implements GameSession {
   private disposed = false
 
   constructor(
-    private readonly name: string,
+    private name: string,
     private readonly room: string | null,
     courseId = DEFAULT_COURSE,
     readonly spectating = false,
@@ -318,7 +355,28 @@ export class NetSession extends BaseSession implements GameSession {
     window.addEventListener('blur', this.releaseInput)
     document.addEventListener('visibilitychange', this.releaseInput)
     window.addEventListener('online', this.retryNow)
-    this.connect()
+    const stored = this.token
+    if (!stored) {
+      this.connect()
+      return
+    }
+    void seatHeldElsewhere(stored).then((held) => {
+      if (this.disposed) return
+      if (held) this.forgetStoredSeat()
+      this.connect()
+    })
+  }
+
+  private forgetStoredSeat() {
+    this.resumingStored = false
+    this.token = null
+    saveSeat(null)
+  }
+
+  private setToken(token: string | null) {
+    if (this.token) liveTokens.delete(this.token)
+    this.token = token
+    if (token) liveTokens.add(token)
   }
 
   private connect() {
@@ -363,19 +421,18 @@ export class NetSession extends BaseSession implements GameSession {
 
   private replayMissed(s: Snapshot, { lastPhase, results }: CatchUp) {
     this.catchUp = null
-    if (lastPhase === null) return
     if (lastPhase === 'finished' && s.phase !== 'finished') this.ready.push({ type: 'restart', t: s.t })
     else if (lastPhase !== 'finished' && s.phase === 'finished' && results) this.ready.push({ type: 'finish', t: s.t, results })
   }
 
   private retryNow = () => {
-    if (this.disposed || this.info.status !== 'reconnecting' || this.ws.readyState !== WebSocket.CLOSED) return
+    if (this.disposed || this.info.status !== 'reconnecting' || this.ws?.readyState !== WebSocket.CLOSED) return
     window.clearTimeout(this.retryTimer)
     this.connect()
   }
 
   private send(msg: ClientMsg) {
-    if (this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg))
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg))
   }
 
   private resetTimeline() {
@@ -407,12 +464,15 @@ export class NetSession extends BaseSession implements GameSession {
       case 'welcome': {
         const resumed = this.token !== null
         this.localPlayers = [{ id: msg.id, device: 'any' }]
-        this.token = msg.token
+        this.setToken(msg.token)
         this.resumingStored = false
         saveSeat({ room: msg.room, token: msg.token })
-        const lastPhase = this.snaps[this.snaps.length - 1]?.phase ?? null
-        if (msg.course !== this.info.courseId) this.resetTimeline()
-        else if (resumed) this.resumeAfterGap({ lastPhase, results: msg.results ?? null })
+        const sameCourse = msg.course === this.info.courseId
+        const lastPhase = sameCourse ? (this.snaps[this.snaps.length - 1]?.phase ?? null) : null
+        if (!sameCourse) this.resetTimeline()
+        this.resumeAfterGap({ lastPhase, results: msg.results ?? null })
+        // A resumed seat keeps the name it joined with; catch up on a rename made since.
+        if (resumed) this.send({ type: 'rename', name: sanitizeName(this.name) })
         this.setInfo({ roomCode: msg.room, courseId: msg.course })
         this.startPinging()
         break
@@ -453,15 +513,13 @@ export class NetSession extends BaseSession implements GameSession {
         break
       case 'error':
         if (msg.code === 'expired' && this.resumingStored) {
-          this.resumingStored = false
-          this.token = null
-          saveSeat(null)
-          this.ws.close()
+          this.forgetStoredSeat()
+          this.ws?.close()
           this.connect()
           break
         }
         this.setInfo({ status: 'error', error: { code: msg.code, message: msg.message } })
-        this.ws.close()
+        this.ws?.close()
         break
       case 'refused':
         this.setInfo({ refused: { key: ++this.refusals, reason: msg.reason } })
@@ -627,7 +685,7 @@ export class NetSession extends BaseSession implements GameSession {
 
   canRestart() {
     if (this.spectating) return false
-    return this.view ? mayRestart(this.isHost(), this.view.phase, this.view.rafts.length > 1) : this.isHost()
+    return this.view ? mayRestart(this.isHost(), this.view.phase, this.view.rafts.length > 1, true) : this.isHost()
   }
 
   isHost() {
@@ -644,6 +702,7 @@ export class NetSession extends BaseSession implements GameSession {
   sendChat(raw: string) {
     const text = sanitizeChat(raw)
     if (!this.canChat || !text) return 'empty'
+    if (this.ws?.readyState !== WebSocket.OPEN) return 'offline'
     const now = Date.now()
     this.chatTimes = this.chatTimes.filter((t) => now - t < CHAT_WINDOW_MS)
     if (this.chatTimes.length >= CHAT_LIMIT) return 'limited'
@@ -652,14 +711,21 @@ export class NetSession extends BaseSession implements GameSession {
     return 'sent'
   }
 
+  rename(name: string) {
+    this.name = name
+    if (!this.spectating) this.send({ type: 'rename', name: sanitizeName(name) })
+  }
+
+  /** Every way out of a room is on purpose (a reload or a dropped connection never gets here), so the seat goes at once. */
   dispose() {
     this.disposed = true
     if (!this.spectating) saveSeat(null)
+    this.setToken(null)
     window.clearTimeout(this.retryTimer)
     window.clearInterval(this.pingTimer)
     window.removeEventListener('blur', this.releaseInput)
     document.removeEventListener('visibilitychange', this.releaseInput)
     window.removeEventListener('online', this.retryNow)
-    this.ws.close()
+    this.ws?.close(LEAVE_CLOSE_CODE)
   }
 }

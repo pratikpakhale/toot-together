@@ -4,6 +4,7 @@ import { BUFF_CODE, BUFF_NAMES } from '../../sim/types'
 import { audio } from '../audio/audio'
 import { inviteLink } from '../game/controller'
 import { crewed, frame, isRace, myRaft, seatColor } from '../game/frame'
+import type { DeviceId } from '../game/input'
 import type { GameSession, NetStats } from '../game/session'
 import { isTouch, SHORT_SCREEN, useShortScreen } from '../platform'
 import { useProgress } from '../state/progress'
@@ -19,6 +20,7 @@ export function Hud() {
   const info = useApp((s) => s.sessionInfo)
   const overlay = useApp((s) => s.overlay)
   const setOverlay = useApp((s) => s.setOverlay)
+  const hasResults = useApp((s) => s.results !== null)
   const course = session?.course
   const localIds = session?.localPlayers.map((p) => p.id) ?? []
   const localKey = localIds.join(',')
@@ -260,10 +262,15 @@ export function Hud() {
             {!isTouch && <span className="kbd mr-1">R</span>} Respawn
           </button>
         )}
-        {!isTouch && <ChatButton />}
+        {phase === 'finished' && hasResults && overlay === null && (
+          <button tabIndex={-1} className="btn btn-sun flex items-center gap-1 px-3 py-1 text-sm" onClick={() => (audio.click(), setOverlay('results'))}>
+            <Icon name="trophy" size="1.5em" /> Results
+          </button>
+        )}
+        {(!isTouch || session.spectating) && <ChatButton />}
       </div>
 
-      {!race && phase === 'pond' && !session.spectating && <PondHint localCount={localPlayers.length} localIds={localIds} />}
+      {!race && phase === 'pond' && !session.spectating && <PondHint devices={session.localPlayers.map((p) => p.device)} localIds={localIds} />}
       {lobby && <RaceLobby session={session} short={short} />}
       {race && <Countdown />}
       {race && <WatchBar session={session} short={short} />}
@@ -340,12 +347,37 @@ function NetStatus({ session }: { session: GameSession }) {
 }
 
 const TASKS = [
-  { key: 'move', icon: 'move', text: (touch: boolean) => (touch ? 'Drag left side to walk your hippo' : 'Hold A or D to walk around the rim') },
-  { key: 'toot', icon: 'toot', text: (touch: boolean) => (touch ? 'Hold TOOT to push the raft' : 'Hold Space to toot') },
-  { key: 'burst', icon: 'burst', text: (touch: boolean) => (touch ? 'Tap BURST for a big blast' : 'Tap Shift to burst') },
+  { key: 'move', icon: 'move', text: (touch: boolean) => (touch ? 'Drag left side to walk your hippo' : 'Hold A or D to walk around the rim'), couch: 'Walk around the rim' },
+  { key: 'toot', icon: 'toot', text: (touch: boolean) => (touch ? 'Hold TOOT to push the raft' : 'Hold Space to toot'), couch: 'Hold to toot' },
+  { key: 'burst', icon: 'burst', text: (touch: boolean) => (touch ? 'Tap BURST for a big blast' : 'Tap Shift to burst'), couch: 'Tap to burst' },
 ] as const
 
-function PondHint({ localCount, localIds }: { localCount: number; localIds: number[] }) {
+type TaskKey = (typeof TASKS)[number]['key']
+
+/** Each couch player's keys (see `KB1`, `KB2` and the pad mapping in input.ts). */
+const PAD_KEYS: Record<TaskKey, string[]> = { move: ['Stick'], toot: ['A'], burst: ['X'] }
+const DEVICE_KEYS: Partial<Record<DeviceId, Record<TaskKey, string[]>>> = {
+  kb1: { move: ['A', 'D'], toot: ['Space'], burst: ['Shift', 'E'] },
+  kb2: { move: ['Left', 'Right'], toot: ['Enter'], burst: ['R Shift', '.'] },
+}
+const keysOf = (device: DeviceId) => DEVICE_KEYS[device] ?? PAD_KEYS
+/** A couch game: every hippo has its own device (solo and online play take any). */
+const isCouch = (devices: DeviceId[]) => devices.some((d) => d !== 'any')
+
+function PlayerKeys({ n, keys }: { n: number; keys: string[] }) {
+  return (
+    <span className="flex items-center gap-0.5 whitespace-nowrap">
+      <span className="mr-0.5 text-ink/60">P{n}</span>
+      {keys.map((k) => (
+        <span key={k} className="kbd">
+          {k}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function PondHint({ devices, localIds }: { devices: DeviceId[]; localIds: number[] }) {
   const [teach] = useState(() => !useProgress.getState().tutorialDone)
   const [visible, setVisible] = useState(true)
   useEffect(() => {
@@ -354,7 +386,7 @@ function PondHint({ localCount, localIds }: { localCount: number; localIds: numb
     return () => window.clearTimeout(id)
   }, [teach])
   if (!visible) return null
-  if (teach) return <Tutorial localIds={localIds} />
+  if (teach) return <Tutorial devices={devices} localIds={localIds} />
   return (
     <div className="absolute bottom-20 left-1/2 w-[min(640px,calc(100%-24px))] -translate-x-1/2 anim-rise short:bottom-3 short:w-[min(420px,calc(100%-360px))]">
       <div className="panel px-5 py-3 text-center short:px-3 short:py-1.5">
@@ -372,21 +404,17 @@ function PondHint({ localCount, localIds }: { localCount: number; localIds: numb
               </span>
               <span>tap BURST for a blast</span>
             </>
-          ) : localCount > 1 ? (
-            <>
-              <span>
-                P1 <span className="kbd">W</span>
-                <span className="kbd">A</span>
-                <span className="kbd">S</span>
-                <span className="kbd">D</span> + <span className="kbd">Space</span>
-              </span>
-              <span>
-                P2 <span className="kbd">↑←↓→</span> + <span className="kbd">Enter</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <Icon name="gamepad" size="1.5em" /> stick + A / RT
-              </span>
-            </>
+          ) : isCouch(devices) ? (
+            devices.map((d, i) => {
+              const keys = keysOf(d)
+              return (
+                <span key={d} className="flex items-center gap-1.5">
+                  <PlayerKeys n={i + 1} keys={keys.move} /> walk
+                  <span className="kbd">{keys.toot[0]}</span> toot
+                  <span className="kbd">{keys.burst[0]}</span> burst
+                </span>
+              )
+            })
           ) : (
             <>
               <span>
@@ -411,7 +439,7 @@ function PondHint({ localCount, localIds }: { localCount: number; localIds: numb
   )
 }
 
-function Tutorial({ localIds }: { localIds: number[] }) {
+function Tutorial({ devices, localIds }: { devices: DeviceId[]; localIds: number[] }) {
   const [done, setDone] = useState<Record<string, boolean>>({})
   const doneRef = useRef(done)
   const key = localIds.join(',')
@@ -443,6 +471,7 @@ function Tutorial({ localIds }: { localIds: number[] }) {
   }, [key])
 
   const all = TASKS.every((t) => done[t.key])
+  const couch = !isTouch && isCouch(devices)
 
   return (
     <div className="absolute left-3 top-1/2 w-[min(340px,calc(50vw-24px))] -translate-y-1/2 anim-rise short:top-[104px] short:translate-y-0">
@@ -452,7 +481,18 @@ function Tutorial({ localIds }: { localIds: number[] }) {
           {TASKS.map((t) => (
             <li key={t.key} className={`flex items-center gap-2 font-extrabold transition-opacity ${done[t.key] ? 'opacity-55' : ''}`}>
               <Icon name={done[t.key] ? 'check' : t.icon} size={26} className={done[t.key] ? 'anim-pop' : undefined} />
-              <span className={done[t.key] ? 'line-through decoration-2' : undefined}>{t.text(isTouch)}</span>
+              {couch ? (
+                <span className="flex flex-col gap-1">
+                  <span className={done[t.key] ? 'line-through decoration-2' : undefined}>{t.couch}</span>
+                  <span className="flex flex-wrap gap-x-2.5 gap-y-1 text-[13px]">
+                    {devices.map((d, i) => (
+                      <PlayerKeys key={d} n={i + 1} keys={keysOf(d)[t.key]} />
+                    ))}
+                  </span>
+                </span>
+              ) : (
+                <span className={done[t.key] ? 'line-through decoration-2' : undefined}>{t.text(isTouch)}</span>
+              )}
             </li>
           ))}
           <li className={`flex items-center gap-2 font-extrabold ${all ? 'anim-pop' : 'opacity-40'}`}>

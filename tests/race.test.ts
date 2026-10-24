@@ -63,15 +63,33 @@ describe('racing', () => {
   })
 
   it('starts once everyone on a raft is ready; the bench and dropped players do not hold it up', () => {
-    const sim = raceRoom([2, 1])
+    const sim = raceRoom([2, 2])
     sim.addPlayer(9, 'Bench', null)
-    for (const id of [1, 2]) sim.setReady(id, true)
+    for (const id of [1, 2, 3]) sim.setReady(id, true)
     run(sim, 0.5, { bots: false })
     expect(sim.phase).toBe('pond')
-    sim.setAway(3, true)
+    sim.setAway(4, true)
     run(sim, DT, { bots: false })
     expect(sim.phase).toBe('countdown')
     for (const p of sim.players.values()) expect(p.ready).toBe(false)
+    expect(sim.setReady(1, true)).toBe('The race is about to start.')
+    expect(sim.pick(9, null)).toBe('The race is about to start.')
+  })
+
+  it('a raft whose only hippos dropped out is not crewed: no start, and it sits the race out', () => {
+    const sim = raceRoom([1, 1, 1])
+    sim.setAway(3, true)
+    sim.setAway(2, true)
+    sim.setReady(1, true)
+    run(sim, 0.5, { bots: false })
+    expect(sim.phase).toBe('pond')
+    expect(sim.start()).not.toBeNull()
+    sim.setAway(2, false)
+    expect(sim.start()).toBeNull()
+    run(sim, COUNTDOWN + 0.5)
+    expect(sim.phase).toBe('racing')
+    expect(sim.rafts.map((r) => r.entered)).toEqual([true, true, false])
+    expect(sim.players.get(3)!.raft).toBeNull()
   })
 
   it('the host never holds up the start: everyone else being ready is enough', () => {
@@ -159,6 +177,22 @@ describe('racing', () => {
     expect(sim.phase).toBe('racing')
     expect(sim.pick(7, 0)).not.toBeNull()
     expect(sim.pick(7, 1)).toBeNull()
+  })
+
+  it('a crew that has finished stops piling up award stats', () => {
+    const sim = raceRoom([2, 1])
+    sim.godMode = true
+    sim.start()
+    for (let k = 0; k < 600 / DT && sim.rafts[0].result === RAFT_RESULT.none; k++) {
+      for (const p of sim.crew(0)) sim.setInput(p.id, botInput(sim, p.id))
+      sim.step()
+    }
+    const before = sim.crew(0).map((p) => ({ ...p.stats }))
+    for (let k = 0; k < 5 / DT; k++) {
+      for (const p of sim.crew(0)) sim.setInput(p.id, { aim: null, walk: 0, fart: true, burst: k })
+      sim.step()
+    }
+    expect(sim.crew(0).map((p) => p.stats)).toEqual(before)
   })
 
   it('makes a finished raft a ghost that hazards cannot pop', () => {
@@ -280,11 +314,14 @@ describe('crews', () => {
     expect(sim.race).toBe(true)
   })
 
-  it('shuffle deals everyone out evenly', () => {
-    const sim = raceRoom([4, 1, 0])
+  it('shuffle deals the crews out evenly, leaving the bench and dropped hippos where they are', () => {
+    const sim = raceRoom([4, 2, 0])
     sim.addPlayer(9, 'Bench', null)
+    sim.setAway(5, true)
     expect(sim.shuffle()).toBeNull()
-    expect([0, 1, 2].map((r) => sim.crew(r).length)).toEqual([2, 2, 2])
+    expect([0, 1, 2].map((r) => sim.crew(r).length).sort()).toEqual([2, 2, 2])
+    expect(sim.players.get(9)!.raft).toBeNull()
+    expect(sim.players.get(5)!.raft).toBe(1)
   })
 
   it('a new river keeps the crews, colours and places on the rim', () => {

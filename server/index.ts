@@ -21,6 +21,7 @@ import {
   type ChatLine,
   type ClientMsg,
   type JoinError,
+  LEAVE_CLOSE_CODE,
   normalizeRoomCode,
   PROTOCOL_VERSION,
   ROOM_CODE_ALPHABET,
@@ -35,7 +36,7 @@ import {
   type ServerStats,
 } from '../src/sim/protocol'
 import { type Refusal, Sim } from '../src/sim/sim'
-import type { RosterEntry } from '../src/sim/types'
+import type { Results, RosterEntry } from '../src/sim/types'
 
 const PORT = Number(process.env.PORT ?? 2567)
 const HOST = process.env.HOST
@@ -93,6 +94,8 @@ class Room {
   readonly clients = new Map<number, Client>()
   readonly spectators = new Set<WebSocket>()
   chat: ChatLine[] = []
+  /** What everyone saw when the last run finished, so late joiners get the same. */
+  results: Results | null = null
   createdAt = Date.now()
   private nextId = 1
   private rosterSent = -1
@@ -151,7 +154,7 @@ class Room {
   }
 
   private welcome(client: Client) {
-    const results = this.sim.phase === 'finished' ? this.sim.results() : undefined
+    const results = this.sim.phase === 'finished' ? (this.results ?? undefined) : undefined
     send(client.ws, { type: 'welcome', id: client.id, room: this.code, course: this.courseId, token: client.token, results })
     send(client.ws, { type: 'chat', lines: this.chat, history: true })
     this.broadcastRoster()
@@ -164,13 +167,14 @@ class Room {
       course: this.courseId,
       createdAt: this.createdAt,
       nextId: this.nextId,
-      seats: [...this.clients.values()].map((c) => ({ id: c.id, token: c.token })),
+      seats: [...this.clients.values()].map((c) => ({ id: c.id, token: c.token, awaySince: c.awaySince })),
       chat: this.chat,
+      results: this.results,
       sim: this.sim.save(),
     }
   }
 
-  static restore(saved: SavedRoom): Room | null {
+  static restore(saved: SavedRoom, savedAt: number): Room | null {
     const sim = isCourseId(saved.course) ? Sim.restore(getCourse(saved.course), saved.sim) : null
     if (!sim) return null
     const room = new Room(saved.code, saved.course)
@@ -178,9 +182,12 @@ class Room {
     room.createdAt = saved.createdAt
     room.nextId = saved.nextId
     room.chat = saved.chat
+    room.results = saved.results ?? null
     const now = Date.now()
-    for (const { id, token } of saved.seats) {
-      const client: Client = { ws: null, id, token, msgCount: 0, msgWindow: now, lastInputAt: now, stale: false, awaySince: now, chatTimes: [] }
+    for (const { id, token, awaySince } of saved.seats) {
+      // Seats already empty when the server went down keep only what was left of their hold.
+      const since = now - (savedAt - (awaySince ?? savedAt))
+      const client: Client = { ws: null, id, token, msgCount: 0, msgWindow: now, lastInputAt: now, stale: false, awaySince: since, chatTimes: [] }
       room.clients.set(id, client)
       room.releaseInput(client)
       sim.setAway(id, true)
@@ -276,12 +283,13 @@ class Room {
         refuse(this.sim.requestRespawn(client.id))
         break
       case 'restart': {
-        if (!mayRestart(host, this.sim.phase, this.sim.race)) {
-          refuse('Only the host can restart.')
+        const course = isCourseId(msg.course) ? msg.course : null
+        const sameCourse = !course || course === this.courseId
+        if (!mayRestart(host, this.sim.phase, this.sim.race, sameCourse)) {
+          refuse(sameCourse ? 'Only the host can restart.' : 'Only the host can pick the next river.')
           break
         }
-        const course = isCourseId(msg.course) ? msg.course : null
-        if (course && course !== this.courseId) this.switchCourse(course)
+        if (!sameCourse) this.switchCourse(course)
         else this.sim.restart()
         break
       }
@@ -309,6 +317,9 @@ class Room {
       case 'chat':
         this.chatFrom(client, msg.text)
         break
+      case 'rename':
+        this.sim.rename(client.id, cleanName(msg.name))
+        break
     }
   }
 
@@ -318,7 +329,10 @@ class Room {
     if (!player || !text) return
     const now = Date.now()
     client.chatTimes = client.chatTimes.filter((t) => now - t < CHAT_WINDOW_MS)
-    if (client.chatTimes.length >= CHAT_LIMIT) return
+    if (client.chatTimes.length >= CHAT_LIMIT) {
+      send(client.ws, { type: 'refused', reason: 'Too many messages. Wait a few seconds.' })
+      return
+    }
     client.chatTimes.push(now)
     const line: ChatLine = { id: client.id, name: player.name, seat: player.seat, text }
     this.chat = [...this.chat, line].slice(-CHAT_HISTORY)
@@ -357,6 +371,7 @@ class Room {
     this.sim.host = this.hostId()
     this.sim.step()
     const events = this.sim.drainEvents()
+    for (const e of events) if (e.type === 'finish') this.results = e.results
     if (this.sim.rosterVersion !== this.rosterSent) this.broadcastRoster()
     if (events.length) this.broadcast({ type: 'events', events })
     if (this.sim.tick % SNAPSHOT_EVERY === 0) this.broadcast(this.snapMsg())
@@ -579,7 +594,7 @@ wss.on('connection', (ws, req) => {
       if (code) {
         room = rooms.get(code) ?? null
         if (!room) {
-          failJoin(resume !== null ? 'expired' : 'not_found', `Room ${code} doesn't exist (or everyone left).`)
+          failJoin('not_found', `Room ${code} doesn't exist (or everyone left).`)
           return
         }
         if (resume !== null) {
@@ -626,11 +641,13 @@ wss.on('connection', (ws, req) => {
     const sent = pingSentAt.get(ws)
     if (sent !== undefined) rtt.set(ws, Math.round(performance.now() - sent))
   })
-  ws.on('close', () => {
+  ws.on('close', (code) => {
     clearTimeout(deadline)
     roomListWatchers.delete(ws)
     room?.spectators.delete(ws)
-    if (room && client && client.ws === ws) room.disconnect(client)
+    if (!room || !client || client.ws !== ws) return
+    if (code === LEAVE_CLOSE_CODE) room.leave(client.id)
+    else room.disconnect(client)
   })
   ws.on('error', () => ws.close())
 })
@@ -748,7 +765,7 @@ function unparkRooms() {
     const parked = JSON.parse(readFileSync(ROOMS_FILE, 'utf8')) as { savedAt: number; rooms: SavedRoom[] }
     if (Date.now() - parked.savedAt > SEAT_HOLD_MS) return
     for (const saved of parked.rooms) {
-      const room = Room.restore(saved)
+      const room = Room.restore(saved, parked.savedAt)
       if (room) rooms.set(room.code, room)
       else console.warn(`Room ${saved.code} not restored: this release changed the simulation.`)
     }

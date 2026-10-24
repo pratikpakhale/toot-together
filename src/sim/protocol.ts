@@ -11,6 +11,8 @@ export const MAX_CHAT_LENGTH = 100
 export const CHAT_LIMIT = 5
 export const CHAT_WINDOW_MS = 10_000
 export const SEAT_HOLD_MS = 30_000
+/** WebSocket close code a client sends when the player leaves on purpose: the seat goes at once instead of being held. */
+export const LEAVE_CLOSE_CODE = 4000
 
 export type ClientMsg =
   /**
@@ -21,12 +23,14 @@ export type ClientMsg =
   | ({ type: 'input' } & PlayerInput)
   /** Sends your own raft back to its last checkpoint. */
   | { type: 'respawn' }
-  /** Back to the pond, optionally on another course. Host only (co-op: anyone once the run is finished). */
+  /** Back to the pond, optionally on another course. Host only (co-op: anyone may go again on the same course once the run is finished). */
   | { type: 'restart'; course?: string }
   | { type: 'ping'; t: number }
   /** Hidden spectator mode: without `room` it streams the live room list, with one it watches that room. */
   | { type: 'watch'; v: number; room?: string }
   | { type: 'chat'; text: string }
+  /** The player changed their name mid-room. */
+  | { type: 'rename'; name: string }
   /** Hop onto a raft or, with a null raft, onto the bench. */
   | { type: 'pick'; raft: number | null }
   | { type: 'ready'; on: boolean }
@@ -117,9 +121,9 @@ function cleanText(raw: unknown, maxLength: number): string {
   return Array.from(clean).slice(0, maxLength).join('')
 }
 
-/** Co-op lets anyone go again once the run is over; a race room leaves that to the host. */
-export function mayRestart(isHost: boolean, phase: Phase, race: boolean) {
-  return isHost || (!race && phase === 'finished')
+/** Co-op lets anyone go again on the same river once the run is over; picking another river, and anything in a race room, is the host's. */
+export function mayRestart(isHost: boolean, phase: Phase, race: boolean, sameCourse: boolean) {
+  return isHost || (!race && phase === 'finished' && sameCourse)
 }
 
 export function sanitizeName(raw: unknown): string {

@@ -4,6 +4,7 @@ import { audio } from '../audio/audio'
 import { fx } from '../scene/Fx'
 import { useProgress } from '../state/progress'
 import { useApp } from '../state/store'
+import { reloadForUpdate } from '../updates'
 import { frame } from './frame'
 import type { DeviceId } from './input'
 import { type GameSession, LocalSession, NetSession, type SessionInfo } from './session'
@@ -53,7 +54,8 @@ function onInfo(session: GameSession) {
   }
   const err = session.info.error
   if (err && (session.info.status === 'error' || session.info.status === 'closed')) {
-    if (err.code === 'outdated' && reloadForUpdate()) return
+    // The page reloads onto the new release and takes its seat back, so keep both the seat and the room in the URL.
+    if (err.code === 'outdated' && mayReloadForUpdate()) return reloadForUpdate()
     if (session.spectating) {
       showHippocam()
       return
@@ -78,20 +80,18 @@ const ERROR_TITLES: Partial<Record<NonNullable<SessionInfo['error']>['code'], st
 const RELOADED_KEY = 'toot-together:reloaded-for-update'
 
 /**
- * The server runs a newer game than this page: reload once (the room stays in the URL, the seat
- * token in the tab). A second refusal soon after means the new version isn't reachable yet, so
- * fall back to telling the player.
+ * The server runs a newer game than this page: update once. A second refusal soon after means the new
+ * version isn't reachable yet, so fall back to telling the player.
  */
-function reloadForUpdate() {
+function mayReloadForUpdate() {
   try {
     const last = Number(sessionStorage.getItem(RELOADED_KEY) ?? 0)
     if (Date.now() - last < 60_000) return false
     sessionStorage.setItem(RELOADED_KEY, String(Date.now()))
+    return true
   } catch {
     return false
   }
-  location.reload()
-  return true
 }
 
 const ATTRACT_CREW = ['Bubbles', 'Gassy', 'Pudding']
@@ -107,6 +107,7 @@ function adoptAttract() {
 
 export function showMenu() {
   const app = useApp.getState()
+  leaveGameHistory()
   adoptAttract()
   app.setOverlay(null)
   app.setScreen('menu')
@@ -126,6 +127,7 @@ export function isHippocamRoute() {
 
 export function showHippocam() {
   const app = useApp.getState()
+  leaveGameHistory()
   adoptAttract()
   app.setOverlay(null)
   app.setScreen('hippocam')
@@ -198,7 +200,49 @@ function enterGame() {
   app.setOverlay(null)
   app.setNotice(null)
   app.setScreen('game')
+  enterGameHistory()
 }
+
+/** Settings' name field: renames the hippo you're playing right now too. */
+export function renamePlayer(name: string) {
+  frame.session?.rename(name)
+  setPlayerName(name)
+}
+
+/**
+ * A game gets its own history entry, so Back (or Android's back swipe) mid-run pauses instead of leaving the
+ * site; Back again from the pause menu leaves the room.
+ */
+const GAME_ENTRY = 'toot-together:game'
+
+function enterGameHistory() {
+  if (history.state === GAME_ENTRY) return
+  const game = location.href
+  // The entry under the game is the menu, so it mustn't keep a room link that would rejoin on reload.
+  const menu = new URL(game)
+  menu.searchParams.delete('room')
+  history.replaceState(history.state, '', menu)
+  history.pushState(GAME_ENTRY, '', game)
+}
+
+function leaveGameHistory() {
+  if (history.state === GAME_ENTRY) history.back()
+}
+
+window.addEventListener('popstate', () => {
+  const app = useApp.getState()
+  if (app.screen !== 'game') return
+  if (app.overlay === 'pause') {
+    leaveGame()
+    return
+  }
+  app.setChatPanel(null)
+  app.setOverlay('pause')
+  const code = frame.session?.info.roomCode
+  const game = new URL(location.href)
+  if (code && !frame.session?.spectating) game.searchParams.set('room', code)
+  history.pushState(GAME_ENTRY, '', game)
+})
 
 export function leaveGame() {
   if (frame.session?.spectating) {
@@ -213,7 +257,7 @@ function setRoomInUrl(code: string | null) {
   const url = new URL(location.href)
   if (code) url.searchParams.set('room', code)
   else url.searchParams.delete('room')
-  history.replaceState(null, '', url)
+  history.replaceState(history.state, '', url)
 }
 
 export function roomFromUrl(): string | null {

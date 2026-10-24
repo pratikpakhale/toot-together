@@ -102,6 +102,30 @@ describe('sim', () => {
   })
 })
 
+describe('a hippo whose connection dropped', () => {
+  it('rides along without weakening its crew, taking up rim or eating snacks', () => {
+    const solo = new Sim(course, 3)
+    solo.addPlayer(1, 'A', 0)
+    const pair = new Sim(course, 3)
+    pair.addPlayer(1, 'A', 0)
+    pair.addPlayer(2, 'B', 1)
+    pair.setAway(2, true)
+    pair.players.get(1)!.rim = Math.PI
+    const snacks: SimEvent[] = []
+    for (let k = 0; k < 120 / DT; k++) {
+      const input = botInput(solo, 1)
+      solo.setInput(1, input)
+      pair.setInput(1, input)
+      solo.step()
+      pair.step()
+      expect(pair.snapshot().rafts).toEqual(solo.snapshot().rafts)
+      snacks.push(...pair.drainEvents().filter((e) => e.type === 'pickup'))
+    }
+    expect(snacks.length).toBeGreaterThan(0)
+    expect(snacks.every((e) => e.type === 'pickup' && e.id === 1)).toBe(true)
+  })
+})
+
 describe('walking around the rim', () => {
   const raftWithCrew = (crew: number) => {
     const sim = new Sim(course, 1)

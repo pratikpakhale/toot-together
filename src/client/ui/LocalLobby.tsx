@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CREW_SIZE } from '../../sim/constants'
 import { audio } from '../audio/audio'
 import { selectLevel, startLocal } from '../game/controller'
-import { useProgress } from '../state/progress'
+import { playable, useProgress } from '../state/progress'
 import { SEAT_COLORS, SEAT_NAMES } from '../game/frame'
 import { type DeviceId, input } from '../game/input'
 import { isTouch } from '../platform'
@@ -24,9 +24,10 @@ const seatName = (seat: number, name: string) => (seat === 0 ? name : `${SEAT_NA
 function begin(list: DeviceId[]) {
   audio.click()
   const { name } = useApp.getState().settings
+  const { records, selected } = useProgress.getState()
   startLocal(
     list.map((device, i) => ({ device, name: seatName(i, name) })),
-    useProgress.getState().selected,
+    playable(records, selected),
   )
 }
 
@@ -41,9 +42,14 @@ export function LocalLobby() {
     () =>
       input.on((action, device) => {
         const list = devicesRef.current
+        // Start on a joined pad starts; Esc, or Back on a joined pad, leaves. A pad nobody joined with does neither.
         if (action === 'pause') {
-          if (device !== 'any' && list.includes(device)) queueMicrotask(() => begin(list))
-          else setScreen('menu')
+          if (device === 'any') setScreen('menu')
+          else if (list.includes(device)) queueMicrotask(() => begin(list))
+          return
+        }
+        if (action === 'respawn') {
+          if (device !== 'any' && list.includes(device)) setScreen('menu')
           return
         }
         if (action !== 'confirm' || device === 'any' || device === 'touch') return

@@ -39,10 +39,16 @@ export function recordOf(records: Record<string, CourseRecord>, courseId: string
   return records[courseId] ?? EMPTY
 }
 
+/** Open once the river before it is finished, or once it has been finished itself (in someone else's room). */
 export function isUnlocked(records: Record<string, CourseRecord>, courseId: string) {
   const i = COURSE_LIST.findIndex((c) => c.id === courseId)
   if (i <= 0) return true
-  return recordOf(records, COURSE_LIST[i - 1].id).finishes > 0
+  return recordOf(records, courseId).finishes > 0 || recordOf(records, COURSE_LIST[i - 1].id).finishes > 0
+}
+
+/** `courseId` if it's open, otherwise the furthest river that is. */
+export function playable(records: Record<string, CourseRecord>, courseId: string) {
+  return isUnlocked(records, courseId) ? courseId : (COURSE_LIST.findLast((c) => isUnlocked(records, c.id))?.id ?? DEFAULT_COURSE)
 }
 
 export const useProgress = create<ProgressState>()(
@@ -52,7 +58,7 @@ export const useProgress = create<ProgressState>()(
       selected: DEFAULT_COURSE,
       tutorialDone: false,
       select: (courseId) => {
-        if (isCourseId(courseId)) set({ selected: courseId })
+        if (isCourseId(courseId)) set({ selected: playable(get().records, courseId) })
       },
       completeTutorial: () => set({ tutorialDone: true }),
       recordFinish: (courseId, time, deaths) => {

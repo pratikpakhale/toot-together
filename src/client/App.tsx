@@ -87,9 +87,10 @@ export function App() {
   }, [screen, overlay])
 
   useEffect(() => {
-    session?.setPaused(overlay === 'pause' || overlay === 'settings' || overlay === 'howto' || sideways)
+    // The menu's demo raft keeps floating behind Settings and How to play.
+    session?.setPaused((screen === 'game' && (overlay === 'pause' || overlay === 'settings' || overlay === 'howto')) || sideways)
     if (overlay || sideways) audio.stopAllFarts()
-  }, [session, overlay, sideways])
+  }, [session, screen, overlay, sideways])
 
   // react-doctor-disable-next-line react-doctor/effect-needs-cleanup -- input.on returns its unsubscribe
   useEffect(
@@ -107,7 +108,8 @@ export function App() {
         }
         if (action === 'pause') {
           if (app.overlay === null) app.setOverlay('pause')
-          else if (app.overlay === 'pause' || app.overlay === 'crews') app.setOverlay(null)
+          // Results come back from the HUD's Results button.
+          else if (app.overlay === 'pause' || app.overlay === 'crews' || app.overlay === 'results') app.setOverlay(null)
           else if (app.overlay === 'settings' || app.overlay === 'howto') app.setOverlay('pause')
         }
         if (action === 'respawn' && app.overlay === null) app.session?.respawn()

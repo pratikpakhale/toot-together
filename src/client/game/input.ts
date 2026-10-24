@@ -107,8 +107,11 @@ class InputManager {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
-    const target = e.target as HTMLElement | null
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
+    const target = e.target
+    // A focused slider (dragged in Settings) only lets Esc through, so Esc still closes the menu.
+    if (target instanceof HTMLTextAreaElement || (target instanceof HTMLInputElement && !(target.type === 'range' && e.code === 'Escape'))) return
+    // Browser shortcuts (Cmd/Ctrl+C, +T, +P…) aren't game keys.
+    if (e.metaKey || e.ctrlKey || e.altKey) return
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault()
     // Enter is a toot key too; don't let it "click" whatever button happens to have focus.
     if (this.captureKeys && GAME_KEYS.has(e.code)) e.preventDefault()
