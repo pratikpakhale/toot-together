@@ -59,7 +59,7 @@ Redeploying restarts the server, but rooms carry over: they're parked in `/var/l
 | Burst | Shift / E (P2: Right Shift) | X / RB / B | BURST |
 | Respawn | R | Back/Select | Menu button |
 | Menu | Esc / P | Start | Menu button |
-| Chat (online) | Q quick lines (then 1–8), T to type | | Chat button |
+| Chat (online) | Hold Q, aim, let go (or Q then 1–8); T to type | | Chat button: slide or tap |
 | Ready / start the race (race rooms) | Y | Y | Ready button |
 | Crews: switch raft or spot (race rooms) | C | | Crews button |
 

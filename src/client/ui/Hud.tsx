@@ -8,6 +8,7 @@ import type { GameSession, NetStats } from '../game/session'
 import { isTouch, SHORT_SCREEN, useShortScreen } from '../platform'
 import { useProgress } from '../state/progress'
 import { useApp } from '../state/store'
+import { ChatButton } from './Chat'
 import { formatTime } from './format'
 import { setTagContent } from './NameTags'
 import { Icon } from './Icon'
@@ -257,6 +258,7 @@ export function Hud() {
             {!isTouch && <span className="kbd mr-1">R</span>} Respawn
           </button>
         )}
+        {!isTouch && <ChatButton />}
       </div>
 
       {!race && phase === 'pond' && !session.spectating && <PondHint localCount={localPlayers.length} localIds={localIds} />}
