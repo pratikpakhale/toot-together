@@ -383,6 +383,23 @@ export const ICONS = {
   target:
     `<circle cx="32" cy="32" r="24" fill="#fff8ec" ${O}/><circle cx="32" cy="32" r="15" fill="#ff5b8a" ${O3}/><circle cx="32" cy="32" r="6" fill="#fff8ec" ${O3}/>` +
     `<path d="M32 2v12M32 50v12M2 32h12M50 32h12" stroke="${INK}" stroke-width="5"/>`,
+
+  stop:
+    `<path d="M22 5h20l15 15v24L42 59H22L7 44V20z" fill="#ff5d5d" ${O}/>` +
+    `<rect x="16" y="27" width="32" height="10" rx="4" fill="#fff" ${O3}/>` +
+    shine(19, 17, 3, 6, 45, 0.5),
+
+  speaker:
+    `<path d="M8 24h11l15-12v40L19 40H8z" fill="#ffcf3f" ${O}/>` +
+    `<path d="M43 23c4 5 4 13 0 18M50 17c8 9 8 21 0 30" fill="none" ${O}/>`,
+
+  speakerOff:
+    `<path d="M8 24h11l15-12v40L19 40H8z" fill="#cfd6e0" ${O}/>` +
+    `<path d="M42 24l16 16M58 24L42 40" stroke="${INK}" stroke-width="10"/><path d="M42 24l16 16M58 24L42 40" stroke="#ff5b8a" stroke-width="4"/>`,
+
+  people:
+    `<circle cx="44" cy="20" r="9" fill="#ff9a3c" ${O}/><path d="M35 33c3-2 6-3 9-3 9 0 15 7 15 17H41" fill="#ff9a3c" ${O}/>` +
+    `<circle cx="22" cy="22" r="10" fill="#4aa8ff" ${O}/><path d="M5 52c0-11 8-18 17-18s17 7 17 18z" fill="#4aa8ff" ${O}/>`,
 } satisfies Record<string, string>
 
 export type IconName = keyof typeof ICONS

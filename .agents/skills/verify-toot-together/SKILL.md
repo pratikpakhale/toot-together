@@ -49,7 +49,7 @@ Browser: the tools you need are `browser_navigate`, `browser_snapshot`, `browser
 
 - Open `http://127.0.0.1:<web port>/` (from `$T status`). Main menu handles: textbox `YOUR HIPPO NAME`, buttons `Play solo`, `Couch party (1–4)`, `Create room`, textbox with placeholder `CODE` + button `Join`, `How to play`, `Settings`.
 - Level select (title `CHOOSE A RIVER`): level cards are buttons whose names start with the number, so use `getByRole('button', { name: /^1 Lazy River/ })`. `/Lazy River/` alone also matches the locked Canyon Run card ("Finish Lazy River to unlock.").
-- In a run: keys go to `window` while no input has focus. `Esc` pause menu, `R` respawn, `A`/`D` walk, `Space` toot, `Shift` burst, `Q` chat wheel (hold and aim, or tap then `1`–`8`), `T` type chat. HUD chip `ROOM <CODE>` (button titled `Copy invite link`), crew list bottom-right with `(you)`, `(reconnecting)` and a `Host` crown.
+- In a run: keys go to `window` while no input has focus. `Esc` pause menu, `R` respawn, `A`/`D` walk, `Space` toot, `Shift` burst, `Q` chat wheel (hold and move the mouse, or tap then `1`–`8`), `T` type chat. HUD chip `ROOM <CODE>` (button titled `Copy invite link`), crew list bottom-right with `(you)`, `(reconnecting)` and a `Host` crown.
 - Observing only: in dev, `window.__toot.useApp.getState()` exposes `screen`, `overlay`, `sessionInfo` (`roomCode`, `status`, `roster`, `chat`), `muted`, `settings`. Use it to assert and to dump state into evidence. **Never call its setters to make something happen**; proofs act through clicks and keys.
 - Phone UI: touch layout is fixed at page load from `matchMedia('(pointer: coarse)')`, so resizing does nothing. In `browser_run_code_unsafe`:
   ```js

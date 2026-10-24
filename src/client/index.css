@@ -127,6 +127,11 @@ img {
     color: var(--color-ink);
     text-shadow: none;
   }
+  .btn-sun {
+    background: linear-gradient(#ffe48a, #ffcf3f);
+    color: var(--color-ink);
+    text-shadow: none;
+  }
 
   .panel {
     background: var(--color-cream);
@@ -373,16 +378,41 @@ img {
   font-size: 30px;
   line-height: 1.1;
 }
-.chat-wheel {
-  background: radial-gradient(circle, rgb(28 53 87 / 0.35) 30%, rgb(28 53 87 / 0.6) 72%);
-  border: 4px solid rgb(255 255 255 / 0.7);
-  box-shadow: 0 10px 0 rgb(28 53 87 / 0.25);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+.chat-wheel-backdrop {
+  background: radial-gradient(circle at 50% 46%, rgb(28 53 87 / 0.18), rgb(28 53 87 / 0.42));
+  animation: fade-in 140ms ease-out both;
 }
-/* The aimed slot, a 45° slice from --from (0deg at the top, clockwise). */
-.chat-wheel-aim {
-  background: conic-gradient(from var(--from), rgb(255 207 63 / 0.6) 0 45deg, transparent 45deg);
+.chat-wheel {
+  animation: wheel-in 160ms cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+@keyframes wheel-in {
+  from {
+    transform: scale(0.86);
+    opacity: 0;
+  }
+}
+.chat-wheel-dial {
+  filter: drop-shadow(0 8px 0 rgb(28 53 87 / 0.32));
+}
+.chat-slice {
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+.chat-slice-icon {
+  filter: drop-shadow(0 2px 0 rgb(28 53 87 / 0.35));
+}
+.chat-slice-label {
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  fill: var(--color-ink);
+  text-anchor: middle;
+}
+.chat-slice-number {
+  font-family: var(--font-display);
+  font-size: 15px;
+  fill: white;
+  text-anchor: middle;
 }
 .chat-bubble-tail {
   width: 12px;
@@ -441,11 +471,14 @@ img {
   .anim-wobble,
   .anim-float,
   .anim-fade,
-  .chat-life {
+  .chat-life,
+  .chat-wheel,
+  .chat-wheel-backdrop {
     animation: none !important;
   }
   .btn,
-  .level-card {
+  .level-card,
+  .chat-slice {
     transition: none;
   }
 }

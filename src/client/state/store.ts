@@ -8,7 +8,12 @@ type Screen = 'menu' | 'local-lobby' | 'game' | 'hippocam'
 /** `crews`: the host's crew tools in a race room. */
 type Overlay = null | 'pause' | 'settings' | 'howto' | 'results' | 'levels' | 'crews'
 type LevelMode = 'solo' | 'online'
-type ChatPanel = null | 'quick' | 'type'
+/**
+ * `aim`: the wheel while Q or the chat button is held (moving from where the press began picks a line, letting
+ * go says it); `wheel`: the wheel left open by a quick tap of Q or a click; `type`: the text box; `people`: the
+ * list of players to mute (with the text box on desktop, instead of it on a phone).
+ */
+type ChatPanel = null | 'aim' | 'wheel' | 'type' | 'people'
 
 export interface Settings {
   name: string
@@ -111,7 +116,8 @@ export const useApp = create<AppState>((set, get) => ({
   toggleMute: (id) => set((s) => ({ muted: s.muted.includes(id) ? s.muted.filter((m) => m !== id) : [...s.muted, id] })),
   setNotice: (notice) => set({ notice }),
   setScreen: (screen) => set({ screen }),
-  setOverlay: (overlay) => set({ overlay }),
+  // Chat shows over the game and the results only; anything else closes it.
+  setOverlay: (overlay) => set(overlay === null || overlay === 'results' ? { overlay } : { overlay, chatPanel: null }),
   updateSettings: (patch) => {
     const settings = { ...get().settings, ...patch }
     try {

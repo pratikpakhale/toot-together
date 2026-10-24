@@ -59,7 +59,7 @@ Redeploying restarts the server, so **never deploy while anyone is on it**. `/he
 | Burst | Shift / E (P2: Right Shift) | X / RB / B | BURST |
 | Respawn | R | Back/Select | Menu button |
 | Menu | Esc / P | Start | Menu button |
-| Chat (online) | Hold Q, aim, let go (or Q then 1–8); T to type | | Chat button: slide or tap |
+| Chat (online) | Hold Q, move the mouse, let go (or tap Q, then 1–8); T to type | | Chat button: tap to type, hold and slide to pick a line |
 | Ready / start the race / hop on (race rooms) | Y | Y | The big button |
 | Crews: raft count, shuffle, move hippos (race host) | C | | Crews button |
 

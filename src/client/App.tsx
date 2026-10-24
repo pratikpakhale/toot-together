@@ -99,7 +99,7 @@ export function App() {
         if (app.screen !== 'game') return
         const chatting = app.session?.canChat && app.settings.chat && (app.overlay === null || app.overlay === 'results')
         if (chatting && action === 'chat') app.setChatPanel('type')
-        if (chatting && action === 'quickChat') app.setChatPanel(app.chatPanel ? null : 'quick')
+        if (chatting && action === 'quickChat') app.setChatPanel(app.chatPanel ? null : 'aim')
         if (action === 'pause' && app.chatPanel) {
           app.setChatPanel(null)
           return
