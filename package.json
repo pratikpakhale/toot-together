@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "knip": "knip",
-    "doctor": "react-doctor --no-score --verbose --yes",
+    "react-doctor": "react-doctor --no-score --verbose --yes",
     "balance": "tsx scripts/balance.ts",
     "icons": "tsx scripts/icons.ts",
     "level-shots": "tsx scripts/level-shots.ts",
