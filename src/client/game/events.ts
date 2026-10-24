@@ -276,7 +276,7 @@ export function handleEvent(e: SimEvent, menu: boolean) {
       if (r) fx.confetti(r.x, r.y + 1.5, r.z, 30)
       if (!p || !own(p.raft)) break
       audio.legendary()
-      toast({ text: 'LEGENDARY TOOT', sub: `by ${nameOf(e.id)}`, icon: 'sparkle', flank: true, tone: 'gold' }, 2200)
+      toast({ text: 'LEGENDARY TOOT', sub: `by ${nameOf(e.id)}`, icon: 'sparkle', tone: 'gold' }, 2200)
       break
     }
     case 'exhausted': {

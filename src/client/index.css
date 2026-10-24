@@ -107,6 +107,18 @@ img {
     cursor: not-allowed;
     transform: none;
   }
+  /* A small toast stuck on the screen: a slab in one of the .btn-* colours, a little crooked. */
+  .sticker {
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
+    color: white;
+    text-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
+    border: 3px solid var(--color-ink);
+    border-radius: 14px;
+    box-shadow: 0 4px 0 var(--color-ink);
+    rotate: var(--tilt, 0deg);
+  }
+
   .btn-green {
     background: linear-gradient(#a5ea52, #6cc632);
   }
@@ -334,6 +346,29 @@ img {
   animation: fade-in 250ms ease both;
 }
 
+/* Stickers are slapped on (speeding up into the glass, then a dead stop) and peeled off when --life runs out. */
+@keyframes sticker-on {
+  from {
+    transform: scale(1.35) rotate(-4deg);
+    opacity: 0;
+    box-shadow: 0 22px 0 rgb(28 53 87 / 0.15);
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes sticker-off {
+  to {
+    transform: translate(10px, -16px) rotate(9deg);
+    opacity: 0;
+  }
+}
+.sticker-life {
+  animation:
+    sticker-on 120ms cubic-bezier(0.55, 0, 1, 0.45) both,
+    sticker-off 170ms ease-in calc(var(--life) - 170ms) forwards;
+}
+
 @keyframes chat-life {
   0% {
     transform: scale(0.6);
@@ -473,7 +508,8 @@ img {
   .anim-fade,
   .chat-life,
   .chat-wheel,
-  .chat-wheel-backdrop {
+  .chat-wheel-backdrop,
+  .sticker-life {
     animation: none !important;
   }
   .btn,

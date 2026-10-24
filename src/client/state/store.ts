@@ -33,9 +33,10 @@ export interface Toast {
   sub?: string
   icon?: IconName
   subIcon?: IconName
-  flank?: boolean
   tone: 'good' | 'bad' | 'gold' | 'info' | 'sync'
   big?: boolean
+  /** How long it stays up, in ms; the exit animation is timed off it. */
+  ms: number
 }
 
 const FUNNY_NAMES = ['Bubbles', 'Gassy', 'Tooter', 'Pudding', 'Mudpie', 'Biscuit', 'Wobbles', 'Beans', 'Puddle', 'Snorty', 'Noodle', 'Chonk']
@@ -94,7 +95,7 @@ interface AppState {
   setSessionInfo(info: SessionInfo | null): void
   setResults(results: Results | null, finish?: FinishOutcome | null): void
   openLevels(mode: LevelMode): void
-  pushToast(toast: Omit<Toast, 'id'>, ms?: number): void
+  pushToast(toast: Omit<Toast, 'id' | 'ms'>, ms?: number): void
 }
 
 let toastId = 0
@@ -131,7 +132,7 @@ export const useApp = create<AppState>((set, get) => ({
   openLevels: (levelMode) => set({ levelMode, overlay: 'levels' }),
   pushToast: (toast, ms = 1800) => {
     const id = ++toastId
-    set((s) => ({ toasts: [...(toast.big ? s.toasts.filter((t) => !t.big) : s.toasts), { ...toast, id }].slice(-4) }))
+    set((s) => ({ toasts: [...(toast.big ? s.toasts.filter((t) => !t.big) : s.toasts), { ...toast, id, ms }].slice(-4) }))
     window.setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), ms)
   },
 }))

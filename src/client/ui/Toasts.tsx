@@ -2,12 +2,12 @@ import { useShortScreen } from '../platform'
 import { useApp, type Toast } from '../state/store'
 import { Icon } from './Icon'
 
-const TONE: Record<Toast['tone'], { color: string; stroke: string }> = {
-  good: { color: '#a6e84a', stroke: 'var(--color-ink)' },
-  bad: { color: '#ff6b6b', stroke: 'var(--color-ink)' },
-  gold: { color: 'var(--color-gold)', stroke: '#7a3d17' },
-  info: { color: '#ffffff', stroke: 'var(--color-ink)' },
-  sync: { color: '#7fe3ff', stroke: 'var(--color-ink)' },
+const TONE: Record<Toast['tone'], { color: string; stroke: string; sticker: string }> = {
+  good: { color: '#a6e84a', stroke: 'var(--color-ink)', sticker: 'btn-green' },
+  bad: { color: '#ff6b6b', stroke: 'var(--color-ink)', sticker: 'btn-pink' },
+  gold: { color: 'var(--color-gold)', stroke: '#7a3d17', sticker: 'btn-sun' },
+  info: { color: '#ffffff', stroke: 'var(--color-ink)', sticker: 'btn-cream' },
+  sync: { color: '#7fe3ff', stroke: 'var(--color-ink)', sticker: 'btn-blue' },
 }
 
 export function Toasts() {
@@ -26,7 +26,6 @@ export function Toasts() {
             >
               {t.icon && <Icon name={t.icon} size="0.85em" className="mr-[0.15em] align-[-0.08em]" />}
               {t.text}
-              {t.icon && t.flank && <Icon name={t.icon} size="0.85em" className="ml-[0.15em] align-[-0.08em]" />}
             </div>
             {t.sub && (
               <div className="font-display stroke-text mt-1 text-2xl text-white sm:text-3xl" style={{ WebkitTextStrokeWidth: 5 }}>
@@ -37,15 +36,16 @@ export function Toasts() {
           </div>
         </div>
       ))}
-      <div className="absolute left-1/2 top-[86px] flex -translate-x-1/2 flex-col items-center gap-2 short:left-auto short:right-3 short:top-[104px] short:translate-x-0 short:items-end short:gap-1.5">
+      <div className="absolute left-1/2 top-[86px] flex -translate-x-1/2 flex-col items-center gap-2.5 short:left-auto short:right-3 short:top-[104px] short:translate-x-0 short:items-end short:gap-1.5">
         {small.map((t) => (
-          <div key={t.id} className="chip anim-pop px-4 py-1 text-center short:px-3 short:py-0.5" style={{ background: t.tone === 'gold' ? '#fff3c4' : undefined }}>
-            <div className="font-display flex items-center justify-center gap-2 text-xl short:gap-1.5 short:text-base" style={{ color: TONE[t.tone].stroke }}>
-              {t.icon && <Icon name={t.icon} size="1.3em" />}
-              {t.text}
-              {t.icon && t.flank && <Icon name={t.icon} size="1.3em" />}
-            </div>
-            {t.sub && !short && <div className="text-sm font-extrabold text-ink/70">{t.sub}</div>}
+          <div
+            key={t.id}
+            className={`sticker sticker-life flex items-center gap-2 py-0.5 pl-2.5 pr-4 text-xl whitespace-nowrap short:gap-1.5 short:pr-3 short:text-base ${TONE[t.tone].sticker}`}
+            style={{ ['--life' as string]: `${t.ms}ms`, ['--tilt' as string]: t.id % 2 ? '-1.5deg' : '1.5deg' }}
+          >
+            {t.icon && <Icon name={t.icon} size="1.3em" />}
+            {t.text}
+            {t.sub && !short && <small className="ml-1 font-body text-[13px] font-black opacity-85 [text-shadow:none]">{t.sub}</small>}
           </div>
         ))}
       </div>
