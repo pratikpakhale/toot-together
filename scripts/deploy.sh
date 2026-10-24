@@ -14,6 +14,13 @@ APP_DIR=/opt/toot-together
 RELEASE=$(date -u +%Y%m%d%H%M%S)
 KEEP=3
 
+# Never restart the server under players. An unreachable server (down, or never set up) has nobody to lose.
+SOCKETS=$(curl -fs --max-time 5 "$URL/health" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => console.log(JSON.parse(s).sockets ?? 0))' 2>/dev/null || echo 0)
+if [ "$SOCKETS" -gt 0 ]; then
+  echo "Not deploying: $SOCKETS connected on $URL (see $URL/hippocam). Wait until nobody is on." >&2
+  exit 1
+fi
+
 pnpm build
 
 ssh "$HOST" "mkdir -p $APP_DIR/releases/$RELEASE"

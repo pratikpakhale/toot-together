@@ -46,7 +46,7 @@ scripts/deploy.sh                                     # builds locally, uploads 
 ssh <deploy host> journalctl -u toot-together -f         # logs
 ```
 
-Redeploying restarts the server, but rooms carry over: they're parked in `/var/lib/toot-together/rooms.json` on the way down and restored on the way up, and players reconnect after a few seconds. A release that changes the simulation's state can't restore old rooms, so deploy those when nobody is playing (`/health` shows the room count). See `AGENTS.md` for the full deploy checklist.
+Redeploying restarts the server, so **never deploy while anyone is on it**. `/health` shows `rooms` and `sockets`, and `scripts/deploy.sh` refuses to run while any socket is connected. Rooms are parked in `/var/lib/toot-together/rooms.json` on the way down and restored on the way up. That is a safety net for crashes and unplanned restarts, not a reason to deploy over players: they still freeze, and a release that changes the simulation's state drops their rooms. See `AGENTS.md` for the full deploy checklist.
 
 ## Controls
 
