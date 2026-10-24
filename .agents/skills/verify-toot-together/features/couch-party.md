@@ -1,14 +1,14 @@
 # Couch party lobby
 
-Up to four hippos on one screen. In the lobby each player claims a seat by pressing their device's toot key: Space for the WASD player, Enter for the arrows player, A on a gamepad. Players pick a river from the compact cards and start the run together; P1 uses WASD + Space, P2 arrows + Enter.
+Up to four hippos on one screen. In the lobby each player claims a seat by pressing their device's toot key: Space for the WASD player, Enter for the arrows player, A on a gamepad. Players pick a river from the compact cards and start the run together; each hippo keeps the keys it joined with, numbered in join order (press Space first and P1 is the WASD player).
 
 ## Sub-features
 
 - `couch-open` main menu `Couch party (1–4)` opens `COUCH PARTY` with four `Press to join` slots.
-- `couch-join-keys` Space fills a slot labelled `WASD + Space`, Enter fills one labelled `Arrows + Enter`; pressing the same key again does nothing.
+- `couch-join-keys` Space fills a slot labelled `WASD + Space`, Enter (or NumpadEnter or `/`) fills one labelled `Arrows + Enter`; pressing the same key again does nothing.
 - `couch-river` the compact river cards highlight the picked river.
 - `couch-start` the button reads `Waiting for hippos…` (disabled) until someone joins, then `Start with N hippo(s)!` and starts a local run with N hippos.
-- `couch-back` `Back` or Esc returns to the menu.
+- `couch-back` `Back`, Esc or P (or Back on a joined gamepad) returns to the menu.
 
 ## How to get to it (user POV)
 
@@ -31,5 +31,5 @@ Preconditions:
 ## Gotchas
 
 - Enter is a toot key, so it is swallowed instead of clicking a focused button; click `Start` with the mouse.
-- Esc from a keyboard backs out of the lobby; Start on a joined gamepad starts it. Headless browsers have no gamepads, so gamepad joins stay unverified.
-- The second seat's name comes from the seat colour (`SEAT_NAMES`), not the name box.
+- Esc (or P) from a keyboard backs out of the lobby; Start on a joined gamepad starts it and Back on one leaves; a pad that hasn't joined does neither. Headless browsers have no gamepads, so gamepad joins stay unverified.
+- Seats 2–4 take their names from the seat colour (`SEAT_NAMES`: `Orange Hippo`, `Green Hippo`, `Purple Hippo`), not the name box; only seat 1 uses it.

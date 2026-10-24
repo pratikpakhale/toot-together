@@ -116,8 +116,8 @@ ls /tmp/verify/toot-together/evidence/<runId>/   # evidence must still be there
 ## Gotchas
 
 - Browser `localStorage` persists across runs in the shared verify browser: the generated name, unlocked levels, medals and `tutorialDone` carry over. Type the name you want into `YOUR HIPPO NAME`; use a new browser context when you need a first-time player (Hippo school, only Lazy River unlocked).
-- Server limits all apply to `127.0.0.1`: 8 room creates per minute, 20 failed joins per minute, 24 sockets per IP, 4 players per room. Many quick runs will hit `Slow down!`; wait a minute.
-- A player who disconnects (bot ending, page closed) keeps their seat for 30 s, shown as `(reconnecting)`, and still counts towards the 4-player cap. Empty rooms close 60 s after the last player leaves.
+- Server limits all apply to `127.0.0.1`: 8 room creates per minute, 20 failed joins per minute, 24 sockets per IP, 4 players per raft (a co-op room holds 4; a race room 4 per raft, bench included). Many quick runs will hit `Slow down!`; wait a minute.
+- A player who disconnects (bot ending, page closed) keeps their seat for 30 s, shown as `(reconnecting)`, and still counts towards the room's cap. Leaving through the pause menu frees the seat at once. Empty rooms close 60 s after the last player leaves.
 - Production-only behaviour is not covered: the PWA service worker and PostHog analytics only run in `pnpm build` output, and Caddy/TLS/`TRUST_PROXY_HEADER` only exist on the VM. Don't use `pnpm build && pnpm start` to cover them: the build overwrites `dist/` that the deploy script ships, and with `VITE_POSTHOG_KEY` in `.env.local` the production client sends analytics to the real PostHog project.
 - Under SwiftShader (see *Keep it cheap*) frames are slow and late, so the HUD ping can read 150–350 ms locally. It's the renderer, not the network.
 

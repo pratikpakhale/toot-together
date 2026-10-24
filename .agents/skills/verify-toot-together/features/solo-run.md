@@ -1,20 +1,20 @@
 # Solo run
 
-One player floats a river alone with keyboard, gamepad or touch. The run starts in a practice pond (first-timers get the `Hippo school` checklist), the timer starts at the START gate, and finishing shows `YOU MADE IT!` with time, medal, and `Next river` / `Again` / `Share`. Finishing a river unlocks the next; best times and medals are saved in the browser.
+One player floats a river alone with keyboard, gamepad or touch. The run starts in a practice pond (first-timers get the `Hippo school` checklist), the timer starts at the START gate, and finishing shows `YOU MADE IT!` with time, medal, and `Next river: <name>` / `Again` / `Share` / `Menu` (plus a `Hide results` eye button). Finishing a river unlocks the next; best times and medals are saved in the browser.
 
 ## Sub-features
 
 - `solo-start` `Play solo` -> `CHOOSE A RIVER` -> an unlocked river starts a local run (no room code, no chat).
-- `solo-locks` locked rivers are disabled cards reading `Finish <previous river> to unlock.`
+- `solo-locks` locked rivers are disabled cards reading `Finish <previous river> to unlock.` (the line is hidden on short screens). A river you have finished yourself (say, in someone else's room) stays open even if the one before it isn't.
 - `solo-tutorial` a first-time player sees `Hippo school`; each line ticks when the hippo walks (A/D), toots (Space) and bursts (Shift).
-- `solo-hud` HUD shows `GAS` meter, timer `00:00.00`, river name, deaths skull, progress bar, `Esc Menu`, `R Respawn`.
-- `solo-pause` `Esc` freezes the run behind `PAUSED` with `Resume`, `Respawn at checkpoint`, `Restart run`, `How to play`, `Settings`, `Quit to menu`.
+- `solo-hud` HUD shows `GAS` meter, timer `00:00.00`, river name, deaths skull, progress bar, `Esc Menu`, `R Respawn` (short screens show the timer as `00:00.0` and no river name; touch shows plain `Menu` / `Respawn`).
+- `solo-pause` `Esc` freezes the run behind `PAUSED` with `Resume`, `Respawn at checkpoint`, `Restart run`, `How to play`, `Settings`, `Full screen` (where supported), `Quit to menu`.
 - `solo-finish` reaching the finish shows the results screen and records the best time on the level card.
 
 ## How to get to it (user POV)
 
 - Main menu `Play solo`, then a river card.
-- From the results screen: `Next river`, `Again`.
+- From the results screen: `Next river: <name>`, `Again`.
 
 ## Driving it with toot-verify + verify-browser
 
@@ -32,7 +32,7 @@ Preconditions:
 
 ## Gotchas
 
-- Keys only reach the game while no input is focused; click the canvas area or press `Escape` twice if the name box kept focus.
+- Keys only reach the game while no input is focused; click the canvas area, or press `Enter` in the name box (which unfocuses it), if the name box kept focus; the game ignores `Escape` while a text box has focus.
 - A hidden/backgrounded tab auto-pauses local runs (`visibilitychange`). Keep the page in front.
 - Saved progress persists in the verify browser; use a new context to see first-time behaviour.
 - The menu's background raft is a local attract-mode session too; check `screen === 'game'`, not just `session.kind`.
