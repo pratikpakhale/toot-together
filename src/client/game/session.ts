@@ -57,7 +57,7 @@ export interface SessionInfo {
 }
 
 /** What a player can do about crews in a race room. */
-export type CrewAction = Extract<ClientMsg, { type: 'pick' | 'ready' | 'rafts' | 'move' | 'shuffle' | 'start' }>
+export type CrewAction = Extract<ClientMsg, { type: 'pick' | 'spot' | 'ready' | 'rafts' | 'move' | 'shuffle' | 'start' }>
 
 export interface NetStats {
   pingMs: number | null

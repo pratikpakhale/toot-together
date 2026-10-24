@@ -291,6 +291,21 @@ describe('crews', () => {
     expect(sim.pick(10, 0)).toBe('That raft is full.')
   })
 
+  it('swapping walks you one spot round the rim, wrapping at the ends, skipping anyone reconnecting, only between races', () => {
+    const sim = raceRoom([3, 1])
+    const order = () => sim.crew(0).sort((a, b) => a.ord - b.ord).map((p) => p.id)
+    expect(sim.swapSpot(1, 1)).toBeNull()
+    expect(order()).toEqual([2, 1, 3])
+    expect(sim.swapSpot(2, -1)).toBeNull()
+    expect(order()).toEqual([3, 1, 2])
+    sim.setAway(2, true)
+    expect(sim.swapSpot(1, 1)).toBeNull()
+    expect(order()).toEqual([1, 3, 2])
+    expect(sim.swapSpot(4, 1)).toMatch(/whole rim/)
+    sim.start()
+    expect(sim.swapSpot(1, 1)).toMatch(/between races/)
+  })
+
   it('changing the raft count keeps everyone aboard and refuses what would not fit', () => {
     const sim = raceRoom([4, 4, 2])
     expect(sim.setRaftCount(2)).toMatch(/don't fit/)

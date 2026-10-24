@@ -296,6 +296,9 @@ class Room {
       case 'pick':
         refuse(this.sim.pick(client.id, msg.raft === null ? null : Number(msg.raft)))
         break
+      case 'spot':
+        refuse(this.sim.swapSpot(client.id, Number(msg.dir)))
+        break
       case 'ready':
         refuse(this.sim.setReady(client.id, msg.on === true))
         break

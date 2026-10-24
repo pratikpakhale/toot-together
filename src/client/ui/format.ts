@@ -14,3 +14,6 @@ export function ordinal(n: number) {
   const suffix = tens >= 11 && tens <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')
   return `${n}${suffix}`
 }
+
+/** A crew at a glance, as on rival raft tags: "Kabir, Mira +1". */
+export const crewLabel = (names: string[]) => (names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', '))

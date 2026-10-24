@@ -33,6 +33,8 @@ export type ClientMsg =
   | { type: 'rename'; name: string }
   /** Hop onto a raft or, with a null raft, onto the bench. */
   | { type: 'pick'; raft: number | null }
+  /** Move one spot round your raft, swapping with the hippo there. */
+  | { type: 'spot'; dir: -1 | 1 }
   | { type: 'ready'; on: boolean }
   /** Host: how many rafts race (1 = co-op). */
   | { type: 'rafts'; count: number }

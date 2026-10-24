@@ -136,11 +136,14 @@ export function Hud() {
   }
   // After a race, the lobby comes back once the results have had their turn.
   const lobby = race && (phase === 'pond' || (phase === 'finished' && overlay === null && resultsSeen))
+  // A phone's race lobby makes room for the raft strip: the race-only HUD (river progress, gas, respawn, clock) waits
+  // for the countdown, keeping its place so nothing jumps when it comes back.
+  const hideRaceHud = lobby && short ? 'invisible' : ''
 
   return (
     // Above the touch controls (z-10), so a HUD button over the walk area still gets the tap.
     <div className="safe-area pointer-events-none z-20 select-none">
-      <div className="absolute left-1/2 top-3 w-[min(820px,calc(100%-440px))] -translate-x-1/2 max-[620px]:top-16 max-[620px]:w-[calc(100%-24px)]">
+      <div className={`absolute left-1/2 top-3 w-[min(820px,calc(100%-440px))] -translate-x-1/2 max-[620px]:top-16 max-[620px]:w-[calc(100%-24px)] ${hideRaceHud}`}>
         <div className="relative h-5 rounded-full border-[3px] border-ink bg-white/85 shadow-[0_3px_0_rgba(28,53,87,0.3)]">
           <div ref={fillRef} className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-toot to-grass" style={{ width: 0 }} />
           {course.checkpoints.map((s) => (
@@ -185,7 +188,7 @@ export function Hud() {
       </div>
 
       <div className="absolute right-3 top-3 flex flex-col items-end gap-2">
-        <div className="chip flex items-center gap-2 px-3 py-1 font-display text-2xl short:text-xl">
+        <div className={`chip flex items-center gap-2 px-3 py-1 font-display text-2xl short:text-xl ${hideRaceHud}`}>
           {short && (
             <>
               <PlaceChip session={session} short />
@@ -209,7 +212,7 @@ export function Hud() {
         )}
       </div>
 
-      <div className="absolute left-3 top-3 flex flex-col gap-2">
+      <div className={`absolute left-3 top-3 flex flex-col gap-2 ${hideRaceHud}`}>
         {localPlayers.map(({ id, entry }) => (
           <div key={id} className="flex items-center gap-2">
             <div ref={setRef(meterWrapRefs.current, id)} className="chip flex items-center gap-2 py-1 pl-2 pr-1">
@@ -257,7 +260,7 @@ export function Hud() {
         <button tabIndex={-1} className="btn btn-cream px-3 py-1 text-sm" onClick={() => (audio.click(), setOverlay('pause'))}>
           {!isTouch && <span className="kbd mr-1">Esc</span>} Menu
         </button>
-        {!session.spectating && !benched && (
+        {!session.spectating && !benched && !hideRaceHud && (
           <button tabIndex={-1} className="btn btn-cream px-3 py-1 text-sm" onClick={() => session.respawn()}>
             {!isTouch && <span className="kbd mr-1">R</span>} Respawn
           </button>

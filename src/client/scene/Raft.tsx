@@ -10,7 +10,7 @@ import { EARSHOT, frame, isRace, myRaft, SEAT_COLORS, standings, tagSlot, TEAMS 
 import { useApp } from '../state/store'
 import type { IconName } from '../ui/icons'
 import { setTagContent } from '../ui/NameTags'
-import { ordinal } from '../ui/format'
+import { crewLabel, ordinal } from '../ui/format'
 import { fx } from './Fx'
 import { Hippo, type HippoHandle } from './Hippo'
 import { PALETTE, soft } from './materials'
@@ -22,6 +22,16 @@ const BUTT_R = SEAT_R + 0.66 * HIPPO_SCALE
 const PUFF_RATE = 30
 const BUFF_ICON: (IconName | null)[] = [null, 'beans', 'chili', 'prune']
 const tagPos = new THREE.Vector3()
+/** Space kept between two crewmates' name tags (px). */
+const TAG_GAP = 4
+
+/** Where a hippo's name tag and chat bubble go on screen this frame. */
+interface TagSpot {
+  tag: HTMLElement | null
+  bubble: HTMLElement | null
+  x: number
+  y: number
+}
 /** Rivals' team tags fade from this distance (m) to their faintest at twice that. */
 const TAG_FADE = 25
 
@@ -195,6 +205,7 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
     const live = crew.filter((p) => !roster.some((e) => e.id === p.id && e.away))
     const ords = live.map((p) => p.ord)
     const sliceGeo = hullKit.slices[live.length]
+    const tagSpots: TagSpot[] = []
 
     for (let seat = 0; seat < CREW_SIZE; seat++) {
       const p = bySeat[seat]
@@ -253,13 +264,13 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
           if (p.exh) icons.push('hippoTired')
           setTagContent(tag, icons, roster.find((e) => e.id === p.id)?.name ?? '')
           tag.style.display = 'block'
-          tag.style.transform = `translate(-50%, -50%) translate(${spot.x}px, ${spot.y}px)`
         } else tag.style.display = 'none'
       }
-      if (bubble) {
-        const talking = spot && (race || showSlices)
-        bubble.style.display = talking ? 'block' : 'none'
-        if (talking) bubble.style.transform = `translate(-50%, -100%) translate(${spot.x}px, ${spot.y - 16}px)`
+      const talking = !!bubble && !!spot && (race || showSlices)
+      if (bubble) bubble.style.display = talking ? 'block' : 'none'
+      const tagShown = !!tag && !!spot && showTags
+      if (spot && (tagShown || talking)) {
+        tagSpots.push({ tag: tagShown ? tag : null, bubble: talking ? bubble : null, x: spot.x, y: spot.y })
       }
 
       const alpha = r.a + p.rim
@@ -301,6 +312,12 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
           arrowMats[seat].opacity = farting ? 0.95 : p.exh ? 0.25 : 0.55
         }
       }
+    }
+
+    spreadTags(tagSpots)
+    for (const s of tagSpots) {
+      if (s.tag) s.tag.style.transform = `translate(-50%, -50%) translate(${s.x}px, ${s.y}px)`
+      if (s.bubble) s.bubble.style.transform = `translate(-50%, -100%) translate(${s.x}px, ${s.y - 16}px)`
     }
   })
 
@@ -359,8 +376,26 @@ function isFarting(p: PlayerSnap, raftState: RaftStateCode, localIds: number[]) 
 /** Before a race a rival raft's tag says who's on it, so friends can find each other: "Kabir, Mira +1". */
 function crewNames(crew: PlayerSnap[]) {
   const roster = useApp.getState().sessionInfo?.roster ?? []
-  const names = crew.map((p) => roster.find((o) => o.id === p.id)?.name ?? '')
-  return names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ')
+  return crewLabel(crew.map((p) => roster.find((o) => o.id === p.id)?.name ?? ''))
+}
+
+/** Nudges crewmates' name tags apart sideways where they would overlap, as two hippos side by side at the back do. */
+function spreadTags(spots: TagSpot[]) {
+  // Measured together, after every tag's text is set: one layout per frame rather than one per hippo.
+  const tags = spots
+    .flatMap((s) => (s.tag ? [{ s, w: s.tag.offsetWidth, h: s.tag.offsetHeight }] : []))
+    .sort((a, b) => a.s.x - b.s.x)
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 1; i < tags.length; i++) {
+      const a = tags[i - 1]
+      const b = tags[i]
+      if (Math.abs(a.s.y - b.s.y) >= (a.h + b.h) / 2) continue
+      const overlap = (a.w + b.w) / 2 + TAG_GAP - (b.s.x - a.s.x)
+      if (overlap <= 0) continue
+      a.s.x -= overlap / 2
+      b.s.x += overlap / 2
+    }
+  }
 }
 
 function elasticOut(x: number) {

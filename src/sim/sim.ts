@@ -387,6 +387,20 @@ export class Sim {
     return null
   }
 
+  /** Moves `id` one spot round its raft (`dir` ±1), swapping with the hippo there. */
+  swapSpot(id: number, dir: number): Refusal {
+    const p = this.players.get(id)
+    if (!p || p.raft === null) return 'Hop on a raft first.'
+    if (!this.lobby) return 'Swap spots between races.'
+    const crew = this.liveCrew(p.raft).sort((a, b) => a.ord - b.ord)
+    if (crew.length < 2) return 'You have the whole rim to yourself.'
+    const k = crew.indexOf(p)
+    const other = crew[(k + (dir < 0 ? -1 : 1) + crew.length) % crew.length]
+    ;[p.ord, other.ord] = [other.ord, p.ord]
+    this.rosterVersion++
+    return null
+  }
+
   setReady(id: number, ready: boolean): Refusal {
     const p = this.players.get(id)
     if (!p || p.raft === null) return 'Hop on a raft first.'
