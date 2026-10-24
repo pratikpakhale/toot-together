@@ -1,33 +1,76 @@
 import * as THREE from 'three'
 
-let gradient: THREE.DataTexture | null = null
+let softRamp: THREE.DataTexture | null = null
 
-export function toonGradient() {
-  if (gradient) return gradient
-  const data = new Uint8Array([90, 90, 90, 255, 175, 175, 175, 255, 255, 255, 255, 255])
-  gradient = new THREE.DataTexture(data, 3, 1, THREE.RGBAFormat)
-  gradient.minFilter = THREE.NearestFilter
-  gradient.magFilter = THREE.NearestFilter
-  gradient.generateMipmaps = false
-  gradient.needsUpdate = true
-  return gradient
+/** Cel bands with soft edges: a shadow side, a mid tone and a lit cap, blended over a few texels. */
+export function softGradient() {
+  if (softRamp) return softRamp
+  const n = 64
+  const data = new Uint8Array(n * 4)
+  const smooth = (a: number, b: number, x: number) => {
+    const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
+    return t * t * (3 - 2 * t)
+  }
+  for (let i = 0; i < n; i++) {
+    const x = i / (n - 1)
+    const v = 0.52 + 0.3 * smooth(0.4, 0.52, x) + 0.18 * smooth(0.7, 0.82, x)
+    data.set([v * 255, v * 255, v * 255, 255], i * 4)
+  }
+  softRamp = new THREE.DataTexture(data, n, 1, THREE.RGBAFormat)
+  softRamp.minFilter = THREE.LinearFilter
+  softRamp.magFilter = THREE.LinearFilter
+  softRamp.generateMipmaps = false
+  softRamp.needsUpdate = true
+  return softRamp
 }
 
-const cache = new Map<string, THREE.MeshToonMaterial>()
+export interface SoftOpts {
+  vertexColors?: boolean
+  emissive?: string
+  /** Strength of the bright fresnel edge that lifts a prop off the background (0 = none). */
+  rim?: number
+}
 
-export function toon(color: THREE.ColorRepresentation, opts: { vertexColors?: boolean; emissive?: string } = {}) {
-  const key = `${new THREE.Color(color).getHexString()}|${opts.vertexColors ? 1 : 0}|${opts.emissive ?? ''}`
-  let m = cache.get(key)
+const softCache = new Map<string, THREE.MeshToonMaterial>()
+
+/**
+ * The look for characters and props: soft cel bands plus a warm rim light, so round shapes read as
+ * round from the chase camera. Big flat surfaces pass `rim: 0`, where a rim would light up everything
+ * at grazing angles.
+ */
+export function soft(color: THREE.ColorRepresentation, opts: SoftOpts = {}) {
+  const rim = opts.rim ?? 0.35
+  const key = `${new THREE.Color(color).getHexString()}|${opts.vertexColors ? 1 : 0}|${opts.emissive ?? ''}|${rim}`
+  let m = softCache.get(key)
   if (!m) {
     m = new THREE.MeshToonMaterial({
       color,
-      gradientMap: toonGradient(),
+      gradientMap: softGradient(),
       vertexColors: !!opts.vertexColors,
       emissive: opts.emissive ?? '#000000',
     })
-    cache.set(key, m)
+    if (rim > 0) addRim(m, rim)
+    softCache.set(key, m)
   }
   return m
+}
+
+function addRim(m: THREE.MeshToonMaterial, strength: number) {
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uRim = { value: strength }
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uRim;')
+      .replace(
+        '#include <opaque_fragment>',
+        `{
+          float facing = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
+          float rim = smoothstep(0.62, 0.98, 1.0 - facing);
+          outgoingLight += mix(diffuseColor.rgb, vec3(1.0, 0.97, 0.9), 0.55) * rim * uRim;
+        }
+        #include <opaque_fragment>`,
+      )
+  }
+  m.customProgramCacheKey = () => `soft-rim-${strength}`
 }
 
 export const PALETTE = {

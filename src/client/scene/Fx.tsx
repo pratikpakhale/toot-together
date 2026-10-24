@@ -1,7 +1,8 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
-import { PALETTE, toon } from './materials'
+import { PALETTE, soft } from './materials'
+import { blob, lumps, paint, smoothstep } from './sculpt'
 
 const PUFF_MAX = 900
 const BIT_MAX = 500
@@ -44,6 +45,9 @@ function pool(count: number): Pool {
 }
 
 const puffs = pool(PUFF_MAX)
+const FLAME_MAX = 300
+/** Chili fire: puffs that glow (unlit) and burn from yellow to red as they rise. */
+const flames = pool(FLAME_MAX)
 const bits = pool(BIT_MAX)
 const rings = pool(RING_MAX)
 const tmpColor = new THREE.Color()
@@ -84,6 +88,8 @@ function spawn(p: Pool, o: SpawnOpts) {
   p.rot[i] = Math.random() * Math.PI * 2
   p.floorY[i] = o.floorY ?? -1e9
   tmpColor.set(o.color)
+  // Gas varies a little from puff to puff, so a cloud reads as separate billows.
+  if (p === puffs) tmpColor.multiplyScalar(0.86 + Math.random() * 0.2)
   p.col[i * 3] = tmpColor.r
   p.col[i * 3 + 1] = tmpColor.g
   p.col[i * 3 + 2] = tmpColor.b
@@ -109,6 +115,44 @@ export const fx = {
       color,
       spin: rand(-2, 2),
     })
+  },
+  flame(x: number, y: number, z: number, dx: number, dz: number, carryX = 0, carryZ = 0) {
+    const speed = rand(3, 4.8)
+    spawn(flames, {
+      x: x + rand(-0.1, 0.1),
+      y: y + rand(-0.08, 0.08),
+      z: z + rand(-0.1, 0.1),
+      vx: dx * speed + rand(-0.5, 0.5) + carryX * 0.5,
+      vy: rand(0.6, 1.6),
+      vz: dz * speed + rand(-0.5, 0.5) + carryZ * 0.5,
+      life: rand(0.4, 0.6),
+      size: rand(0.3, 0.42),
+      grow: rand(0.35, 0.6),
+      drag: 2.6,
+      color: '#ffffff',
+      spin: rand(-4, 4),
+    })
+  },
+  /** The "pff" as a toot starts: a puff ring blown out of the butt and a couple of big first clouds. */
+  tootStart(x: number, y: number, z: number, dx: number, dz: number, color: string, carryX = 0, carryZ = 0) {
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2
+      const side = Math.cos(a) * 1.6
+      spawn(puffs, {
+        x,
+        y,
+        z,
+        vx: dx * 2.2 - dz * side + carryX * 0.5,
+        vy: Math.sin(a) * 1.6 + 0.3,
+        vz: dz * 2.2 + dx * side + carryZ * 0.5,
+        life: rand(0.35, 0.5),
+        size: 0.12,
+        grow: 0.35,
+        drag: 4,
+        color,
+      })
+    }
+    for (let k = 0; k < 3; k++) fx.fart(x, y, z, dx, dz, color, 1.5, carryX, carryZ)
   },
   rainbowFart(x: number, y: number, z: number, dx: number, dz: number) {
     fx.fart(x, y, z, dx, dz, RAINBOW[Math.floor(Math.random() * RAINBOW.length)], 1.1)
@@ -239,7 +283,7 @@ export const fx = {
     spawn(rings, { x, y: y + 0.05, z, life, size: size * 0.35, grow: size, color })
   },
   clear() {
-    for (const p of [puffs, bits, rings]) {
+    for (const p of [puffs, flames, bits, rings]) {
       p.life.fill(1)
       p.max.fill(1)
     }
@@ -262,8 +306,16 @@ function useInstanced(geometry: THREE.BufferGeometry, material: THREE.Material, 
 }
 
 export function FxLayer() {
-  const puffGeo = useMemo(() => new THREE.IcosahedronGeometry(1, 1), [])
-  const bitGeo = useMemo(() => new THREE.BoxGeometry(1, 0.35, 1), [])
+  // Gas: a soft lumpy cloud ball, shaded darker underneath. Bits: rounded pebbles (drops, raft scraps, confetti).
+  const puffGeo = useMemo(
+    () =>
+      paint(
+        blob(16, 12, (p, u) => p.multiplyScalar(1 + lumps(u.x * 2.6, u.y * 2.6, u.z * 2.6, 3) * 0.13)),
+        (p, _n, out) => out.setScalar(0.78 + 0.27 * smoothstep(-0.9, 0.6, p.y)),
+      ),
+    [],
+  )
+  const bitGeo = useMemo(() => blob(10, 6, (p) => p.set(p.x, p.y * 0.4, p.z)), [])
   const ringGeo = useMemo(() => new THREE.RingGeometry(0.82, 1, 40).rotateX(-Math.PI / 2), [])
   const ringMat = useMemo(
     () =>
@@ -291,8 +343,10 @@ export function FxLayer() {
       }),
     [],
   )
-  const puffMesh = useInstanced(puffGeo, toon('#ffffff'), PUFF_MAX)
-  const bitMesh = useInstanced(bitGeo, toon('#ffffff'), BIT_MAX)
+  const puffMesh = useInstanced(puffGeo, soft('#ffffff', { vertexColors: true, rim: 0.55 }), PUFF_MAX)
+  const bitMesh = useInstanced(bitGeo, soft('#ffffff', { rim: 0.3 }), BIT_MAX)
+  const flameMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), [])
+  const flameMesh = useInstanced(puffGeo, flameMat, FLAME_MAX)
   const ringMesh = useInstanced(ringGeo, ringMat, RING_MAX)
   const ringAlpha = useMemo(() => {
     const attr = new THREE.InstancedBufferAttribute(new Float32Array(RING_MAX), 1)
@@ -307,8 +361,9 @@ export function FxLayer() {
       bitGeo.dispose()
       ringGeo.dispose()
       ringMat.dispose()
+      flameMat.dispose()
     },
-    [puffGeo, bitGeo, ringGeo, ringMat],
+    [puffGeo, bitGeo, ringGeo, ringMat, flameMat],
   )
 
   useFrame((_, rawDt) => {
@@ -327,12 +382,37 @@ export function FxLayer() {
       dummy.scale.setScalar(Math.max(0.0001, s))
       dummy.updateMatrix()
       puffMesh.setMatrixAt(n, dummy.matrix)
-      puffMesh.instanceColor!.setXYZ(n, puffs.col[i * 3], puffs.col[i * 3 + 1], puffs.col[i * 3 + 2])
+      // Gas thins out towards a pale tint as it ages.
+      const pale = k * 0.45
+      const r = puffs.col[i * 3]
+      const g = puffs.col[i * 3 + 1]
+      const b = puffs.col[i * 3 + 2]
+      puffMesh.instanceColor!.setXYZ(n, r + (1 - r) * pale, g + (1 - g) * pale, b + (1 - b) * pale)
       n++
     }
     puffMesh.count = n
     puffMesh.instanceMatrix.needsUpdate = true
     puffMesh.instanceColor!.needsUpdate = true
+
+    n = 0
+    for (let i = 0; i < flames.count; i++) {
+      if (flames.life[i] >= flames.max[i]) continue
+      integrate(flames, i, dt)
+      const k = flames.life[i] / flames.max[i]
+      if (k >= 1) continue
+      const s = (flames.size[i] + flames.grow[i] * k) * Math.min(1, k / 0.1) * (1 - k * k)
+      dummy.position.set(flames.pos[i * 3], flames.pos[i * 3 + 1], flames.pos[i * 3 + 2])
+      dummy.rotation.set(flames.rot[i], flames.rot[i] * 0.7, 0)
+      dummy.scale.setScalar(Math.max(0.0001, s))
+      dummy.updateMatrix()
+      flameMesh.setMatrixAt(n, dummy.matrix)
+      // Yellow, then orange, then red.
+      flameMesh.instanceColor!.setXYZ(n, 1, Math.max(0.18, 0.92 - k * 1.1), Math.max(0.04, 0.35 - k * 1.2))
+      n++
+    }
+    flameMesh.count = n
+    flameMesh.instanceMatrix.needsUpdate = true
+    flameMesh.instanceColor!.needsUpdate = true
 
     n = 0
     for (let i = 0; i < bits.count; i++) {
@@ -379,6 +459,7 @@ export function FxLayer() {
     <>
       <primitive object={ringMesh} renderOrder={2} />
       <primitive object={puffMesh} />
+      <primitive object={flameMesh} />
       <primitive object={bitMesh} />
     </>
   )

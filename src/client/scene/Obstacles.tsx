@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {
   crusherInner,
   crusherOpen,
@@ -21,7 +22,11 @@ import type { BakedCourse, BakedItem, ItemDef } from '../../sim/track'
 import { audio } from '../audio/audio'
 import { crewed, frame } from '../game/frame'
 import { CHASE_CAM_HEIGHT } from './CameraRig'
-import { PALETTE, toon, toonGradient } from './materials'
+import { boulder, bracket, chain, dome, glowTexture, GOLD, hazardStripes, lumber, METAL, painted, spikeBall, turnedPost, woodMat, woodTexture } from './hazardKit'
+import { beansCan, chili, crusherDetail, flameGeo, flameTrim, mushroomCap, mushroomStem, pistonTrim, prune, rotor, spikedLog, wheel } from './hazardShapes'
+import { PALETTE, softGradient } from './materials'
+import { useFogCull } from './fogCull'
+import { merge as mergeParts, tint } from './sculpt'
 import { BlobShadow } from './shadow'
 
 type Def<K extends ItemDef['kind']> = Extract<ItemDef, { kind: K }>
@@ -47,14 +52,24 @@ export function Obstacles({ course }: { course: BakedCourse }) {
     return map
   }, [course])
 
+  // Hazards cast real shadows where the sun has them on; glows, decals and water marks don't.
+  const root = useRef<THREE.Group>(null!)
+  useLayoutEffect(() => {
+    root.current.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (m.isMesh && m.material instanceof THREE.MeshToonMaterial) m.castShadow = true
+    })
+  }, [course])
+  useFogCull(root)
+
   return (
-    <>
+    <group ref={root}>
       {course.items.map((item, k) => (
         <group key={k} position={[item.x, item.y, item.z]} rotation={[0, -Math.atan2(item.hz, item.hx), 0]}>
           <ItemView item={item} slot={pickupSlots.get(item) ?? -1} />
         </group>
       ))}
-    </>
+    </group>
   )
 }
 
@@ -94,94 +109,58 @@ function ItemView({ item, slot }: { item: BakedItem; slot: number }) {
   }
 }
 
-const coneGeo = new THREE.ConeGeometry(0.13, 0.42, 6)
 
-function SpikeRow({ x0, x1, radius, spacing = 0.55 }: { x0: number; x1: number; radius: number; spacing?: number }) {
-  const spikes = useMemo(() => {
-    const out: { p: [number, number, number]; r: [number, number, number] }[] = []
-    let k = 0
-    for (let x = x0 + spacing / 2; x < x1; x += spacing, k++) {
-      for (let j = 0; j < 4; j++) {
-        const a = (j / 4) * Math.PI * 2 + (k % 2 ? Math.PI / 4 : 0)
-        const y = Math.cos(a) * (radius + 0.12)
-        const z = Math.sin(a) * (radius + 0.12)
-        // cone points +Y by default; rotate about X so it points radially in the YZ plane.
-        out.push({ p: [x, y, z], r: [a, 0, 0] })
-      }
-    }
-    return out
-  }, [x0, x1, radius, spacing])
-  const mat = toon(PALETTE.spike)
-  return (
-    <>
-      {spikes.map((s, i) => (
-        <mesh key={i} geometry={coneGeo} material={mat} position={s.p} rotation={s.r} />
-      ))}
-    </>
-  )
+/** The one vertex-coloured material every merged hazard part uses. */
+const paint = painted()
+
+/** A per-hazard material whose emissive flashes as a warning (optionally grained timber). */
+function flashMaterial(color: string, grain = false) {
+  return new THREE.MeshToonMaterial({ color, emissive: '#000000', gradientMap: softGradient(), map: grain ? woodTexture() : null })
 }
 
-const SPIKE_BALL_DIRS = (() => {
-  const g = new THREE.IcosahedronGeometry(1, 0)
-  const pos = g.getAttribute('position')
-  const up = new THREE.Vector3(0, 1, 0)
-  const seen = new Set<string>()
-  const out: { d: THREE.Vector3; q: THREE.Quaternion }[] = []
-  for (let i = 0; i < pos.count; i++) {
-    const d = new THREE.Vector3().fromBufferAttribute(pos, i).normalize()
-    const key = d
-      .toArray()
-      .map((n) => n.toFixed(2))
-      .join()
-    if (!seen.has(key)) {
-      seen.add(key)
-      out.push({ d, q: new THREE.Quaternion().setFromUnitVectors(up, d) })
-    }
-  }
-  g.dispose()
-  return out
-})()
+const footingGeo = tint(new THREE.CylinderGeometry(0.55, 0.7, 0.5, 8), '#8d8994')
 
-function SpikeBall({ radius, color }: { radius: number; color: string }) {
-  const mat = toon(PALETTE.spike)
+/** A timber gantry over the river: two posts on stone footings, a beam, knee braces and bolted brackets. */
+function Gantry({ z = 0, half, post, beam, postTop, beamY }: { z?: number; half: number; post: number; beam: number; postTop: number; beamY: number }) {
+  const wood = woodMat(PALETTE.wood)
+  const postH = postTop + 0.75
+  const beamLen = 2 * half + 2 * post + 0.9
+  const braceLen = 1.9
   return (
-    <group>
-      <mesh material={toon(color)}>
-        <icosahedronGeometry args={[radius, 1]} />
-      </mesh>
-      {SPIKE_BALL_DIRS.map(({ d, q }, i) => (
-        <mesh key={i} geometry={coneGeo} material={mat} position={d.clone().multiplyScalar(radius + 0.15).toArray()} quaternion={q} scale={radius / 0.7} />
+    <group position={[0, 0, z]}>
+      {[-1, 1].map((s) => (
+        <group key={s} position={[0, 0, s * half]}>
+          <mesh geometry={lumber(post, postH, post)} position={[0, postH / 2 - 0.75, 0]} material={wood} />
+          <mesh geometry={footingGeo} position={[0, -0.45, 0]} material={paint} />
+          <mesh
+            geometry={lumber(post * 0.45, braceLen, post * 0.45)}
+            position={[0, beamY - beam / 2 - 0.62, -s * (post / 2 + 0.55)]}
+            rotation={[-s * 0.8, 0, 0]}
+            material={wood}
+          />
+          {[-1, 1].map((x) => (
+            <mesh key={x} geometry={bracket(Math.max(post, beam) * 1.05)} position={[x * (post / 2 + 0.035), beamY, 0]} rotation={[0, x * (Math.PI / 2), 0]} material={paint} />
+          ))}
+        </group>
       ))}
+      <mesh geometry={lumber(beam, beamLen, beam)} position={[0, beamY, 0]} rotation={[Math.PI / 2, 0, 0]} material={wood} />
     </group>
   )
 }
 
 function Spinner({ def }: { def: Def<'spinner'> }) {
   const arms = def.arms ?? 4
-  const rotor = useRef<THREE.Group>(null)
+  const spin = useRef<THREE.Group>(null)
   useFrame(() => {
-    if (rotor.current) rotor.current.rotation.y = -spinnerAngle(def, simTime())
+    if (spin.current) spin.current.rotation.y = -spinnerAngle(def, simTime())
   })
   return (
     <group position={[0, 0, def.d ?? 0]}>
-      <mesh position={[0, 0.4, 0]} material={toon('#7d5a8c')}>
-        <cylinderGeometry args={[ITEM_SIZES.spinnerHub, 0.62, 1.6, 12]} />
-      </mesh>
-      <mesh position={[0, 1.3, 0]} material={toon('#ffcf3f')}>
-        <sphereGeometry args={[0.45, 12, 8]} />
-      </mesh>
-      <group ref={rotor} position={[0, 0.45, 0]}>
-        {Array.from({ length: arms }, (_, k) => (
-          <group key={k} rotation={[0, (-k * Math.PI * 2) / arms, 0]}>
-            <mesh position={[def.arm / 2 + 0.2, 0, 0]} rotation={[0, 0, Math.PI / 2]} material={toon(PALETTE.spikeTube)}>
-              <cylinderGeometry args={[ITEM_SIZES.spinnerArm, ITEM_SIZES.spinnerArm, def.arm - 0.3, 10]} />
-            </mesh>
-            <mesh position={[def.arm, 0, 0]} material={toon(PALETTE.spikeTube)}>
-              <sphereGeometry args={[0.28, 10, 8]} />
-            </mesh>
-            <SpikeRow x0={0.5} x1={def.arm} radius={ITEM_SIZES.spinnerArm} />
-          </group>
-        ))}
+      <mesh geometry={turnedPost(0.62, ITEM_SIZES.spinnerHub, 1.6, '#7d5a8c')} position={[0, -0.4, 0]} material={paint} />
+      <mesh geometry={dome(0.45)} position={[0, 1.3, 0]} material={paint} />
+      <group ref={spin} position={[0, 0.45, 0]}>
+        {/* Arms run 0.35 → arm, knob at the tip, spikes from 0.5: the same as the hit shape. */}
+        <mesh geometry={rotor(def.arm, arms, ITEM_SIZES.spinnerArm, 0.35, 0.5, PALETTE.spikeTube, 0.28)} material={paint} />
       </group>
       <BlobShadow size={def.arm * 2.2} opacity={0.18} />
     </group>
@@ -191,7 +170,7 @@ function Spinner({ def }: { def: Def<'spinner'> }) {
 function Mace({ def, hw }: { def: Def<'mace'>; hw: number }) {
   const L = GANTRY_TOP - 0.75
   const ball = useRef<THREE.Group>(null)
-  const chain = useRef<THREE.Mesh>(null)
+  const links = useRef<THREE.Mesh>(null)
   const shadow = useRef<THREE.Group>(null)
   useFrame(() => {
     const v = maceOffset(def, simTime())
@@ -199,28 +178,19 @@ function Mace({ def, hw }: { def: Def<'mace'>; hw: number }) {
     const y = GANTRY_TOP - L * Math.cos(th)
     ball.current?.position.set(0, y, v)
     ball.current?.rotation.set(simTime() * 2, 0, 0)
-    if (chain.current) {
-      chain.current.position.set(0, (GANTRY_TOP + y) / 2, v / 2)
-      chain.current.rotation.set(-th, 0, 0)
+    if (links.current) {
+      links.current.position.set(0, (GANTRY_TOP + y) / 2, v / 2)
+      links.current.rotation.set(-th, 0, 0)
     }
     shadow.current?.position.set(0, 0, v)
   })
-  const post = toon(PALETTE.wood)
   return (
     <group>
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[0, GANTRY_TOP / 2, s * (hw + 0.9)]} material={post}>
-          <boxGeometry args={[0.6, GANTRY_TOP + 1.5, 0.6]} />
-        </mesh>
-      ))}
-      <mesh position={[0, GANTRY_TOP + 0.3, 0]} material={post}>
-        <boxGeometry args={[0.7, 0.7, 2 * hw + 2.6]} />
-      </mesh>
-      <mesh ref={chain} material={toon('#5a5560')}>
-        <cylinderGeometry args={[0.07, 0.07, L, 6]} />
-      </mesh>
+      <Gantry half={hw + 0.9} post={0.6} beam={0.7} postTop={GANTRY_TOP + 0.75} beamY={GANTRY_TOP + 0.3} />
+      <mesh geometry={chain(L)} ref={links} material={paint} />
+      <mesh position={[0, GANTRY_TOP - 0.02, 0]} rotation={[0, Math.PI / 2, 0]} material={paint} geometry={hookGeo} />
       <group ref={ball}>
-        <SpikeBall radius={ITEM_SIZES.mace} color="#8e2f45" />
+        <mesh geometry={spikeBall(ITEM_SIZES.mace, '#8e2f45')} material={paint} />
       </group>
       <group ref={shadow}>
         <BlobShadow size={2.6} opacity={0.35} />
@@ -228,6 +198,8 @@ function Mace({ def, hw }: { def: Def<'mace'>; hw: number }) {
     </group>
   )
 }
+
+const hookGeo = tint(new THREE.TorusGeometry(0.2, 0.06, 8, 16), METAL)
 
 function Slider({ def }: { def: Def<'slider'> }) {
   const log = useRef<THREE.Group>(null)
@@ -241,21 +213,19 @@ function Slider({ def }: { def: Def<'slider'> }) {
     <group ref={log}>
       <group rotation={[0, -Math.PI / 2, 0]}>
         <group ref={roller}>
-          <mesh rotation={[0, 0, Math.PI / 2]} material={toon(PALETTE.spikeTube)}>
-            <cylinderGeometry args={[ITEM_SIZES.sliderThickness, ITEM_SIZES.sliderThickness, def.len, 12]} />
-          </mesh>
-          <SpikeRow x0={-def.len / 2} x1={def.len / 2} radius={ITEM_SIZES.sliderThickness} />
+          <mesh geometry={spikedLog(def.len, ITEM_SIZES.sliderThickness)} material={paint} />
         </group>
         {[-1, 1].map((s) => (
-          <mesh key={s} position={[(s * def.len) / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]} material={toon('#ffcf3f')}>
-            <cylinderGeometry args={[0.42, 0.42, 0.2, 12]} />
-          </mesh>
+          <mesh key={s} geometry={wheel(0.42, 0.2)} position={[(s * def.len) / 2, 0, 0]} material={paint} />
         ))}
       </group>
       <BlobShadow size={def.len * 0.9} opacity={0.2} stretch={[0.35, 1]} />
     </group>
   )
 }
+
+let stripes: THREE.MeshToonMaterial | null = null
+const stripeMat = () => (stripes ??= new THREE.MeshToonMaterial({ map: hazardStripes(), gradientMap: softGradient() }))
 
 function Crusher({ def, item }: { def: Def<'crusher'>; item: BakedItem }) {
   const hw = item.hw
@@ -264,8 +234,31 @@ function Crusher({ def, item }: { def: Def<'crusher'>; item: BakedItem }) {
   const right = useRef<THREE.Group>(null)
   const width = hw + 2.4
   const depth = ITEM_SIZES.crusherDepth * 2
-  const mat = useMemo(() => new THREE.MeshToonMaterial({ color: '#8a6a55', emissive: '#000000', gradientMap: toonGradient() }), [])
-  useEffect(() => () => mat.dispose(), [mat])
+  const mat = useMemo(() => flashMaterial('#a07a5e', true), [])
+  const body = useMemo(() => {
+    const g = new RoundedBoxGeometry(depth, 2.8, width, 3, 0.1)
+    // Planks: grain along the wall's length.
+    const uv = g.attributes.uv
+    const pos = g.attributes.position
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getY(i) * 0.45 + pos.getX(i) * 0.3, pos.getZ(i) * 0.25)
+    return g
+  }, [depth, width])
+  const band = useMemo(() => {
+    const g = new RoundedBoxGeometry(depth + 0.1, 0.28, width + 0.05, 2, 0.05)
+    // Stripes along the wall's length on every face.
+    const uv = g.attributes.uv
+    const pos = g.attributes.position
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (pos.getZ(i) + pos.getX(i)) / 4, pos.getY(i) / 0.28 + 0.5)
+    return g
+  }, [depth, width])
+  useEffect(
+    () => () => {
+      mat.dispose()
+      body.dispose()
+      band.dispose()
+    },
+    [mat, body, band],
+  )
   useFrame(() => {
     const t = simTime()
     const inner = crusherInner(crusherOpen(def, t), hw)
@@ -283,22 +276,9 @@ function Crusher({ def, item }: { def: Def<'crusher'>; item: BakedItem }) {
     <group>
       {[-1, 1].map((s) => (
         <group key={s} ref={s < 0 ? left : right}>
-          <mesh position={[0, 1.1, 0]} material={mat}>
-            <boxGeometry args={[depth, 2.8, width]} />
-          </mesh>
-          <mesh position={[0, 2.6, 0]} material={toon('#ffcf3f')}>
-            <boxGeometry args={[depth + 0.1, 0.25, width + 0.05]} />
-          </mesh>
-          {Array.from({ length: 6 }, (_, k) => (
-            <mesh
-              key={k}
-              geometry={coneGeo}
-              material={toon(PALETTE.spike)}
-              position={[k % 2 ? 0.25 : -0.25, 0.1 + (k >> 1) * 0.75, (-s * width) / 2 - s * 0.2]}
-              rotation={[(-s * Math.PI) / 2, 0, 0]}
-              scale={1.3}
-            />
-          ))}
+          <mesh geometry={body} position={[0, 1.1, 0]} material={mat} />
+          <mesh geometry={band} position={[0, 2.6, 0]} material={stripeMat()} />
+          <mesh geometry={crusherDetail(depth, width, s)} material={paint} />
         </group>
       ))}
     </group>
@@ -311,6 +291,8 @@ function Piston({ def, item }: { def: Def<'piston'>; item: BakedItem }) {
   const head = useRef<THREE.Group>(null)
   const shadowMat = useRef<THREE.MeshBasicMaterial>(null)
   const ring = useRef<THREE.Mesh>(null)
+  const headGeo = useMemo(() => new THREE.CylinderGeometry(r, r, PISTON_HEAD_LEN, 32, 1), [r])
+  useEffect(() => () => headGeo.dispose(), [headGeo])
   useFrame(() => {
     const t = simTime()
     const st = pistonState(def, t)
@@ -328,37 +310,20 @@ function Piston({ def, item }: { def: Def<'piston'>; item: BakedItem }) {
       ;(ring.current.material as THREE.MeshBasicMaterial).opacity = st.warn ? 0.45 + Math.sin(t * 20) * 0.25 : 0.6
     }
   })
-  const wood = toon('#9b6b43')
   return (
     <group>
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[0, GANTRY_TOP / 2, def.d + s * (r + 0.9)]} material={toon(PALETTE.wood)}>
-          <boxGeometry args={[0.5, GANTRY_TOP + 1, 0.5]} />
-        </mesh>
-      ))}
-      <mesh position={[0, GANTRY_TOP + 0.3, def.d]} material={toon(PALETTE.wood)}>
-        <boxGeometry args={[0.6, 0.6, 2 * r + 2.4]} />
-      </mesh>
+      <Gantry z={def.d} half={r + 0.9} post={0.5} beam={0.6} postTop={GANTRY_TOP + 0.5} beamY={GANTRY_TOP + 0.3} />
       <group ref={head}>
-        <mesh position={[0, PISTON_HEAD_LEN / 2, 0]} material={wood}>
-          <cylinderGeometry args={[r, r, PISTON_HEAD_LEN, 14]} />
-        </mesh>
-        {[0.3, 2.9].map((y) => (
-          <mesh key={y} position={[0, y, 0]} material={toon('#5c5866')}>
-            <cylinderGeometry args={[r + 0.06, r + 0.06, 0.3, 14]} />
-          </mesh>
-        ))}
-        <mesh position={[0, PISTON_HEAD_LEN + 5, 0]} material={toon('#5c5866')}>
-          <cylinderGeometry args={[0.18, 0.18, 10, 6]} />
-        </mesh>
+        <mesh geometry={headGeo} position={[0, PISTON_HEAD_LEN / 2, 0]} material={woodMat('#9b6b43')} />
+        <mesh geometry={pistonTrim(r, PISTON_HEAD_LEN)} material={paint} />
       </group>
       <group position={[0, 0.04, def.d]}>
         <mesh rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[r * 1.05, 24]} />
+          <circleGeometry args={[r * 1.05, 32]} />
           <meshBasicMaterial ref={shadowMat} color="#0b2a4a" transparent opacity={0.2} depthWrite={false} />
         </mesh>
         <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-          <ringGeometry args={[r * 0.9, r * 1.1, 32]} />
+          <ringGeometry args={[r * 0.9, r * 1.1, 40]} />
           <meshBasicMaterial color="#ff4040" transparent opacity={0.5} depthWrite={false} />
         </mesh>
       </group>
@@ -366,18 +331,28 @@ function Piston({ def, item }: { def: Def<'piston'>; item: BakedItem }) {
   )
 }
 
+/** Every mine's beacon blinks together, off the shared clock. */
+const mineLamp = new THREE.MeshBasicMaterial({ color: '#ff3b2f' })
+const lampGeo = tint(new THREE.SphereGeometry(0.09, 10, 8), '#ffffff')
+const lampBase = tint(new THREE.CylinderGeometry(0.1, 0.13, 0.12, 12), METAL)
+
 function Mine({ def }: { def: Def<'mine'> }) {
+  const r = def.r ?? ITEM_SIZES.mine
   const g = useRef<THREE.Group>(null)
   const phase = useMemo(() => Math.random() * 10, [])
   useFrame(() => {
     const t = simTime() + phase
     g.current?.position.set(0, 0.25 + Math.sin(t * 2.2) * 0.12, def.d)
     g.current?.rotation.set(Math.sin(t) * 0.3, t * 0.6, 0)
+    const on = Math.sin(simTime() * 6) > 0.2
+    mineLamp.color.set(on ? '#ff5a3c' : '#5a1a14')
   })
   return (
     <>
       <group ref={g}>
-        <SpikeBall radius={def.r ?? ITEM_SIZES.mine} color="#e2444f" />
+        <mesh geometry={spikeBall(r, '#e2444f')} material={paint} />
+        <mesh geometry={lampBase} position={[0, r + 0.02, 0]} material={paint} />
+        <mesh geometry={lampGeo} position={[0, r + 0.12, 0]} material={mineLamp} />
       </group>
       <group position={[0, 0, def.d]}>
         <BlobShadow size={2} opacity={0.25} />
@@ -385,12 +360,6 @@ function Mine({ def }: { def: Def<'mine'> }) {
     </>
   )
 }
-
-const BUMPER_SPOTS = Array.from({ length: 7 }, (_, i) => {
-  const a = (i / 7) * Math.PI * 2
-  const el = i === 0 ? Math.PI / 2 : 0.55
-  return new THREE.Vector3(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el))
-})
 
 function Bumper({ def, item }: { def: Def<'bumper'>; item: BakedItem }) {
   const r = def.r ?? ITEM_SIZES.bumper
@@ -413,18 +382,9 @@ function Bumper({ def, item }: { def: Def<'bumper'>; item: BakedItem }) {
   })
   return (
     <group position={[0, 0, def.d]}>
-      <mesh position={[0, 0.2, 0]} material={toon('#fff3e2')}>
-        <cylinderGeometry args={[r * 0.45, r * 0.55, 0.9, 12]} />
-      </mesh>
+      <mesh geometry={mushroomStem(r)} material={paint} />
       <group ref={cap} position={[0, 0.55, 0]}>
-        <mesh scale={[1, 0.62, 1]} material={toon('#ff5b8a')}>
-          <sphereGeometry args={[r, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        </mesh>
-        {BUMPER_SPOTS.map((d, i) => (
-          <mesh key={i} position={[d.x * r * 0.92, d.y * r * 0.6, d.z * r * 0.92]} scale={[1, 0.5, 1]} material={toon('#ffffff')}>
-            <sphereGeometry args={[r * 0.17, 8, 6]} />
-          </mesh>
-        ))}
+        <mesh geometry={mushroomCap(r)} material={paint} />
       </group>
     </group>
   )
@@ -432,17 +392,36 @@ function Bumper({ def, item }: { def: Def<'bumper'>; item: BakedItem }) {
 
 function Rock({ def }: { def: Def<'rock'> }) {
   const r = def.r ?? ITEM_SIZES.rock
-  const rot = useMemo(() => [Math.random(), Math.random() * 6, Math.random()] as [number, number, number], [])
+  const look = useMemo(() => ({ rot: [Math.random() * 0.3, Math.random() * 6, Math.random() * 0.3] as [number, number, number], seed: Math.floor(Math.random() * 3) }), [])
   return (
     <group position={[0, 0, def.d]}>
-      <mesh position={[0, 0.15, 0]} scale={[r, r * 0.75, r]} rotation={rot} material={toon(PALETTE.rock)}>
-        <dodecahedronGeometry args={[1, 0]} />
-      </mesh>
-      <mesh position={[r * 0.5, 0.05, r * 0.4]} scale={[r * 0.45, r * 0.35, r * 0.45]} material={toon('#a39ea8')}>
-        <dodecahedronGeometry args={[1, 0]} />
+      <mesh geometry={boulder(look.seed, PALETTE.rock, '#7fa86a')} position={[0, 0.15, 0]} scale={[r, r * 0.75, r]} rotation={look.rot} material={paint} />
+      <mesh geometry={boulder((look.seed + 1) % 3, '#a39ea8')} position={[r * 0.5, 0.05, r * 0.4]} scale={[r * 0.45, r * 0.35, r * 0.45]} material={paint} />
+      <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]} material={foamMat()}>
+        <ringGeometry args={[r * 0.85, r * 1.35, 40]} />
       </mesh>
     </group>
   )
+}
+
+let foam: THREE.MeshBasicMaterial | null = null
+/** A soft white wash round anything standing in the water. */
+const foamMat = () => (foam ??= new THREE.MeshBasicMaterial({ map: ringTexture(), color: '#ffffff', transparent: true, opacity: 0.7, depthWrite: false }))
+
+function ringTexture() {
+  const c = document.createElement('canvas')
+  c.width = 128
+  c.height = 8
+  const ctx = c.getContext('2d')!
+  const g = ctx.createLinearGradient(0, 0, 128, 0)
+  g.addColorStop(0, 'rgba(255,255,255,0.95)')
+  g.addColorStop(0.35, 'rgba(255,255,255,0.45)')
+  g.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, 128, 8)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
 }
 
 const chevronShape = (() => {
@@ -457,15 +436,42 @@ const chevronShape = (() => {
   return new THREE.ShapeGeometry(s)
 })()
 
+function roundedRect(w: number, h: number, r: number) {
+  const s = new THREE.Shape()
+  s.moveTo(-w / 2 + r, -h / 2)
+  s.lineTo(w / 2 - r, -h / 2)
+  s.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r)
+  s.lineTo(w / 2, h / 2 - r)
+  s.quadraticCurveTo(w / 2, h / 2, w / 2 - r, h / 2)
+  s.lineTo(-w / 2 + r, h / 2)
+  s.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r)
+  s.lineTo(-w / 2, -h / 2 + r)
+  s.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r, -h / 2)
+  return s
+}
+
+const boostPadMat = new THREE.MeshBasicMaterial({ color: '#ff7b39', transparent: true, opacity: 0.18, depthWrite: false })
+const boostRimMat = new THREE.MeshBasicMaterial({ color: '#ffd27a', transparent: true, opacity: 0.75, depthWrite: false })
+
 function Boost({ def }: { def: Def<'boost'> }) {
   const len = def.len ?? ITEM_SIZES.boostLen
   const w = def.w ?? ITEM_SIZES.boostWidth
   const mats = useMemo(() => [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ color: '#ff7b39', transparent: true, depthWrite: false })), [])
+  const glows = useMemo(() => [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ color: '#ffb36b', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })), [])
+  const pad = useMemo(() => {
+    const outer = roundedRect(len + 0.3, w + 0.3, 0.45)
+    const hole = roundedRect(len + 0.05, w + 0.05, 0.35)
+    const rim = new THREE.Shape(outer.getPoints(12))
+    rim.holes.push(new THREE.Path(hole.getPoints(12).reverse()))
+    return { fill: new THREE.ShapeGeometry(hole, 12), rim: new THREE.ShapeGeometry(rim, 12) }
+  }, [len, w])
   useEffect(
     () => () => {
-      for (const m of mats) m.dispose()
+      for (const m of [...mats, ...glows]) m.dispose()
+      pad.fill.dispose()
+      pad.rim.dispose()
     },
-    [mats],
+    [mats, glows, pad],
   )
   useFrame((state) => {
     const t = state.clock.elapsedTime
@@ -473,21 +479,44 @@ function Boost({ def }: { def: Def<'boost'> }) {
       const k = (Math.sin(t * 7 - i * 1.4) + 1) / 2
       mats[i].color.setRGB(1, 0.42 + k * 0.45, 0.2 + k * 0.5)
       mats[i].opacity = 0.65 + k * 0.35
+      glows[i].opacity = k * 0.35
     }
   })
   return (
     <group position={[0, 0.06, def.d ?? 0]}>
+      <group position={[len / 2, -0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh geometry={pad.fill} material={boostPadMat} />
+        <mesh geometry={pad.rim} material={boostRimMat} />
+      </group>
       {mats.map((m, i) => (
-        <mesh key={i} geometry={chevronShape} material={m} position={[0.8 + (i * (len - 1.2)) / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.1, w / 2.2, 1]} />
+        <group key={i} position={[0.8 + (i * (len - 1.2)) / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh geometry={chevronShape} material={glows[i]} position={[0, 0, -0.005]} scale={[1.35, (w / 2.2) * 1.15, 1]} />
+          <mesh geometry={chevronShape} material={m} scale={[1.1, w / 2.2, 1]} />
+        </group>
       ))}
     </group>
   )
 }
 
 const PICKUP_RING = { beans: '#ff9f43', chili: '#ff4d3d', prune: '#a46be8' } as const
+const PICKUP_GEO = { beans: beansCan, chili, prune } as const
+const haloMats = new Map<string, THREE.SpriteMaterial>()
+/** An additive glow sprite in `color`, shared by every pickup of that colour. */
+function glowSprite(color: string, opacity = 1) {
+  let m = haloMats.get(color)
+  if (!m) {
+    m = new THREE.SpriteMaterial({ map: glowTexture(), color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending })
+    haloMats.set(color, m)
+  }
+  return m
+}
 
 function Pickup({ def, slot }: { def: Def<'pickup'>; slot: number }) {
   const g = useRef<THREE.Group>(null)
+  const item = useRef<THREE.Group>(null)
+  const ring = useRef<THREE.Mesh>(null)
+  const halo = useRef<THREE.Sprite>(null)
+  const sparks = useRef<THREE.Group>(null)
   const scale = useRef(1)
   useFrame((state, dt) => {
     const v = frame.view
@@ -498,81 +527,109 @@ function Pickup({ def, slot }: { def: Def<'pickup'>; slot: number }) {
       g.current.visible = scale.current > 0.02
       g.current.scale.setScalar(scale.current)
       g.current.position.y = 1.0 + Math.sin(t * 3 + slot) * 0.15
-      g.current.rotation.y = t * 1.8
+    }
+    if (item.current) {
+      item.current.rotation.y = t * 1.8
+      item.current.rotation.z = Math.sin(t * 2.3 + slot) * 0.12
+    }
+    halo.current?.scale.setScalar(2.1 + Math.sin(t * 4 + slot) * 0.2)
+    if (sparks.current) sparks.current.rotation.y = -t * 2.4
+    if (ring.current) {
+      const k = (t * 0.8 + slot * 0.3) % 1
+      ring.current.scale.setScalar(0.9 + k * 0.5)
+      ;(ring.current.material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - k) * scale.current
     }
   })
   return (
     <group position={[0, 0, def.d]}>
       <group ref={g}>
-        {def.item === 'beans' && (
-          <group rotation={[0.2, 0, 0.15]}>
-            <mesh material={toon('#e94b3c')}>
-              <cylinderGeometry args={[0.38, 0.38, 0.8, 16]} />
-            </mesh>
-            <mesh material={toon('#ffe7b8')}>
-              <cylinderGeometry args={[0.39, 0.39, 0.42, 16]} />
-            </mesh>
-            <mesh position={[0, 0.41, 0]} material={toon('#c9c9d1')}>
-              <cylinderGeometry args={[0.36, 0.36, 0.04, 16]} />
-            </mesh>
-          </group>
-        )}
-        {def.item === 'chili' && (
-          <group rotation={[0, 0, -0.6]}>
-            <mesh scale={[0.32, 0.75, 0.32]} material={toon('#ff3b2f')}>
-              <sphereGeometry args={[1, 14, 10]} />
-            </mesh>
-            <mesh position={[0, 0.78, 0]} material={toon('#3fae3a')}>
-              <cylinderGeometry args={[0.07, 0.1, 0.3, 6]} />
-            </mesh>
-          </group>
-        )}
-        {def.item === 'prune' && (
-          <group>
-            <mesh scale={[0.5, 0.42, 0.42]} material={toon('#7b3fb8')}>
-              <icosahedronGeometry args={[1, 1]} />
-            </mesh>
-            <mesh position={[0, 0.42, 0]} material={toon('#5b8a2f')}>
-              <cylinderGeometry args={[0.04, 0.05, 0.2, 5]} />
-            </mesh>
-          </group>
-        )}
+        <sprite ref={halo} material={glowSprite(PICKUP_RING[def.item], 0.75)} />
+        <group ref={item}>
+          <mesh geometry={PICKUP_GEO[def.item]()} material={paint} rotation={def.item === 'beans' ? [0.2, 0, 0.15] : def.item === 'chili' ? [0, 0, -0.6] : [0, 0, 0]} />
+        </group>
+        <group ref={sparks}>
+          {[0, 1, 2].map((k) => (
+            <sprite key={k} material={glowSprite('#fff6c8')} position={[Math.cos((k * Math.PI * 2) / 3) * 0.75, (k - 1) * 0.25, Math.sin((k * Math.PI * 2) / 3) * 0.75]} scale={0.22} />
+          ))}
+        </group>
       </group>
       <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.7, 0.95, 28]} />
+        <ringGeometry args={[0.7, 0.95, 40]} />
         <meshBasicMaterial color={PICKUP_RING[def.item]} transparent opacity={0.7} depthWrite={false} />
+      </mesh>
+      <mesh ref={ring} position={[0, 0.07, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.9, 1.0, 40]} />
+        <meshBasicMaterial color={PICKUP_RING[def.item]} transparent opacity={0.5} depthWrite={false} />
       </mesh>
     </group>
   )
 }
 
-let spiral: THREE.CanvasTexture | null = null
+let vortex: { spiral: THREE.CanvasTexture; shade: THREE.CanvasTexture; foam: THREE.CanvasTexture } | null = null
 
-/** Pale spiral arms on a transparent disc, drawn once and shared by every whirlpool. */
-function spiralTexture() {
-  if (spiral) return spiral
-  const size = 256
-  const c = document.createElement('canvas')
-  c.width = c.height = size
-  const ctx = c.getContext('2d')!
-  ctx.translate(size / 2, size / 2)
-  ctx.lineCap = 'round'
-  for (let arm = 0; arm < 4; arm++) {
-    ctx.beginPath()
-    for (let k = 0; k <= 60; k++) {
-      const u = k / 60
-      const a = (arm * Math.PI) / 2 + u * Math.PI * 1.6
-      const r = (size / 2) * (0.12 + u * 0.86)
-      if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
-      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r)
-    }
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)'
-    ctx.lineWidth = 9
-    ctx.stroke()
+/** The whirlpool's textures, drawn once: tapering spiral arms, a darkening funnel and a broken foam rim. */
+function vortexTextures() {
+  if (vortex) return vortex
+  const size = 512
+  const canvas = () => {
+    const c = document.createElement('canvas')
+    c.width = c.height = size
+    const ctx = c.getContext('2d')!
+    ctx.translate(size / 2, size / 2)
+    return { c, ctx }
   }
-  spiral = new THREE.CanvasTexture(c)
-  spiral.colorSpace = THREE.SRGBColorSpace
-  return spiral
+  const tex = (c: HTMLCanvasElement) => {
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }
+
+  const sp = canvas()
+  sp.ctx.lineCap = 'round'
+  for (let arm = 0; arm < 6; arm++) {
+    for (let k = 0; k < 60; k++) {
+      const u0 = k / 60
+      const u1 = (k + 1) / 60
+      const at = (u: number) => {
+        const a = (arm * Math.PI) / 3 + u * Math.PI * 1.7
+        const r = (size / 2) * (0.14 + u * 0.84)
+        return [Math.cos(a) * r, Math.sin(a) * r]
+      }
+      const [x0, y0] = at(u0)
+      const [x1, y1] = at(u1)
+      sp.ctx.strokeStyle = `rgba(255,255,255,${0.9 * Math.sin(Math.PI * Math.min(1, u0 * 1.15))})`
+      sp.ctx.lineWidth = 4 + 14 * Math.sin(Math.PI * u0)
+      sp.ctx.beginPath()
+      sp.ctx.moveTo(x0, y0)
+      sp.ctx.lineTo(x1, y1)
+      sp.ctx.stroke()
+    }
+  }
+
+  const sh = canvas()
+  const g = sh.ctx.createRadialGradient(0, 0, 0, 0, 0, size / 2)
+  g.addColorStop(0, 'rgba(2,14,22,0.95)')
+  g.addColorStop(0.22, 'rgba(4,24,36,0.85)')
+  g.addColorStop(0.5, 'rgba(10,58,82,0.45)')
+  g.addColorStop(0.85, 'rgba(14,80,110,0.15)')
+  g.addColorStop(1, 'rgba(14,80,110,0)')
+  sh.ctx.fillStyle = g
+  sh.ctx.fillRect(-size / 2, -size / 2, size, size)
+
+  const fo = canvas()
+  for (let k = 0; k < 48; k++) {
+    const a0 = (k / 48) * Math.PI * 2
+    const span = (0.4 + Math.abs(Math.sin(k * 2.7)) * 0.6) * ((Math.PI * 2) / 48)
+    fo.ctx.strokeStyle = `rgba(255,255,255,${0.55 + 0.4 * Math.abs(Math.sin(k * 1.3))})`
+    fo.ctx.lineWidth = 8 + 10 * Math.abs(Math.sin(k * 0.9))
+    fo.ctx.lineCap = 'round'
+    fo.ctx.beginPath()
+    fo.ctx.arc(0, 0, size / 2 - 16, a0, a0 + span)
+    fo.ctx.stroke()
+  }
+
+  vortex = { spiral: tex(sp.c), shade: tex(sh.c), foam: tex(fo.c) }
+  return vortex
 }
 
 function Whirlpool({ def }: { def: Def<'whirlpool'> }) {
@@ -580,29 +637,43 @@ function Whirlpool({ def }: { def: Def<'whirlpool'> }) {
   const swirl = Math.sign(whirlpoolSwirl(def))
   const outer = useRef<THREE.Mesh>(null)
   const inner = useRef<THREE.Mesh>(null)
-  const map = spiralTexture()
+  const foam = useRef<THREE.Mesh>(null)
+  const lip = useRef<THREE.Mesh>(null)
+  const tex = vortexTextures()
   useFrame(() => {
     const t = simTime()
     if (outer.current) outer.current.rotation.z = swirl * t * 1.2
     if (inner.current) inner.current.rotation.z = swirl * t * 2.6
+    if (foam.current) foam.current.rotation.z = swirl * t * 0.5
+    if (lip.current) lip.current.rotation.z = swirl * t * 4
   })
+  // Mirror the spiral for whirlpools that turn the other way, so the arms always trail.
+  const flip = swirl < 0 ? -1 : 1
   return (
     <group position={[0, 0.05, def.d]} rotation={[-Math.PI / 2, 0, 0]}>
       <mesh>
-        <circleGeometry args={[r, 40]} />
-        <meshBasicMaterial color="#0b3d55" transparent opacity={0.35} depthWrite={false} />
+        <circleGeometry args={[r * 1.05, 48]} />
+        <meshBasicMaterial map={tex.shade} transparent depthWrite={false} />
       </mesh>
-      <mesh ref={outer} position={[0, 0, 0.01]}>
-        <circleGeometry args={[r, 40]} />
-        <meshBasicMaterial map={map} transparent opacity={0.55} depthWrite={false} />
+      <mesh ref={outer} position={[0, 0, 0.01]} scale={[flip, 1, 1]}>
+        <circleGeometry args={[r, 48]} />
+        <meshBasicMaterial map={tex.spiral} transparent opacity={0.5} depthWrite={false} />
       </mesh>
-      <mesh ref={inner} position={[0, 0, 0.02]} scale={0.5}>
-        <circleGeometry args={[r, 40]} />
-        <meshBasicMaterial map={map} transparent opacity={0.8} depthWrite={false} />
+      <mesh ref={inner} position={[0, 0, 0.02]} scale={[0.55 * flip, 0.55, 0.55]}>
+        <circleGeometry args={[r, 48]} />
+        <meshBasicMaterial map={tex.spiral} transparent opacity={0.8} depthWrite={false} />
+      </mesh>
+      <mesh ref={foam} position={[0, 0, 0.025]}>
+        <circleGeometry args={[r * 1.08, 48]} />
+        <meshBasicMaterial map={tex.foam} transparent opacity={0.75} depthWrite={false} />
       </mesh>
       <mesh position={[0, 0, 0.03]}>
-        <circleGeometry args={[ITEM_SIZES.whirlpoolCore, 28]} />
-        <meshBasicMaterial color="#04161f" transparent opacity={0.9} depthWrite={false} />
+        <circleGeometry args={[ITEM_SIZES.whirlpoolCore, 40]} />
+        <meshBasicMaterial color="#04161f" transparent opacity={0.92} depthWrite={false} />
+      </mesh>
+      <mesh ref={lip} position={[0, 0, 0.035]}>
+        <ringGeometry args={[ITEM_SIZES.whirlpoolCore * 0.98, ITEM_SIZES.whirlpoolCore * 1.18, 40]} />
+        <meshBasicMaterial map={tex.foam} color="#d9f6ff" transparent opacity={0.9} depthWrite={false} />
       </mesh>
     </group>
   )
@@ -664,49 +735,38 @@ function Sweeper({ def, hw }: { def: Def<'sweeper'>; hw: number }) {
     // Point the boom's local +x along (sin a, -side cos a) in (along, across).
     if (boom.current) boom.current.rotation.y = Math.atan2(def.side * Math.cos(a), Math.sin(a))
   })
-  const arm = ITEM_SIZES.sweeperArm
   return (
     <group position={[0, 0, pivot]}>
-      <mesh position={[0, 0.6, 0]} material={toon('#7d5a8c')}>
-        <cylinderGeometry args={[0.45, 0.6, 2.2, 12]} />
-      </mesh>
-      <mesh position={[0, 1.8, 0]} material={toon('#ffcf3f')}>
-        <sphereGeometry args={[0.42, 12, 8]} />
-      </mesh>
+      <mesh geometry={turnedPost(0.6, 0.45, 2.2, '#7d5a8c')} position={[0, -0.5, 0]} material={paint} />
+      <mesh geometry={dome(0.42)} position={[0, 1.8, 0]} material={paint} />
       <group ref={boom} position={[0, 0.45, 0]}>
-        <mesh position={[def.len / 2 + 0.2, 0, 0]} rotation={[0, 0, Math.PI / 2]} material={toon(PALETTE.spikeTube)}>
-          <cylinderGeometry args={[arm, arm, def.len - 0.4, 10]} />
-        </mesh>
-        <mesh position={[def.len, 0, 0]} material={toon('#ffcf3f')}>
-          <sphereGeometry args={[0.32, 10, 8]} />
-        </mesh>
-        <SpikeRow x0={0.7} x1={def.len} radius={arm} />
+        {/* Boom runs 0.4 → len with a gold knob; spikes from 0.7, as the hit shape. */}
+        <mesh geometry={rotor(def.len, 1, ITEM_SIZES.sweeperArm, 0.4, 0.7, GOLD, 0.32)} material={paint} />
       </group>
     </group>
   )
 }
 
-const flameGeo = (() => {
-  const g = new THREE.CylinderGeometry(1, 0.45, 1, 14, 1, true)
-  g.translate(0, 0.5, 0)
-  return g
-})()
+const nozzleGlowMat = () => new THREE.MeshBasicMaterial({ color: '#ff7a2f', map: glowTexture(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
 
 function Flame({ def, item }: { def: Def<'flame'>; item: BakedItem }) {
   const hw = item.hw
   const len = flameLength(def, hw)
   const jet = useRef<THREE.Group>(null)
+  const mid = useRef<THREE.Mesh>(null)
   const sound = useRef(false)
-  const nozzle = useMemo(() => new THREE.MeshToonMaterial({ color: '#5c5866', emissive: '#000000', gradientMap: toonGradient() }), [])
+  const housing = useMemo(() => new RoundedBoxGeometry(1.5, 1.1, 1.1, 3, 0.12), [])
+  const nozzle = useMemo(() => flashMaterial(METAL), [])
+  const glow = useMemo(nozzleGlowMat, [])
   const outer = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ff5a1f', transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }), [])
-  const core = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }), [])
+  const middle = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ff9a2a', transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }), [])
+  const core = useMemo(() => new THREE.MeshBasicMaterial({ color: '#fff0a0', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }), [])
   useEffect(
     () => () => {
-      nozzle.dispose()
-      outer.dispose()
-      core.dispose()
+      housing.dispose()
+      for (const m of [nozzle, glow, outer, middle, core]) m.dispose()
     },
-    [nozzle, outer, core],
+    [housing, nozzle, glow, outer, middle, core],
   )
   useFrame(() => {
     const t = simTime()
@@ -718,25 +778,41 @@ function Flame({ def, item }: { def: Def<'flame'>; item: BakedItem }) {
     if (jet.current) {
       jet.current.visible = reach > 0.05
       jet.current.scale.set(ITEM_SIZES.flameHalf * flicker, reach, ITEM_SIZES.flameHalf * flicker)
+      jet.current.rotation.y = t * 9
     }
+    if (mid.current) mid.current.rotation.y = -t * 14
     nozzle.emissive.setRGB(st.warn && Math.sin(t * 30) > 0 ? 0.6 : lit ? 0.4 : 0, lit ? 0.15 : 0, 0)
+    glow.opacity = lit ? 0.9 : st.warn ? 0.4 + Math.sin(t * 30) * 0.3 : 0
     if (lit && !sound.current && nearRaft(item)) audio.flame()
     sound.current = lit
   })
   return (
     <group position={[0, 0, def.side * hw]}>
-      <mesh position={[0, 0.85, def.side * 0.35]} material={nozzle}>
-        <boxGeometry args={[1.5, 1.1, 1.1]} />
+      <mesh geometry={housing} position={[0, 0.85, def.side * 0.35]} material={nozzle} />
+      <mesh geometry={flameTrim(def.side)} material={paint} />
+      <mesh position={[0, 0.85, -def.side * 0.4]} scale={1.6} material={glow}>
+        <planeGeometry args={[1, 1]} />
       </mesh>
-      <mesh position={[0, 0.85, -def.side * 0.25]} rotation={[Math.PI / 2, 0, 0]} material={toon('#3b3742')}>
-        <cylinderGeometry args={[0.5, 0.42, 0.4, 12]} />
-      </mesh>
-      <group ref={jet} position={[0, 0.85, 0]} rotation={[-def.side * (Math.PI / 2), 0, 0]}>
-        <mesh geometry={flameGeo} material={outer} />
-        <mesh geometry={flameGeo} material={core} scale={[0.55, 0.92, 0.55]} />
+      <group position={[0, 0.85, 0]} rotation={[-def.side * (Math.PI / 2), 0, 0]}>
+        <group ref={jet}>
+          <mesh geometry={flameGeo} material={outer} />
+          <mesh ref={mid} geometry={flameGeo} material={middle} scale={[0.75, 0.96, 0.75]} />
+          <mesh geometry={flameGeo} material={core} scale={[0.42, 0.85, 0.42]} />
+        </group>
       </group>
     </group>
   )
+}
+
+const fencePostGeo = (() =>
+  tintMerge([
+    [new THREE.ConeGeometry(0.22, 0.9, 16).translate(0, 0.75, 0), GOLD],
+    [new THREE.TorusGeometry(0.2, 0.05, 6, 16).rotateX(Math.PI / 2).translate(0, 0.32, 0), METAL],
+    [new THREE.SphereGeometry(0.09, 10, 8).translate(0, 1.22, 0), '#fff2c4'],
+  ]))()
+
+function tintMerge(parts: [THREE.BufferGeometry, string][]) {
+  return mergeParts(parts.map(([g, c]) => tint(g, c)))
 }
 
 function Fence({ def, hw }: { def: Def<'fence'>; hw: number }) {
@@ -755,16 +831,9 @@ function Fence({ def, hw }: { def: Def<'fence'>; hw: number }) {
       {[-1, 1].map((s) => (
         <group key={s} ref={s < 0 ? left : right}>
           <group rotation={[0, -Math.PI / 2, 0]}>
-            <mesh rotation={[0, 0, Math.PI / 2]} material={toon(PALETTE.spikeTube)}>
-              <cylinderGeometry args={[ITEM_SIZES.fenceLog, ITEM_SIZES.fenceLog, logLen, 12]} />
-            </mesh>
-            <SpikeRow x0={-logLen / 2} x1={logLen / 2} radius={ITEM_SIZES.fenceLog} />
-            <mesh position={[(-s * logLen) / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]} material={toon('#ffcf3f')}>
-              <cylinderGeometry args={[0.46, 0.46, 0.24, 12]} />
-            </mesh>
-            <mesh position={[(-s * logLen) / 2, 0.75, 0]} material={toon('#ffcf3f')}>
-              <coneGeometry args={[0.22, 0.9, 8]} />
-            </mesh>
+            <mesh geometry={spikedLog(logLen, ITEM_SIZES.fenceLog)} material={paint} />
+            <mesh geometry={wheel(0.46, 0.24)} position={[(-s * logLen) / 2, 0, 0]} material={paint} />
+            <mesh geometry={fencePostGeo} position={[(-s * logLen) / 2, 0, 0]} material={paint} />
           </group>
         </group>
       ))}

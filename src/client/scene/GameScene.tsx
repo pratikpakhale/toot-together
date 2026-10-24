@@ -65,6 +65,8 @@ export function GameScene() {
       key={quality}
       className="!fixed inset-0"
       flat
+      // Sun shadows on high quality only; low keeps the blob shadows alone.
+      shadows={quality === 'high' ? 'percentage' : false}
       dpr={quality === 'high' ? [1, MAX_DPR] : [0.75, 1]}
       gl={{ antialias: quality === 'high', powerPreference: 'high-performance', stencil: false }}
       camera={{ fov: 55, near: 0.2, far: 1400, position: [0, 8, -12] }}
@@ -75,7 +77,7 @@ export function GameScene() {
       <ContextWatch />
       <Suspense fallback={null}>
         <Driver mode={mode} />
-        <Environment course={course} />
+        <Environment course={course} shadows={quality === 'high'} />
         <Track course={course} />
         <Decor course={course} />
         <Gates course={course} />

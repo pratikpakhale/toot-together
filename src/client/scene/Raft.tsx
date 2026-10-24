@@ -13,89 +13,47 @@ import { setTagContent } from '../ui/NameTags'
 import { ordinal } from '../ui/format'
 import { fx } from './Fx'
 import { Hippo, type HippoHandle } from './Hippo'
-import { PALETTE, toon, toonGradient } from './materials'
+import { PALETTE, soft } from './materials'
+import { HIPPO_SCALE, hullKit, SEAT_R, SEAT_Y, SLICE_GAP } from './raftKit'
+import { RaftHull } from './RaftHull'
 import { BlobShadow } from './shadow'
 
-const HIPPO_R = 1.08
-const BUTT_R = HIPPO_R + 0.66
-const FLOOR_Y = 0.14
+const BUTT_R = SEAT_R + 0.66 * HIPPO_SCALE
 const PUFF_RATE = 30
 const BUFF_ICON: (IconName | null)[] = [null, 'beans', 'chili', 'prune']
 const tagPos = new THREE.Vector3()
-const SLICE_GAP = 0.08
 /** Rivals' team tags fade from this distance (m) to their faintest at twice that. */
 const TAG_FADE = 25
 
 const FART_COLORS = SEAT_COLORS.map((c) => '#' + new THREE.Color(PALETTE.fart).lerp(new THREE.Color(c), 0.3).getHexString())
-const FIRE = ['#ff5a1f', '#ffb21f', '#ff3b2f']
+/** Soot that rolls off chili fire. */
+const SMOKE = '#5e4a46'
 
-function plankTexture() {
-  const c = document.createElement('canvas')
-  c.width = c.height = 256
-  const ctx = c.getContext('2d')!
-  const planks = 7
-  for (let i = 0; i < planks; i++) {
-    ctx.fillStyle = i % 2 ? PALETTE.raftFloor : '#8cc650'
-    ctx.fillRect(0, (i * 256) / planks, 256, 256 / planks)
-    ctx.fillStyle = '#6fa23f'
-    ctx.fillRect(0, (i * 256) / planks, 256, 4)
-  }
-  const tex = new THREE.CanvasTexture(c)
-  tex.colorSpace = THREE.SRGBColorSpace
-  return tex
-}
-
-/** Everything every raft shares: geometry and materials built once. */
-function useRaftKit() {
-  const kit = useMemo(() => {
-    const arrow = new THREE.Shape()
-    arrow.moveTo(0, 0.55)
-    arrow.lineTo(0.5, -0.05)
-    arrow.lineTo(0.18, -0.05)
-    arrow.lineTo(0.18, -0.5)
-    arrow.lineTo(-0.18, -0.5)
-    arrow.lineTo(-0.18, -0.05)
-    arrow.lineTo(-0.5, -0.05)
-    arrow.closePath()
-    const pennant = new THREE.Shape()
-    pennant.moveTo(0, 0)
-    pennant.lineTo(-0.9, 0.28)
-    pennant.lineTo(0, 0.56)
-    pennant.closePath()
-    return {
-      sliceGeos: Array.from({ length: CREW_SIZE + 1 }, (_, n) => (n < 2 ? null : new THREE.TorusGeometry(1.45, 0.352, 12, 40, (Math.PI * 2) / n - SLICE_GAP))),
-      floorMat: new THREE.MeshToonMaterial({ map: plankTexture(), gradientMap: toonGradient() }),
-      arrowGeo: new THREE.ShapeGeometry(arrow).rotateX(-Math.PI / 2),
-      pennantGeo: new THREE.ExtrudeGeometry(pennant, { depth: 0.04, bevelEnabled: false }),
-    }
-  }, [])
-  useEffect(
-    () => () => {
-      for (const g of kit.sliceGeos) g?.dispose()
-      kit.floorMat.map?.dispose()
-      kit.floorMat.dispose()
-      kit.arrowGeo.dispose()
-      kit.pennantGeo.dispose()
-    },
-    [kit],
-  )
-  return kit
-}
-
-type Kit = ReturnType<typeof useRaftKit>
+/** The push arrow under each hippo, shared by every raft. */
+const arrowGeo = (() => {
+  const arrow = new THREE.Shape()
+  arrow.moveTo(0, 0.55)
+  arrow.lineTo(0.5, -0.05)
+  arrow.lineTo(0.18, -0.05)
+  arrow.lineTo(0.18, -0.5)
+  arrow.lineTo(-0.18, -0.5)
+  arrow.lineTo(-0.18, -0.05)
+  arrow.lineTo(-0.5, -0.05)
+  arrow.closePath()
+  return new THREE.ShapeGeometry(arrow).rotateX(-Math.PI / 2)
+})()
 
 export function Rafts({ course }: { course: BakedCourse }) {
-  const kit = useRaftKit()
   return (
     <>
       {Array.from({ length: MAX_RAFTS }, (_, i) => (
-        <RaftView key={i} course={course} index={i} kit={kit} />
+        <RaftView key={i} course={course} index={i} />
       ))}
     </>
   )
 }
 
-function RaftView({ course, index, kit }: { course: BakedCourse; index: number; kit: Kit }) {
+function RaftView({ course, index }: { course: BakedCourse; index: number }) {
   const info = useApp((s) => s.sessionInfo)
   const session = useApp((s) => s.session)
   const roster = info?.roster ?? []
@@ -105,6 +63,7 @@ function RaftView({ course, index, kit }: { course: BakedCourse; index: number; 
   const raftBody = useRef<THREE.Group>(null!)
   const band = useRef<THREE.Mesh>(null!)
   const belt = useRef<THREE.Mesh>(null!)
+  const rope = useRef<THREE.Group>(null!)
   const pennant = useRef<THREE.Group>(null!)
   const flag = useRef<THREE.Mesh>(null!)
   const shadow = useRef<THREE.Group>(null!)
@@ -116,11 +75,18 @@ function RaftView({ course, index, kit }: { course: BakedCourse; index: number; 
   const slices = useRef<(THREE.Mesh | null)[]>([])
   const arrowMats = useMemo(() => SEAT_COLORS.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.6, depthWrite: false })), [])
   const fartKeys = useMemo(() => SEAT_COLORS.map((_, seat) => `p${index}-${seat}`), [index])
-  const state = useRef({ emit: [0, 0, 0, 0], wake: 0, tiltX: 0, tiltZ: 0, team: false })
+  const state = useRef({ emit: [0, 0, 0, 0], tooting: [false, false, false, false], wake: 0, tiltX: 0, tiltZ: 0, team: false })
 
   useEffect(() => () => arrowMats.forEach((m) => m.dispose()), [arrowMats])
+  // The raft and crew cast sun shadows (drawn only where the renderer has shadows on).
+  useEffect(() => {
+    root.current.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) o.castShadow = true
+    })
+  }, [])
 
   const hideHippo = (seat: number) => {
+    state.current.tooting[seat] = false
     const slot = tagSlot(index, seat)
     const tag = frame.tagEls[slot]
     const bubble = frame.bubbleEls[slot]
@@ -165,9 +131,10 @@ function RaftView({ course, index, kit }: { course: BakedCourse; index: number; 
 
     if (st.team !== race) {
       st.team = race
-      band.current.material = toon(race ? TEAMS[index].color : PALETTE.raftBand)
+      band.current.material = soft(race ? TEAMS[index].color : PALETTE.raftBand)
     }
     belt.current.visible = race
+    rope.current.visible = !race
     pennant.current.visible = race
     if (race) flag.current.rotation.y = Math.sin(t * 6 + index) * 0.25
 
@@ -225,7 +192,7 @@ function RaftView({ course, index, kit }: { course: BakedCourse; index: number; 
     const bySeat: (PlayerSnap | undefined)[] = []
     for (const p of crew) bySeat[p.seat] = p
     const ords = crew.map((p) => p.ord)
-    const sliceGeo = kit.sliceGeos[crew.length]
+    const sliceGeo = hullKit.slices[crew.length]
 
     for (let seat = 0; seat < CREW_SIZE; seat++) {
       const p = bySeat[seat]
@@ -252,13 +219,13 @@ function RaftView({ course, index, kit }: { course: BakedCourse; index: number; 
       const sa = Math.sin(p.rim)
       if (r.st === RAFT_STATE.popped) {
         const k = r.stT
-        const out = HIPPO_R + k * 4.5
-        const y = FLOOR_Y + 7 * k - 12 * k * k
+        const out = SEAT_R + k * 4.5
+        const y = SEAT_Y + 7 * k - 12 * k * k
         holder.position.set(ca * out, Math.max(-2, y), sa * out)
         holder.rotation.set(k * 9 * (seat % 2 ? 1 : -1), -(p.rim + Math.PI), k * 6)
         holder.visible = y > -1.6
       } else {
-        holder.position.set(ca * HIPPO_R, FLOOR_Y, sa * HIPPO_R)
+        holder.position.set(ca * SEAT_R, SEAT_Y, sa * SEAT_R)
         holder.rotation.set(0, -(p.rim + Math.PI), r.st === RAFT_STATE.falling ? Math.sin(t * 20 + seat) * 0.4 : 0)
       }
       hippo.pose({
@@ -300,15 +267,21 @@ function RaftView({ course, index, kit }: { course: BakedCourse; index: number; 
       if (!farting || loudness < 0.08) audio.fartStop(fartKey)
       else if (!audio.isFarting(fartKey)) audio.fartStart(fartKey, seat, { pan: seat % 2 ? 0.3 : -0.3, kind: p.buff === BUFF_CODE.chili ? 'chili' : 'normal', gain: loudness })
 
+      const started = farting && !st.tooting[seat]
+      st.tooting[seat] = farting
       if (farting) {
         st.emit[seat] += dt * PUFF_RATE * (p.buff === BUFF_CODE.beans ? 1.5 : 1)
         const bx = r.x + ox * BUTT_R
-        const by = r.y + FLOOR_Y + 0.62
+        const by = r.y + SEAT_Y + 0.62 * HIPPO_SCALE
         const bz = r.z + oz * BUTT_R
+        if (started && !p.sync && p.buff !== BUFF_CODE.chili) fx.tootStart(bx, by, bz, ox, oz, FART_COLORS[seat], r.vx, r.vz)
         while (st.emit[seat] >= 1) {
           st.emit[seat] -= 1
           if (p.sync) fx.rainbowFart(bx, by, bz, ox, oz)
-          else if (p.buff === BUFF_CODE.chili) fx.fart(bx, by, bz, ox, oz, FIRE[Math.floor(Math.random() * 3)], 1.2, r.vx, r.vz)
+          else if (p.buff === BUFF_CODE.chili) {
+            fx.flame(bx, by, bz, ox, oz, r.vx, r.vz)
+            if (Math.random() < 0.25) fx.fart(bx, by, bz, ox, oz, SMOKE, 1, r.vx, r.vz)
+          }
           else fx.fart(bx, by, bz, ox, oz, FART_COLORS[seat], p.buff === BUFF_CODE.beans ? 1.35 : 1, r.vx, r.vz)
         }
       }
@@ -334,44 +307,7 @@ function RaftView({ course, index, kit }: { course: BakedCourse; index: number; 
       <group ref={root} visible={false}>
         <group ref={tilt}>
           <group ref={raftBody}>
-            <mesh position={[0, 0.07, 0]} material={kit.floorMat}>
-              <cylinderGeometry args={[1.32, 1.32, 0.14, 28]} />
-            </mesh>
-            <mesh position={[0, 0.22, 0]} rotation={[Math.PI / 2, 0, 0]} material={toon(PALETTE.raftRing)}>
-              <torusGeometry args={[1.45, 0.34, 14, 36]} />
-            </mesh>
-            <mesh ref={band} position={[0, 0.02, 0]} rotation={[Math.PI / 2, 0, 0]} material={toon(PALETTE.raftBand)}>
-              <torusGeometry args={[1.5, 0.2, 10, 36]} />
-            </mesh>
-            {/* Race rooms: a belt in the raft's colour round the outside, where the crew's slices don't cover it. */}
-            <mesh ref={belt} position={[0, 0.24, 0]} rotation={[Math.PI / 2, 0, 0]} material={toon(TEAMS[index].color)} visible={false}>
-              <torusGeometry args={[1.78, 0.13, 8, 40]} />
-            </mesh>
-            {SEAT_COLORS.map((color, seat) => (
-              <mesh
-                key={seat}
-                ref={(m) => {
-                  slices.current[seat] = m
-                }}
-                position={[0, 0.22, 0]}
-                material={toon(new THREE.Color(PALETTE.raftRing).lerp(new THREE.Color(color), 0.7))}
-                visible={false}
-              />
-            ))}
-            {[0, 1, 2, 3].map((k) => {
-              const a = Math.PI / 4 + (k * Math.PI) / 2
-              return (
-                <mesh key={k} position={[Math.cos(a) * 1.45, 0.5, Math.sin(a) * 1.45]} rotation={[0, -a + Math.PI / 2, 0]} material={toon(PALETTE.raftHandle)}>
-                  <torusGeometry args={[0.2, 0.07, 8, 14, Math.PI]} />
-                </mesh>
-              )
-            })}
-            <group ref={pennant} visible={false}>
-              <mesh position={[0, 1.15, 0]} material={toon(PALETTE.wood)}>
-                <cylinderGeometry args={[0.05, 0.06, 2.1, 6]} />
-              </mesh>
-              <mesh ref={flag} position={[0, 1.65, 0]} geometry={kit.pennantGeo} material={toon(TEAMS[index].color)} />
-            </group>
+            <RaftHull index={index} parts={{ band, belt, rope, pennant, flag, slices }} />
           </group>
           {SEAT_COLORS.map((color, seat) => (
             <group
@@ -381,13 +317,15 @@ function RaftView({ course, index, kit }: { course: BakedCourse; index: number; 
               }}
               visible={false}
             >
-              <Hippo
-                ref={(h) => {
-                  hippos.current[seat] = h
-                }}
-                color={color}
-                seat={seat}
-              />
+              <group scale={HIPPO_SCALE}>
+                <Hippo
+                  ref={(h) => {
+                    hippos.current[seat] = h
+                  }}
+                  color={color}
+                  seat={seat}
+                />
+              </group>
             </group>
           ))}
         </group>
@@ -403,7 +341,7 @@ function RaftView({ course, index, kit }: { course: BakedCourse; index: number; 
           }}
           visible={false}
         >
-          <mesh geometry={kit.arrowGeo} material={arrowMats[seat]} renderOrder={3} />
+          <mesh geometry={arrowGeo} material={arrowMats[seat]} renderOrder={3} />
         </group>
       ))}
     </>
