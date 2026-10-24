@@ -113,6 +113,12 @@ export function showMenu() {
 }
 
 const HIPPOCAM_PATH = '/hippocam'
+const LAB_PATH = '/lab'
+
+/** The asset lab: a page of its own, outside the game. */
+export function isLabRoute() {
+  return location.pathname === LAB_PATH
+}
 
 export function isHippocamRoute() {
   return location.pathname === HIPPOCAM_PATH
