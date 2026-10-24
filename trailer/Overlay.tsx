@@ -56,7 +56,7 @@ function sounds(b: Beat) {
   cue(o, 0.25, 'oSlam', () => audio.burst(2, 0))
   cue(o, 0.6, 'oBoing', () => audio.boing())
   cue(o, 1.7, 'oUrl', () => audio.checkpoint())
-  ;[2.3, 2.5, 2.7].forEach((at, n) => cue(o, at, `oChip${n}`, () => audio.click()))
+  ;[2.3, 2.5, 2.7, 2.9].forEach((at, n) => cue(o, at, `oChip${n}`, () => audio.click()))
   if (CUT.musicStopsAt !== null) cue(o, CUT.musicStopsAt, 'oMusic', () => audio.setMusic(false))
 }
 
@@ -261,7 +261,7 @@ function Outro({ t }: { t: number }) {
             toottogether.fun
           </div>
         </Pop>
-        <div style={{ display: 'flex', gap: reel ? 16 : 22, marginTop: 14 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: reel ? 16 : 22, marginTop: 14, maxWidth: reel ? 720 : undefined }}>
           <Pop t={t} at={2.3}>
             <Chip icon="hippo" text="SOLO" />
           </Pop>
@@ -270,6 +270,9 @@ function Outro({ t }: { t: number }) {
           </Pop>
           <Pop t={t} at={2.7}>
             <Chip icon="globe" text="ONLINE" />
+          </Pop>
+          <Pop t={t} at={2.9}>
+            <Chip icon="flag" text="RACE" />
           </Pop>
         </div>
       </div>

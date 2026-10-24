@@ -8,6 +8,7 @@ import type { PlayerInput } from '../src/sim/types'
 const TOOT_TURN_SECONDS = 1.1
 
 export const CREW = ['Aarav', 'Priya', 'Kabir', 'Ananya'] as const
+const RIVALS = ['Meera', 'Rohan', 'Isha', 'Dev', 'Zoya', 'Arjun']
 
 interface ChatCue {
   at: number
@@ -33,6 +34,8 @@ export interface Shot {
   caption?: Caption
   steer?: (sim: Sim, id: number, t: number) => PlayerInput | undefined
   everyoneToots?: boolean
+  /** A race: our crew is on the first raft, rival crews of two on the rest. */
+  rafts?: number
 }
 
 const itemS = (c: BakedCourse, kind: string, nth = 0) => c.items.filter((i) => i.def.kind === kind)[nth].s
@@ -94,6 +97,17 @@ export const SHOTS: Shot[] = [
     },
   },
   {
+    name: 'Kabir snipes Teal',
+    course: 'canyon-run',
+    seed: 11,
+    rafts: 3,
+    startWhen: (sim) => sim.phase === 'racing' && sim.rafts[0].s >= itemS(canyon, 'spinner') - 22,
+    seconds: 8,
+    highlight: [3.4, 6.4],
+    caption: { text: 'RACE YOUR FRIENDS', at: 0.4, color: '#ffc53d' },
+    chat: [{ at: 5.6, seat: 2, text: 'Sorry not sorry 😈' }],
+  },
+  {
     name: 'Caldera finale',
     course: 'volcano-peak',
     seed: 88,
@@ -105,7 +119,7 @@ export const SHOTS: Shot[] = [
   },
 ]
 
-const [, spinner, crusher, kabir] = SHOTS
+const [, spinner, crusher, kabir, snipe] = SHOTS
 
 /** The vertical cut for Reels: hard cuts, captions up top, one beat per shot. */
 export const REEL_SHOTS: Shot[] = [
@@ -116,6 +130,7 @@ export const REEL_SHOTS: Shot[] = [
   },
   { ...crusher, seconds: 5.5, caption: { text: 'TIME IT RIGHT…', at: 0, color: '#a6e84a' } },
   { ...kabir, seconds: 5, caption: { text: '…OR BLAME KABIR', at: 0, color: '#ff6b6b' } },
+  { ...snipe, seconds: 6.6, caption: { text: '…OR RACE THEM', at: 0, color: '#ffc53d' } },
   {
     name: 'Finish line',
     course: 'volcano-peak',
@@ -128,8 +143,12 @@ export const REEL_SHOTS: Shot[] = [
 ]
 
 export function prime(shot: Shot): Sim {
-  const sim = new Sim(getCourse(shot.course), shot.seed)
+  const sim = new Sim(getCourse(shot.course), shot.seed, shot.rafts)
   CREW.forEach((name, seat) => sim.addPlayer(seat + 1, name, seat))
+  if (sim.race) {
+    for (let raft = 1; raft < sim.rafts.length; raft++) for (const seat of [0, 1]) sim.addPlayer(sim.players.size + 1, RIVALS[sim.players.size - CREW.length], seat, raft)
+    sim.start()
+  }
   for (let i = 0; i < 60 * 240 && !shot.startWhen(sim); i++) {
     for (const id of sim.players.keys()) sim.setInput(id, botInput(sim, id))
     sim.step()
