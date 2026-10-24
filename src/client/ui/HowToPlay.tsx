@@ -59,7 +59,7 @@ const CARDS: { icon: IconName; title: string; body: ReactNode }[] = [
     title: 'Racing',
     body: (
       <>
-        Online, a room can race 2–4 rafts. Pick a raft and a spot, press <span className="kbd">Y</span> when you're ready, and the start gate drops on GO. Bump rivals, toot them into trouble, and get there first.
+        Online, a room can race 2–4 rafts. You land on a raft (one tap switches), press <span className="kbd">Y</span> when you're ready, and the start gate drops on GO. Bump rivals, toot them into trouble, and get there first.
       </>
     ),
   },

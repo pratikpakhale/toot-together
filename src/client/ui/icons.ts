@@ -345,6 +345,11 @@ export const ICONS = {
     `<path d="M8 25h24V12l24 20-24 20V39H8z" fill="#9be23a" ${O}/>` +
     `<path d="M12 29h22" stroke="#fff" stroke-width="3" opacity=".6"/>`,
 
+  /** Points right; flip it with `-scale-x-100` for left. */
+  chevron:
+    `<path d="M23 11l21 21-21 21" fill="none" stroke="${INK}" stroke-width="15"/>` +
+    `<path d="M23 11l21 21-21 21" fill="none" stroke="#4aa8ff" stroke-width="6"/>`,
+
   share:
     `<path d="M16 30h-4v24h40V30h-4" fill="none" stroke="${INK}" stroke-width="10"/><path d="M16 30h-4v24h40V30h-4" fill="none" stroke="#fff8ec" stroke-width="4"/>` +
     `<path d="M32 42V8M21 19L32 8l11 11" fill="none" stroke="${INK}" stroke-width="11"/><path d="M32 42V8M21 19L32 8l11 11" fill="none" stroke="#4aa8ff" stroke-width="5"/>`,

@@ -13,7 +13,7 @@ import type { IconName } from './icons'
 import { MEDAL_ICON } from './LevelSelect'
 import { Modal } from './Modal'
 import { Icon } from './Icon'
-import { Refusal, startBlocker, TeamBadge, useRace, useRaftCount } from './Race'
+import { Refusal, roomiestRaft, startBlocker, TeamBadge, useRace, useRaftCount } from './Race'
 
 function rank(deaths: number) {
   if (deaths === 0) return { title: 'Flawless Flatulence', icon: 'trophy' as const }
@@ -215,9 +215,11 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
   const list = awards(ran).slice(0, short ? 3 : 4)
   const mine = results.standings.find((st) => myId !== undefined && st.ids.includes(myId))
   const nameOf = (id: number) => results.players.find((p) => p.id === id)?.name ?? '?'
-  const racers = roster.filter((p) => p.raft !== null && !p.away)
+  // The host's Rematch is its ready.
+  const racers = roster.filter((p) => p.raft !== null && !p.away && !p.host)
   const ready = racers.filter((p) => p.ready).length
   const blocker = startBlocker(roster, rafts)
+  const hopTo = roomiestRaft(roster, rafts)
   const click = (fn: () => void) => () => (audio.click(), fn())
 
   const title = winner?.place ? `${TEAMS[winner.raft].name.toUpperCase()} WINS!` : 'NOBODY MADE IT!'
@@ -299,8 +301,8 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
             </span>
           </button>
         ) : (
-          <button className="btn btn-blue flex-1 text-xl short:text-base" onClick={click(() => setOverlay('join'))}>
-            Join a raft
+          <button className="btn btn-blue flex flex-1 items-center justify-center gap-2 text-xl short:text-base" onClick={click(() => session.act({ type: 'pick', raft: hopTo }))}>
+            <TeamBadge raft={hopTo} size="1em" /> Hop on {TEAMS[hopTo].name}
           </button>
         )}
         <button className="btn btn-cream text-base" onClick={click(leaveGame)}>

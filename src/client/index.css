@@ -231,6 +231,9 @@ img {
     background: white;
     font-family: var(--font-display);
     font-size: 0.85em;
+    /* Coloured buttons set white text with a shadow; a key is always ink on white. */
+    color: var(--color-ink);
+    text-shadow: none;
   }
 
   input[type='range'].slider {

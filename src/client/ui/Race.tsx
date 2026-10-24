@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CREW_SIZE } from '../../sim/constants'
 import { RAFT_RESULT, type RosterEntry, type Snapshot } from '../../sim/types'
 import { audio } from '../audio/audio'
+import { inviteLink } from '../game/controller'
 import { frame, isRace, myRaft, seatColor, standings, TEAMS, watchable } from '../game/frame'
 import type { GameSession } from '../game/session'
 import { useViewKey } from '../game/useView'
@@ -43,119 +44,282 @@ export function startBlocker(roster: RosterEntry[], rafts: number) {
   return crewed < 2 ? 'Needs a second raft with a hippo on it.' : null
 }
 
-const live = (roster: RosterEntry[]) => roster.filter((p) => p.raft !== null && !p.away)
+/** Where someone hopping on goes by default: the raft with the most room, the first on a tie (as the server seats newcomers). */
+export function roomiestRaft(roster: RosterEntry[], rafts: number) {
+  let best = 0
+  for (let r = 1; r < rafts; r++) if (crewOf(roster, r).length < crewOf(roster, best).length) best = r
+  return best
+}
 
-/** The pond is the lobby: crews, ready ticks, and Ready / Start / Crews. */
+/** Mid-race, a hippo on the bench can hop onto a raft that's still going and has room. */
+function canHopOn(v: Snapshot, raft: number) {
+  const crew = v.players.filter((p) => p.raft === raft).length
+  return crew > 0 && crew < CREW_SIZE && v.rafts[raft]?.res === RAFT_RESULT.none
+}
+
+/** The one thing to do between races: the big button, and Y. */
+type LobbyAction = { kind: 'invite' } | { kind: 'split' } | { kind: 'start' } | { kind: 'ready'; on: boolean } | { kind: 'hop'; raft: number }
+
+function lobbyAction(roster: RosterEntry[], rafts: number, myId: number | undefined, host: boolean): LobbyAction | null {
+  const me = roster.find((p) => p.id === myId)
+  if (!me) return null
+  if (host) {
+    if (roster.length < 2) return { kind: 'invite' }
+    return startBlocker(roster, rafts) ? { kind: 'split' } : { kind: 'start' }
+  }
+  if (me.raft === null) return { kind: 'hop', raft: roomiestRaft(roster, rafts) }
+  return { kind: 'ready', on: !me.ready }
+}
+
+const canShare = () => isTouch && typeof navigator.share === 'function'
+
+/** The room's link: the share sheet on phones, the clipboard elsewhere. */
+async function shareInvite(code: string) {
+  const app = useApp.getState()
+  const url = inviteLink(code)
+  try {
+    if (canShare()) await navigator.share({ title: 'Toot Together', text: `Race me down the river! Room ${code}.`, url })
+    else {
+      await navigator.clipboard.writeText(url)
+      app.pushToast({ text: 'INVITE LINK COPIED', icon: 'link', tone: 'info' }, 1600)
+    }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return
+    app.setNotice({ icon: 'link', title: "Couldn't copy the link", message: `Your browser blocked the clipboard. Tell your friends to join room ${code}.` })
+  }
+}
+
+function runLobbyAction(session: GameSession, action: LobbyAction) {
+  audio.click()
+  if (action.kind === 'invite') {
+    const code = useApp.getState().sessionInfo?.roomCode
+    if (code) void shareInvite(code)
+  } else if (action.kind === 'split') session.act({ type: 'shuffle' })
+  else if (action.kind === 'start') session.act({ type: 'start' })
+  else if (action.kind === 'ready') session.act({ type: 'ready', on: action.on })
+  else session.act({ type: 'pick', raft: action.raft })
+}
+
+/** Y: the lobby's big button between races; mid-race on the bench, hop onto the raft you're watching. */
+export function pressPrimary(session: GameSession) {
+  const v = frame.view
+  if (!v || !isRace(v) || session.spectating) return
+  const myId = session.localPlayers[0]?.id
+  if (v.phase === 'pond' || v.phase === 'finished') {
+    const action = lobbyAction(useApp.getState().sessionInfo?.roster ?? [], v.rafts.length, myId, session.isHost())
+    if (action) runLobbyAction(session, action)
+  } else if (myRaft(v, session) === null && canHopOn(v, frame.follow)) {
+    audio.click()
+    session.act({ type: 'pick', raft: frame.follow })
+  }
+}
+
+/** The line under (desktop) or over (phone) the big button: what happens next. */
+function lobbyHint(action: LobbyAction, { short, twoCrews, others, hostName }: { short: boolean; twoCrews: boolean; others: boolean; hostName: string }) {
+  if (action.kind === 'invite') return 'A race needs a second crew. Friends who open the link land on a raft.'
+  if (action.kind === 'split') return "Everyone's on one raft. Split them up to race."
+  if (action.kind === 'start') return others ? "Or it starts by itself once everyone's ready." : 'Start whenever you like.'
+  if (action.kind === 'hop') return short ? 'Or tap any raft up top.' : 'Or pick any raft above.'
+  if (!twoCrews) return 'Waiting for a second crew.'
+  // `on` is what pressing would set: true while you're not ready yet.
+  if (!action.on) return 'Waiting for the others.'
+  return short ? 'Tap a raft up top to switch.' : `${hostName} can start any time.`
+}
+
+const ACTION_BUTTON: Record<LobbyAction['kind'], string> = { invite: 'btn-blue', split: 'btn-purple', start: 'btn-orange', ready: 'btn-green', hop: 'btn-blue' }
+// Once you're ready the button goes quiet; pressing it again takes it back.
+const buttonTone = (action: LobbyAction) => (action.kind === 'ready' && !action.on ? 'btn-cream' : ACTION_BUTTON[action.kind])
+
+function ActionLabel({ action }: { action: LobbyAction }) {
+  if (action.kind === 'invite') return <><Icon name={canShare() ? 'share' : 'link'} size="1.1em" /> Invite friends</>
+  if (action.kind === 'split') return <><Icon name="move" size="1.1em" /> Split crews</>
+  if (action.kind === 'start') return <><Icon name="flag" size="1.1em" /> Start race</>
+  if (action.kind === 'ready') return action.on ? <>Ready</> : <><Icon name="check" size="1.1em" /> Ready!</>
+  return <><TeamBadge raft={action.raft} size="1.1em" /> Hop on {TEAMS[action.raft].name}</>
+}
+
+/** "You're on Teal" each time you land on a raft in a race room, and when you're moved to the bench. */
+export function useSeatToast(session: GameSession | null) {
+  const race = useRace()
+  const raft = useApp((s) => s.sessionInfo?.roster.find((p) => p.id === s.session?.localPlayers[0]?.id)?.raft)
+  const prev = useRef<number | null | undefined>(undefined)
+  useEffect(() => {
+    if (!race || !session || session.spectating || raft === undefined) return
+    const was = prev.current
+    prev.current = raft
+    if (raft === was) return
+    const push = useApp.getState().pushToast
+    if (raft !== null) push({ text: `YOU'RE ON ${TEAMS[raft].name.toUpperCase()}`, icon: TEAMS[raft].icon, tone: 'info' }, 1800)
+    // Opening the room mid-race starts you on the bench, which the watch bar already says.
+    else if (was !== undefined) push({ text: "YOU'RE ON THE BENCH", icon: 'eye', tone: 'info' }, 1800)
+  }, [race, raft, session])
+}
+
+function CrewName({ p, me }: { p: RosterEntry; me: boolean }) {
+  return (
+    <span className={`flex min-w-0 items-center gap-0.5 ${p.away ? 'opacity-40' : ''}`} title={p.away ? `${p.name} is reconnecting` : undefined}>
+      <Icon name="hippo" size={18} style={{ ['--hippo' as string]: seatColor(p.seat) }} />
+      <span className="max-w-[7.5rem] truncate">{p.name}</span>
+      {me && <span className="text-ink/45">(you)</span>}
+      {p.host ? <Icon name="crown" size={15} label="Host" /> : p.ready && <Icon name="check" size={14} label="Ready" />}
+    </span>
+  )
+}
+
+const MINE = { boxShadow: '0 0 0 3px var(--color-sun), 0 4px 0 rgb(28 53 87 / 0.3)' }
+const smallBtn = 'btn rounded-xl px-2.5 py-0.5 text-[13px] shadow-[0_3px_0_var(--color-ink)]'
+
+/**
+ * The pond is the lobby. Desktop: a card with every crew and a button to switch to each raft.
+ * Phone: a pill per raft up top (tap one to switch) and the big button at the bottom, between the thumbs.
+ */
 export function RaceLobby({ session, short }: { session: GameSession; short: boolean }) {
   const roster = useApp((s) => s.sessionInfo?.roster) ?? []
   const setOverlay = useApp((s) => s.setOverlay)
   const rafts = useRaftCount()
   const myId = session.localPlayers[0]?.id
   const me = roster.find((p) => p.id === myId)
-  const host = roster.find((p) => p.host)
-  const amHost = session.isHost()
-  const onRaft = !!me && me.raft !== null
-  const racers = live(roster)
+  const host = session.isHost()
+  const hostName = roster.find((p) => p.host)?.name ?? 'The host'
+  // The host's Start is its ready, so the count is everyone else on a raft.
+  const racers = roster.filter((p) => p.raft !== null && !p.away && !p.host)
   const ready = racers.filter((p) => p.ready).length
-  const blocker = startBlocker(roster, rafts)
-  const click = (fn: () => void) => () => (audio.click(), fn())
-  const main = 'flex-1 px-3 py-2 text-lg short:flex-none short:rounded-[14px] short:px-3 short:py-1 short:text-[15px]'
+  const tally = racers.length ? `${ready} of ${racers.length} ready` : ''
+  const twoCrews = !startBlocker(roster, rafts)
+  const action = session.spectating ? null : lobbyAction(roster, rafts, myId, host)
+  const pickable = !session.spectating && !!me
+  const bench = roster.filter((p) => p.raft === null)
+  const pick = (raft: number) => {
+    audio.click()
+    session.act({ type: 'pick', raft })
+  }
 
-  const buttons = session.spectating ? null : (
-    <>
-      {amHost ? (
-        <button
-          tabIndex={-1}
-          disabled={!!blocker}
-          title={blocker ?? undefined}
-          className={`btn btn-orange ${main}`}
-          onClick={click(() => session.act({ type: 'start' }))}
-        >
-          {!isTouch && <span className="kbd">Y</span>} Start race
-        </button>
-      ) : onRaft ? (
-        <button
-          tabIndex={-1}
-          className={`btn ${me.ready ? 'btn-cream' : 'btn-green'} ${main}`}
-          onClick={click(() => session.act({ type: 'ready', on: !me.ready }))}
-        >
-          {!isTouch && <span className="kbd">Y</span>} {me.ready ? <><Icon name="check" size="1em" /> Ready</> : 'Ready'}
-        </button>
-      ) : (
-        <button tabIndex={-1} className={`btn btn-blue ${main}`} onClick={click(() => setOverlay('join'))}>
-          Join a raft
-        </button>
-      )}
-      <button tabIndex={-1} className="btn btn-cream px-3 py-2 text-base short:rounded-[14px] short:px-3 short:py-1 short:text-sm" onClick={click(() => setOverlay('crews'))}>
-        {!isTouch && <span className="kbd">C</span>} Crews
-      </button>
-    </>
-  )
+  const hint = action ? lobbyHint(action, { short, twoCrews, others: racers.length > 0, hostName }) : ''
 
   if (short) {
     return (
-      <div className="pointer-events-auto absolute left-1/2 top-[46px] flex -translate-x-1/2 items-center gap-2">
-        <div className="chip font-display flex items-center gap-1.5 px-2.5 py-0.5 text-[15px]">
-          {Array.from({ length: rafts }, (_, r) => (
-            <span key={r} className="flex items-center gap-0.5">
-              <TeamBadge raft={r} size={16} />
-              {crewOf(roster, r).length}
+      <>
+        <div className="pointer-events-auto absolute left-1/2 top-[46px] flex -translate-x-1/2 items-center gap-1.5">
+          {Array.from({ length: rafts }, (_, r) => {
+            const crew = crewOf(roster, r)
+            const mine = me?.raft === r
+            const full = crew.length >= CREW_SIZE
+            const others = crew.filter((p) => !p.host && !p.away)
+            return (
+              <button
+                key={r}
+                tabIndex={-1}
+                disabled={!pickable || (full && !mine)}
+                aria-label={`${TEAMS[r].name} raft, ${crew.length} of ${CREW_SIZE}${mine ? ', yours' : ''}`}
+                className="chip font-display flex items-center gap-1 px-2 py-0.5 text-[15px] disabled:opacity-100"
+                style={mine ? MINE : full ? { opacity: 0.55 } : undefined}
+                onClick={mine ? undefined : () => pick(r)}
+              >
+                <TeamBadge raft={r} size={17} />
+                {mine && me && <Icon name="hippo" size={16} style={{ ['--hippo' as string]: seatColor(me.seat) }} />}
+                <span className="tabular-nums">{crew.length}</span>
+                {others.length > 0 && others.every((p) => p.ready) && <Icon name="check" size={13} label="Ready" />}
+              </button>
+            )
+          })}
+          {bench.length > 0 && (
+            <span className="chip font-display flex items-center gap-1 px-2 py-0.5 text-[15px] text-ink/70" style={me?.raft === null ? MINE : undefined} aria-label={`${bench.length} on the bench`}>
+              <Icon name="eye" size={17} />
+              <span className="tabular-nums">{bench.length}</span>
             </span>
-          ))}
-          <span aria-hidden className="mx-0.5 h-4 w-[2px] rounded-full bg-ink/20" />
-          <Icon name="check" size={15} />
-          {ready}/{racers.length}
+          )}
+          {host && (
+            <button tabIndex={-1} className="chip font-display px-2.5 py-0.5 text-[13px]" onClick={() => (audio.click(), setOverlay('crews'))}>
+              Crews
+            </button>
+          )}
         </div>
-        {buttons}
-      </div>
+        {action && (
+          <div className="pointer-events-auto absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5 anim-rise">
+            <div className="chip whitespace-nowrap px-2.5 py-0.5 text-[11px] font-extrabold">{action.kind === 'start' && tally ? tally : hint}</div>
+            <button tabIndex={-1} className={`btn ${buttonTone(action)} flex items-center gap-2 whitespace-nowrap rounded-[16px] px-6 py-1.5 text-lg`} onClick={() => runLobbyAction(session, action)}>
+              <ActionLabel action={action} />
+            </button>
+          </div>
+        )}
+      </>
     )
   }
 
   return (
-    <div className="pointer-events-auto absolute left-3 top-1/2 w-[min(410px,calc(50vw-24px))] -translate-y-1/2 anim-rise">
+    <div className="pointer-events-auto absolute left-3 top-1/2 w-[min(420px,calc(50vw-24px))] -translate-y-1/2 anim-rise">
       <div className="panel px-4 pb-4 pt-3">
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <div className="font-display flex items-center gap-1.5 text-xl">
             <Icon name="flag" size="1em" /> Race lobby
           </div>
-          <div className="text-sm font-extrabold text-ink/50">
-            {ready} of {racers.length} ready
+          <div className="flex items-center gap-2">
+            {tally && <span className="text-sm font-extrabold text-ink/50">{tally}</span>}
+            {host && (
+              <button tabIndex={-1} className={`${smallBtn} btn-cream`} onClick={() => (audio.click(), setOverlay('crews'))}>
+                {!isTouch && <span className="kbd">C</span>} Crews
+              </button>
+            )}
           </div>
         </div>
-        <div className="mt-1">
+        <div className="mt-2 flex flex-col gap-1">
           {Array.from({ length: rafts }, (_, r) => {
             const crew = crewOf(roster, r)
+            const mine = me?.raft === r
+            const full = crew.length >= CREW_SIZE
             return (
-              <div key={r} className="flex items-center gap-2 border-t-2 border-ink/10 py-1.5">
+              <div
+                key={r}
+                className="flex min-h-[40px] items-center gap-2 rounded-2xl px-2 py-1"
+                style={mine ? { background: `color-mix(in srgb, ${TEAMS[r].color} 22%, white)`, boxShadow: 'inset 0 0 0 3px var(--color-sun)' } : { background: 'rgb(255 255 255 / 0.6)' }}
+              >
                 <TeamBadge raft={r} size={22} />
                 <span className="font-display w-14 shrink-0">{TEAMS[r].name}</span>
                 <span className="flex min-w-0 flex-1 flex-wrap gap-x-2.5 gap-y-0.5 text-sm font-extrabold">
                   {crew.length === 0 && <span className="text-ink/35">empty</span>}
                   {crew.map((p) => (
-                    <span key={p.id} className={`flex min-w-0 items-center gap-0.5 ${p.away ? 'text-ink/40' : ''}`}>
-                      <Icon name="hippo" size={18} style={{ ['--hippo' as string]: seatColor(p.seat) }} />
-                      <span className="max-w-[7.5rem] truncate">{p.name}</span>
-                      {p.id === myId && <span className="text-ink/45">(you)</span>}
-                      {p.host && <Icon name="crown" size={15} label="Host" />}
-                      {p.ready ? <Icon name="check" size={14} label="Ready" /> : <span className="text-ink/35">…</span>}
-                    </span>
+                    <CrewName key={p.id} p={p} me={p.id === myId} />
                   ))}
                 </span>
-                <span className="shrink-0 text-xs font-extrabold text-ink/45">{crew.length}/{CREW_SIZE}</span>
+                {mine ? (
+                  <span className="font-display shrink-0 rounded-full border-2 border-ink bg-sun px-2 text-[13px]">YOU</span>
+                ) : (
+                  pickable &&
+                  (full ? (
+                    <span className="font-display shrink-0 px-2 text-[13px] text-ink/45">FULL</span>
+                  ) : (
+                    <button tabIndex={-1} className={`${smallBtn} ${me?.raft === null ? 'btn-blue' : 'btn-cream'} shrink-0`} onClick={() => pick(r)}>
+                      {me?.raft === null ? 'Hop on' : 'Switch'}
+                    </button>
+                  ))
+                )}
               </div>
             )
           })}
-        </div>
-        {buttons && <div className="mt-2.5 flex gap-2.5">{buttons}</div>}
-        <p className="mt-2 text-center text-xs font-extrabold text-ink/50">
-          {amHost && blocker ? (
-            blocker
-          ) : (
-            <>
-              <Icon name="crown" size={14} /> {amHost ? 'You can' : `${host?.name ?? 'The host'} can`} start any time. It starts by itself when everyone's ready.
-            </>
+          {bench.length > 0 && (
+            <div className="flex min-h-[34px] items-center gap-2 rounded-2xl border-2 border-dashed border-ink/20 px-2 py-1">
+              <Icon name="eye" size={22} />
+              <span className="font-display w-14 shrink-0 text-ink/60">Bench</span>
+              <span className="flex min-w-0 flex-1 flex-wrap gap-x-2.5 gap-y-0.5 text-sm font-extrabold">
+                {bench.map((p) => (
+                  <CrewName key={p.id} p={p} me={p.id === myId} />
+                ))}
+              </span>
+            </div>
           )}
-        </p>
+        </div>
+        {action && (
+          <>
+            <button
+              tabIndex={-1}
+              className={`btn ${buttonTone(action)} mt-3 flex w-full items-center justify-center gap-2 py-2 text-xl`}
+              onClick={() => runLobbyAction(session, action)}
+            >
+              {!isTouch && <span className="kbd">Y</span>} <ActionLabel action={action} />
+            </button>
+            <p className="mt-2 text-center text-xs font-extrabold text-ink/50">{hint}</p>
+          </>
+        )}
       </div>
     </div>
   )
@@ -206,16 +370,18 @@ function cycleWatch(dir: number) {
   frame.watch = list[(k + dir + list.length) % list.length]
 }
 
-/** On the bench or done racing: who you're watching, the closing clock, and ◀ ▶ to switch. */
+/** On the bench while a race is on, or done racing: who you're watching, ◀ ▶ to switch, and Hop on from the bench. */
 export function WatchBar({ session, short }: { session: GameSession; short: boolean }) {
-  const setOverlay = useApp((s) => s.setOverlay)
   const shown = useViewKey((v) => {
-    if (!isRace(v) || v.phase !== 'racing') return false
+    if (!isRace(v) || (v.phase !== 'racing' && v.phase !== 'countdown')) return false
     const mine = myRaft(v, session)
-    return mine === null || v.rafts[mine].res !== RAFT_RESULT.none
+    return mine === null || (v.phase === 'racing' && v.rafts[mine].res !== RAFT_RESULT.none)
   }, false)
+  const phase = usePhase()
   const mine = useViewKey((v) => myRaft(v, session), null)
   const follow = useViewKey(() => frame.follow, 0)
+  const rank = useViewKey((v) => (v.phase === 'racing' && v.rafts[frame.follow]?.res !== RAFT_RESULT.dnf ? standings(v).indexOf(frame.follow) + 1 : 0), 0)
+  const open = useViewKey((v) => canHopOn(v, frame.follow), false)
   const left = useViewKey(secondsLeft, null)
   const going = useViewKey((v) => standings(v).filter((r) => v.rafts[r].res === RAFT_RESULT.none).join(','), '')
 
@@ -235,8 +401,8 @@ export function WatchBar({ session, short }: { session: GameSession; short: bool
   const size = short ? 'px-2.5 py-0.5 text-sm' : 'px-3 py-1 text-sm'
 
   return (
-    <div className={`pointer-events-auto absolute left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5 ${isTouch ? 'bottom-[150px] short:bottom-3' : 'bottom-4'}`}>
-      {left !== null && going !== '' && (
+    <div className={`pointer-events-auto absolute left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5 ${isTouch && !bench ? 'bottom-[150px] short:bottom-3' : 'bottom-4 short:bottom-3'}`}>
+      {left !== null && going !== '' ? (
         <div className="chip font-display flex items-center gap-1.5 px-3 py-0.5 text-base short:text-sm">
           <Icon name="clock" size="1.1em" /> Waiting for
           {going.split(',').map((r) => (
@@ -244,25 +410,32 @@ export function WatchBar({ session, short }: { session: GameSession; short: bool
           ))}
           · <span className="tabular-nums text-berry">{formatMedalTime(left)}</span>
         </div>
+      ) : (
+        bench && (
+          <div className="chip font-display flex items-center gap-1.5 px-3 py-0.5 text-base short:text-sm">
+            <Icon name="flag" size="1.1em" /> {phase === 'countdown' ? 'Race starting' : 'Race in progress'}
+          </div>
+        )
       )}
       <div className="flex items-center gap-2">
-        <button tabIndex={-1} className={`btn btn-cream ${size}`} aria-label="Previous raft" onClick={() => (audio.click(), cycleWatch(-1))}>
-          {isTouch ? '◀' : <span className="kbd">←</span>}
+        <button tabIndex={-1} className={`btn btn-cream ${size}`} aria-label="Previous raft" title={isTouch ? undefined : 'Previous raft (←)'} onClick={() => (audio.click(), cycleWatch(-1))}>
+          <Icon name="chevron" size="1.1em" className="-scale-x-100" />
         </button>
-        <span className="chip font-display flex items-center gap-1.5 px-3 py-0.5 text-[15px] short:text-sm">
-          <Icon name="eye" size="1.15em" /> Watching <TeamBadge raft={follow} size="1em" /> {TEAMS[follow].name}
+        <span className="chip font-display flex items-center gap-1.5 whitespace-nowrap px-3 py-0.5 text-[15px] short:text-sm">
+          <Icon name="eye" size="1.15em" /> <TeamBadge raft={follow} size="1em" /> {TEAMS[follow].name}
+          {rank > 0 && <span className="text-ink/55">· {ordinal(rank)}</span>}
         </span>
-        <button tabIndex={-1} className={`btn btn-cream ${size}`} aria-label="Next raft" onClick={() => (audio.click(), cycleWatch(1))}>
-          {isTouch ? '▶' : <span className="kbd">→</span>}
+        <button tabIndex={-1} className={`btn btn-cream ${size}`} aria-label="Next raft" title={isTouch ? undefined : 'Next raft (→)'} onClick={() => (audio.click(), cycleWatch(1))}>
+          <Icon name="chevron" size="1.1em" />
         </button>
         {mine !== null && (
           <button tabIndex={-1} className={`btn btn-cream ${size}`} onClick={() => (audio.click(), (frame.watch = mine))}>
             My raft
           </button>
         )}
-        {bench && (
-          <button tabIndex={-1} className={`btn btn-blue ${size}`} onClick={() => (audio.click(), setOverlay('join'))}>
-            Join a raft
+        {bench && open && (
+          <button tabIndex={-1} className={`btn btn-blue flex items-center gap-1.5 whitespace-nowrap ${size}`} onClick={() => (audio.click(), session.act({ type: 'pick', raft: follow }))}>
+            {!isTouch && <span className="kbd">Y</span>} Hop on {TEAMS[follow].name}
           </button>
         )}
       </div>
@@ -327,39 +500,4 @@ export function PlaceChip({ session, short }: { session: GameSession; short: boo
       <span className="text-[0.55em] opacity-85">/{of}</span>
     </span>
   )
-}
-
-/** Opens the Join sheet for a newcomer on the bench, once per phase unless they ask again. */
-export function useJoinPrompt(session: GameSession | null) {
-  const phase = usePhase()
-  const race = useRace()
-  const roster = useApp((s) => s.sessionInfo?.roster)
-  const overlay = useApp((s) => s.overlay)
-  const setOverlay = useApp((s) => s.setOverlay)
-  const dismissed = useRef<string | null>(null)
-  const prev = useRef(overlay)
-  const myId = session?.localPlayers[0]?.id
-  const benched = !!session && !session.spectating && race && roster?.find((p) => p.id === myId)?.raft === null
-  useEffect(() => {
-    if (prev.current === 'join' && overlay !== 'join') dismissed.current = phase
-    prev.current = overlay
-  }, [overlay, phase])
-  useEffect(() => {
-    if (dismissed.current !== phase) dismissed.current = null
-    if (benched && overlay === null && dismissed.current === null) setOverlay('join')
-    if (!benched && overlay === 'join') setOverlay(null)
-  }, [benched, overlay, phase, setOverlay])
-}
-
-/** Y: the host starts the race, a racer toggles ready, someone on the bench picks a raft. */
-export function pressReady(session: GameSession) {
-  const v = frame.view
-  if (!v || !isRace(v) || session.spectating || (v.phase !== 'pond' && v.phase !== 'finished')) return
-  const app = useApp.getState()
-  const me = app.sessionInfo?.roster.find((p) => p.id === session.localPlayers[0]?.id)
-  if (!me) return
-  audio.click()
-  if (session.isHost()) session.act({ type: 'start' })
-  else if (me.raft === null) app.setOverlay('join')
-  else session.act({ type: 'ready', on: !me.ready })
 }

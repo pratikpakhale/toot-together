@@ -5,27 +5,26 @@ import { connect, freePort, startServer } from './server'
 const v = PROTOCOL_VERSION
 
 describe('race rooms', { timeout: 30_000 }, () => {
-  it('benches newcomers, lets them pick rafts and spots, and starts when everyone is ready', async () => {
+  it('seats newcomers on the emptiest raft, lets them switch, and starts once everyone but the host is ready', async () => {
     const port = await freePort()
     await startServer(port)
 
     const host = await connect(port)
     host.send({ type: 'join', v, name: 'Host', course: 'lazy-river', rafts: 3 })
     const { room, id: hostId } = await host.next('welcome')
-    await host.next('roster', (m) => m.players.some((p) => p.id === hostId && p.raft === null))
+    await host.next('roster', (m) => m.players.some((p) => p.id === hostId && p.raft === 0))
 
     const guest = await connect(port)
     guest.send({ type: 'join', v, name: 'Guest', room })
     const { id: guestId } = await guest.next('welcome')
+    await guest.next('roster', (m) => m.players.find((p) => p.id === guestId)?.raft === 1)
 
-    host.send({ type: 'pick', raft: 0 })
     guest.send({ type: 'pick', raft: 2 })
-    await guest.next('roster', (m) => m.players.find((p) => p.id === guestId)?.raft === 2 && m.players.find((p) => p.id === hostId)?.raft === 0)
+    await guest.next('roster', (m) => m.players.find((p) => p.id === guestId)?.raft === 2)
 
     guest.send({ type: 'start' })
     expect((await guest.next('refused')).reason).toBe('Only the host can do that.')
 
-    host.send({ type: 'ready', on: true })
     guest.send({ type: 'ready', on: true })
     await guest.next('events', (m) => m.events.some((e) => e.type === 'countdown'))
     await guest.next('events', (m) => m.events.some((e) => e.type === 'go'))
@@ -35,6 +34,7 @@ describe('race rooms', { timeout: 30_000 }, () => {
     const late = await connect(port)
     late.send({ type: 'join', v, name: 'Late', room })
     const { id: lateId } = await late.next('welcome')
+    await late.next('roster', (m) => m.players.find((p) => p.id === lateId)?.raft === null)
     late.send({ type: 'pick', raft: 1 })
     expect((await late.next('refused')).reason).toBe('That raft is not in this race.')
     late.send({ type: 'pick', raft: 0 })

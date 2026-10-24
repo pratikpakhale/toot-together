@@ -114,10 +114,8 @@ class Room {
     return this.clients.size >= this.sim.capacity
   }
 
-  /** Co-op seats newcomers on the raft; a race room puts them on the bench to pick a raft. */
   join(ws: WebSocket, name: string): Client | null {
     if (this.full) return null
-    const seat = this.sim.race ? null : this.sim.freeSeat()
     const client: Client = {
       ws,
       id: this.nextId++,
@@ -130,7 +128,7 @@ class Room {
       chatTimes: [],
     }
     this.clients.set(client.id, client)
-    this.sim.addPlayer(client.id, name, seat)
+    this.sim.addNewcomer(client.id, name)
     this.emptySince = null
     this.welcome(client)
     return client
@@ -288,10 +286,7 @@ class Room {
         break
       }
       case 'pick':
-        refuse(this.sim.pick(client.id, msg.raft === null ? null : Number(msg.raft), msg.spot === undefined ? undefined : Number(msg.spot)))
-        break
-      case 'spot':
-        refuse(this.sim.swapSpot(client.id, Number(msg.dir)))
+        refuse(this.sim.pick(client.id, msg.raft === null ? null : Number(msg.raft)))
         break
       case 'ready':
         refuse(this.sim.setReady(client.id, msg.on === true))
@@ -359,6 +354,7 @@ class Room {
       }
     }
     if (this.connectedCount() === 0) return
+    this.sim.host = this.hostId()
     this.sim.step()
     const events = this.sim.drainEvents()
     if (this.sim.rosterVersion !== this.rosterSent) this.broadcastRoster()

@@ -7,7 +7,7 @@ import { enterFullscreen, isIOS, isTouch, keepAwake, usePortraitPhone } from './
 import { GameScene } from './scene/GameScene'
 import { useApp } from './state/store'
 import { ChatDock } from './ui/Chat'
-import { CrewsPanel, JoinSheet } from './ui/Crews'
+import { CrewsPanel } from './ui/Crews'
 import { HowToPlay } from './ui/HowToPlay'
 import { Hud } from './ui/Hud'
 import { InstallPrompt } from './ui/InstallPrompt'
@@ -17,7 +17,7 @@ import { MainMenu } from './ui/MainMenu'
 import { NameTags } from './ui/NameTags'
 import { Connecting, Notice } from './ui/Notice'
 import { PauseMenu } from './ui/PauseMenu'
-import { pressReady } from './ui/Race'
+import { pressPrimary } from './ui/Race'
 import { Results } from './ui/Results'
 import { RotatePrompt } from './ui/RotatePrompt'
 import { Settings } from './ui/Settings'
@@ -106,14 +106,14 @@ export function App() {
         }
         if (action === 'pause') {
           if (app.overlay === null) app.setOverlay('pause')
-          else if (app.overlay === 'pause' || app.overlay === 'crews' || app.overlay === 'join') app.setOverlay(null)
+          else if (app.overlay === 'pause' || app.overlay === 'crews') app.setOverlay(null)
           else if (app.overlay === 'settings' || app.overlay === 'howto') app.setOverlay('pause')
         }
         if (action === 'respawn' && app.overlay === null) app.session?.respawn()
-        if (action === 'ready' && app.overlay === null && app.session) pressReady(app.session)
+        if (action === 'ready' && app.overlay === null && app.session) pressPrimary(app.session)
         if (action === 'crews' && (app.overlay === null || app.overlay === 'crews')) {
           const v = frame.view
-          const lobby = !!v && isRace(v) && (v.phase === 'pond' || v.phase === 'finished') && !app.session?.spectating
+          const lobby = !!v && isRace(v) && (v.phase === 'pond' || v.phase === 'finished') && !!app.session?.isHost()
           if (lobby) app.setOverlay(app.overlay ? null : 'crews')
         }
       }),
@@ -142,7 +142,6 @@ export function App() {
       {overlay === 'results' && <Results />}
       {overlay === 'levels' && <LevelSelect />}
       {overlay === 'crews' && <CrewsPanel />}
-      {overlay === 'join' && <JoinSheet />}
       <div id="flash" className="pointer-events-none fixed inset-0 bg-white opacity-0" />
       <Connecting />
       <Notice />

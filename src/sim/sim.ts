@@ -215,6 +215,8 @@ export class Sim {
   private lastLegendary = -LEGENDARY_COOLDOWN
   /** Test/debug flag: hazards bounce instead of killing. */
   godMode = false
+  /** The room's host, kept up to date by the server. Its Start is its ready, so it never holds up the rest. */
+  host: number | null = null
 
   constructor(course: BakedCourse, seed = 1, raftCount = 1) {
     this.course = course
@@ -286,10 +288,20 @@ export class Sim {
     this.players.set(id, p)
     if (p.raft !== null) {
       // Spots follow colour order unless crews were rearranged (a race room gone co-op): then the end.
-      if (this.crew(p.raft).some((o) => o !== p && o.ord === p.ord)) this.reorder(p, CREW_SIZE)
+      if (this.crew(p.raft).some((o) => o !== p && o.ord === p.ord)) this.toBack(p)
       p.rim = homeRim(this.sectorOf(p))
     }
     this.rosterVersion++
+  }
+
+  /**
+   * Someone opening the room: co-op puts them on the raft; a race, between races, on the raft with
+   * the most room, and mid-race on the bench to watch until they hop on.
+   */
+  addNewcomer(id: number, name: string) {
+    if (!this.race) return this.addPlayer(id, name, this.freeSeat())
+    this.addPlayer(id, name, null)
+    if (this.lobby) this.seat(this.players.get(id)!, this.emptiestRaft())
   }
 
   removePlayer(id: number) {
@@ -335,11 +347,10 @@ export class Sim {
   }
 
   /**
-   * Moves `id` onto `raft` at rim spot `spot` (0 = first slice from the back; default: last), or
-   * to the bench with a null raft. Between races anyone may move; while one is on, only a hippo on
-   * the bench may hop onto a raft that's still in it.
+   * Moves `id` onto `raft`, behind its crew, or to the bench with a null raft. Between races anyone
+   * may move; while one is on, only a hippo on the bench may hop onto a raft that's still in it.
    */
-  pick(id: number, raft: number | null, spot?: number): Refusal {
+  pick(id: number, raft: number | null): Refusal {
     const p = this.players.get(id)
     if (!p) return 'You are not in this room.'
     if (raft === null) {
@@ -355,26 +366,9 @@ export class Sim {
       const inIt = this.phase === 'countdown' ? this.crew(raft).length > 0 : r.entered && r.result === RAFT_RESULT.none
       if (!inIt) return 'That raft is not in this race.'
     }
-    if (p.raft === raft) {
-      if (spot !== undefined) this.reorder(p, spot)
-      return null
-    }
+    if (p.raft === raft) return null
     if (this.crew(raft).length >= CREW_SIZE) return 'That raft is full.'
-    this.seat(p, raft, spot)
-    return null
-  }
-
-  /** Moves `id` one spot round its raft (`dir` ±1), swapping with the hippo there. */
-  swapSpot(id: number, dir: number): Refusal {
-    const p = this.players.get(id)
-    if (!p || p.raft === null) return 'Hop on a raft first.'
-    if (!this.lobby) return 'Swap spots between races.'
-    const crew = this.crew(p.raft).sort((a, b) => a.ord - b.ord)
-    if (crew.length < 2) return 'You have the whole rim to yourself.'
-    const k = crew.indexOf(p)
-    const other = crew[(k + (dir < 0 ? -1 : 1) + crew.length) % crew.length]
-    ;[p.ord, other.ord] = [other.ord, p.ord]
-    this.rosterVersion++
+    this.seat(p, raft)
     return null
   }
 
@@ -433,13 +427,14 @@ export class Sim {
     return null
   }
 
+  /** The raft with the fewest hippos on it, the first of them on a tie. */
   private emptiestRaft() {
     let best = 0
     for (let r = 1; r < this.rafts.length; r++) if (this.crew(r).length < this.crew(best).length) best = r
     return best
   }
 
-  private seat(p: Player, raft: number | null, spot?: number) {
+  private seat(p: Player, raft: number | null) {
     const from = p.raft
     p.raft = raft
     p.ready = false
@@ -447,7 +442,7 @@ export class Sim {
     p.seat = -1
     if (raft !== null) {
       p.seat = this.freeSeat(raft) ?? 0
-      this.reorder(p, spot ?? CREW_SIZE)
+      this.toBack(p)
       p.rim = homeRim(this.sectorOf(p))
     }
     p.stats.raft = raft
@@ -456,14 +451,14 @@ export class Sim {
     if (from !== raft) this.emit({ type: 'seat', t: this.t, id: p.id, raft })
   }
 
-  /** Puts `p` at position `spot` in its crew's rim order and renumbers the crew 0…n-1. */
-  private reorder(p: Player, spot: number) {
+  /** Puts `p` last in its crew's rim order and renumbers the crew 0…n-1. */
+  private toBack(p: Player) {
     if (p.raft === null) return
-    const others = this.crew(p.raft)
+    const order = this.crew(p.raft)
       .filter((o) => o !== p)
       .sort((a, b) => a.ord - b.ord)
-    others.splice(clamp(Math.floor(spot), 0, others.length), 0, p)
-    others.forEach((o, i) => (o.ord = i))
+    order.push(p)
+    order.forEach((o, i) => (o.ord = i))
     this.rosterVersion++
   }
 
@@ -1128,11 +1123,11 @@ export class Sim {
     if (running === 0) this.finishRace()
   }
 
-  /** Every hippo on a raft that's connected has said ready, and there's at least one. */
+  /** Every hippo on a raft that's connected has said ready (the host always has), and there's at least one. */
   private allReady() {
     let live = 0
     for (const p of this.players.values()) {
-      if (p.raft === null || p.away) continue
+      if (p.raft === null || p.away || p.id === this.host) continue
       if (!p.ready) return false
       live++
     }
@@ -1348,7 +1343,7 @@ export class Sim {
     return sim
   }
 
-  /** Same crews on a fresh river: everyone keeps their raft, colour and spot. */
+  /** Same crews on a fresh river: everyone keeps their raft, colour and place on the rim. */
   static carryOver(from: Sim, course: BakedCourse, seed: number) {
     const sim = new Sim(course, seed, from.rafts.length)
     for (const p of from.players.values()) sim.addPlayer(p.id, p.name, p.raft === null ? null : p.seat, p.raft ?? 0)

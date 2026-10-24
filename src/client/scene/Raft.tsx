@@ -216,7 +216,7 @@ function RaftView({ course, index, kit }: { course: BakedCourse; index: number; 
       if (spot) {
         const running = v.phase === 'racing' || v.phase === 'finished'
         const rank = r.res === RAFT_RESULT.finished ? r.pl : r.res === RAFT_RESULT.none && running ? standings(v).indexOf(index) + 1 : 0
-        setTagContent(raftTag, [TEAMS[index].icon], ` ${TEAMS[index].name}${rank ? ` · ${ordinal(rank)}` : ''}`)
+        setTagContent(raftTag, [TEAMS[index].icon], ` ${running ? `${TEAMS[index].name}${rank ? ` · ${ordinal(rank)}` : ''}` : crewNames(crew)}`)
         raftTag.style.opacity = String(THREE.MathUtils.clamp(1 - (away - TAG_FADE) / TAG_FADE, 0.45, 1))
         raftTag.style.transform = `translate(-50%, -50%) translate(${spot.x}px, ${spot.y}px)`
       }
@@ -414,6 +414,13 @@ function isFarting(p: PlayerSnap, raftState: RaftStateCode, localIds: number[]) 
   if (raftState !== RAFT_STATE.float) return false
   if (p.fart) return true
   return localIds.includes(p.id) && frame.localFart.get(p.id) === true && p.exh === 0 && p.stam > 0.02
+}
+
+/** Before a race a rival raft's tag says who's on it, so friends can find each other: "Kabir, Mira +1". */
+function crewNames(crew: PlayerSnap[]) {
+  const roster = useApp.getState().sessionInfo?.roster ?? []
+  const names = crew.map((p) => roster.find((o) => o.id === p.id)?.name ?? '')
+  return names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ')
 }
 
 function elasticOut(x: number) {

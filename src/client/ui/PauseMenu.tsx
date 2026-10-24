@@ -1,10 +1,11 @@
 import { audio } from '../audio/audio'
 import { leaveGame } from '../game/controller'
+import { TEAMS } from '../game/frame'
 import { useApp } from '../state/store'
 import { FullscreenButton } from './FullscreenButton'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
-import { usePhase, useRace } from './Race'
+import { roomiestRaft, usePhase, useRace, useRaftCount } from './Race'
 
 export function PauseMenu() {
   const session = useApp((s) => s.session)
@@ -13,10 +14,12 @@ export function PauseMenu() {
   const online = session?.kind === 'online'
   const canRestart = session?.canRestart() ?? false
   const race = useRace()
+  const rafts = useRaftCount()
   const phase = usePhase()
   const myId = session?.localPlayers[0]?.id
   const benched = race && info?.roster.find((p) => p.id === myId)?.raft === null
   const lobby = phase === 'pond' || phase === 'finished'
+  const hopTo = roomiestRaft(info?.roster ?? [], rafts)
   const act = (fn: () => void) => () => {
     audio.click()
     fn()
@@ -55,8 +58,14 @@ export function PauseMenu() {
         </button>
         <div className="flex flex-col gap-3 short:flex-row short:items-center short:gap-2.5 short:*:flex-1">
           {race && lobby ? (
-            <button className="btn btn-blue" onClick={act(() => setOverlay(benched ? 'join' : 'crews'))}>
-              {benched ? 'Join a raft' : 'Switch raft'}
+            <button
+              className={`btn ${benched ? 'btn-blue' : 'btn-cream'}`}
+              onClick={act(() => {
+                session?.act({ type: 'pick', raft: benched ? hopTo : null })
+                setOverlay(null)
+              })}
+            >
+              {benched ? `Hop on ${TEAMS[hopTo].name}` : 'Sit out the next race'}
             </button>
           ) : (
             !benched && (

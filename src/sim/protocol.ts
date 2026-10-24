@@ -27,10 +27,8 @@ export type ClientMsg =
   /** Hidden spectator mode: without `room` it streams the live room list, with one it watches that room. */
   | { type: 'watch'; v: number; room?: string }
   | { type: 'chat'; text: string }
-  /** Hop onto a raft (at rim `spot`, default last) or, with a null raft, onto the bench. */
-  | { type: 'pick'; raft: number | null; spot?: number }
-  /** Move one spot round your raft. */
-  | { type: 'spot'; dir: -1 | 1 }
+  /** Hop onto a raft or, with a null raft, onto the bench. */
+  | { type: 'pick'; raft: number | null }
   | { type: 'ready'; on: boolean }
   /** Host: how many rafts race (1 = co-op). */
   | { type: 'rafts'; count: number }

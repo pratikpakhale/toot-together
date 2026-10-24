@@ -48,7 +48,7 @@ export function Driver({ mode }: { mode: 'menu' | 'game' }) {
 }
 
 /** Menus that take the keys and taps; the hippo lets go of everything while one is open. */
-const MENUS = new Set(['pause', 'settings', 'howto', 'crews', 'join'])
+const MENUS = new Set(['pause', 'settings', 'howto', 'crews'])
 
 function inputBlocked(mode: 'menu' | 'game') {
   const overlay = useApp.getState().overlay

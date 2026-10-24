@@ -16,7 +16,7 @@ export function Toasts() {
   const big = toasts.filter((t) => t.big).slice(-1)
   const small = toasts.filter((t) => !t.big).slice(short ? -2 : undefined)
   return (
-    <div className="safe-area pointer-events-none">
+    <div className="safe-area pointer-events-none z-20">
       {big.map((t) => (
         <div key={t.id} className="absolute left-1/2 top-[24%] -translate-x-1/2 text-center">
           <div className="anim-pop">

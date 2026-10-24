@@ -12,7 +12,7 @@ import { ChatButton } from './Chat'
 import { formatTime } from './format'
 import { setTagContent } from './NameTags'
 import { Icon } from './Icon'
-import { ClosingChip, Countdown, MiniStandings, PlaceChip, RaceLobby, TeamBadge, useJoinPrompt, usePhase, useRace, WatchBar } from './Race'
+import { ClosingChip, Countdown, MiniStandings, PlaceChip, RaceLobby, TeamBadge, usePhase, useRace, useSeatToast, WatchBar } from './Race'
 
 export function Hud() {
   const session = useApp((s) => s.session)
@@ -27,7 +27,7 @@ export function Hud() {
   shortRef.current = short
   const race = useRace()
   const phase = usePhase()
-  useJoinPrompt(session)
+  useSeatToast(session)
 
   const timerRef = useRef<HTMLDivElement>(null)
   const deathRef = useRef<HTMLSpanElement>(null)
@@ -135,7 +135,8 @@ export function Hud() {
   const lobby = race && (phase === 'pond' || (phase === 'finished' && overlay === null && resultsSeen))
 
   return (
-    <div className="safe-area pointer-events-none select-none">
+    // Above the touch controls (z-10), so a HUD button over the walk area still gets the tap.
+    <div className="safe-area pointer-events-none z-20 select-none">
       <div className="absolute left-1/2 top-3 w-[min(820px,calc(100%-440px))] -translate-x-1/2 max-[620px]:top-16 max-[620px]:w-[calc(100%-24px)]">
         <div className="relative h-5 rounded-full border-[3px] border-ink bg-white/85 shadow-[0_3px_0_rgba(28,53,87,0.3)]">
           <div ref={fillRef} className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-toot to-grass" style={{ width: 0 }} />

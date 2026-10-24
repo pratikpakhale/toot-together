@@ -74,6 +74,25 @@ describe('racing', () => {
     for (const p of sim.players.values()) expect(p.ready).toBe(false)
   })
 
+  it('the host never holds up the start: everyone else being ready is enough', () => {
+    const sim = raceRoom([1, 1, 1])
+    sim.host = 1
+    sim.setReady(2, true)
+    run(sim, DT, { bots: false })
+    expect(sim.phase).toBe('pond')
+    sim.setReady(3, true)
+    run(sim, DT, { bots: false })
+    expect(sim.phase).toBe('countdown')
+  })
+
+  it('a host with everyone else gone does not start a race on their own', () => {
+    const sim = raceRoom([1, 1])
+    sim.host = 1
+    sim.setAway(2, true)
+    run(sim, 0.5, { bots: false })
+    expect(sim.phase).toBe('pond')
+  })
+
   it('never auto-starts with nobody connected', () => {
     const sim = raceRoom([1, 1])
     sim.setAway(1, true)
@@ -122,7 +141,6 @@ describe('racing', () => {
     run(sim, COUNTDOWN + 1)
     expect(sim.pick(1, 1)).not.toBeNull()
     expect(sim.pick(1, null)).not.toBeNull()
-    expect(sim.swapSpot(1, 1)).not.toBeNull()
     expect(sim.setRaftCount(3)).not.toBeNull()
     expect(sim.shuffle()).not.toBeNull()
     expect(sim.pick(7, 0)).toBeNull()
@@ -213,21 +231,24 @@ describe('rafts touching', () => {
 })
 
 describe('crews', () => {
-  it('spots are an order: hopping on at a spot shifts the others, swapping walks round the ring', () => {
+  it('newcomers land on the raft with the most room between races, and on the bench mid-race', () => {
+    const sim = raceRoom([2, 1, 0])
+    sim.addNewcomer(9, 'New')
+    expect(sim.players.get(9)!.raft).toBe(2)
+    sim.addNewcomer(10, 'Next')
+    expect(sim.players.get(10)!.raft).toBe(1)
+    expect(sim.start()).toBeNull()
+    sim.addNewcomer(11, 'Late')
+    expect(sim.players.get(11)!.raft).toBeNull()
+  })
+
+  it('a hippo hops on behind its new crew, in a colour nobody there has', () => {
     const sim = raceRoom([3, 0])
     sim.addPlayer(9, 'New', null)
-    expect(sim.pick(9, 0, 1)).toBeNull()
-    const order = () =>
-      sim
-        .crew(0)
-        .sort((a, b) => a.ord - b.ord)
-        .map((p) => p.id)
-    expect(order()).toEqual([1, 9, 2, 3])
-    sim.swapSpot(9, -1)
-    expect(order()).toEqual([9, 1, 2, 3])
-    sim.swapSpot(9, -1)
-    expect(order()).toEqual([3, 1, 2, 9])
-    expect(new Set(sim.crew(0).map((p) => p.seat)).size).toBe(4)
+    expect(sim.pick(9, 0)).toBeNull()
+    const crew = sim.crew(0).sort((a, b) => a.ord - b.ord)
+    expect(crew.map((p) => p.id)).toEqual([1, 2, 3, 9])
+    expect(new Set(crew.map((p) => p.seat)).size).toBe(4)
     sim.addPlayer(10, 'Full', null)
     expect(sim.pick(10, 0)).toBe('That raft is full.')
   })
@@ -262,10 +283,9 @@ describe('crews', () => {
     expect([0, 1, 2].map((r) => sim.crew(r).length)).toEqual([2, 2, 2])
   })
 
-  it('a new river keeps the crews, colours and spots', () => {
+  it('a new river keeps the crews, colours and places on the rim', () => {
     const sim = raceRoom([2, 2])
     sim.addPlayer(9, 'Bench', null)
-    sim.swapSpot(1, 1)
     const next = Sim.carryOver(sim, getCourse('canyon-run'), 3)
     expect(next.rafts).toHaveLength(2)
     expect(next.roster()).toEqual(sim.roster())
@@ -345,7 +365,7 @@ describe('fuzz', () => {
     const join = () => {
       if (sim.players.size >= sim.capacity) return
       const id = nextId++
-      sim.addPlayer(id, `P${id}`, sim.race ? null : sim.freeSeat())
+      sim.addNewcomer(id, `P${id}`)
     }
     for (let i = 0; i < 3; i++) join()
     const someone = () => rng.pick([...sim.players.keys()])
@@ -365,10 +385,10 @@ describe('fuzz', () => {
             sim.setAway(id, rng.next() < 0.5)
             break
           case 3:
-            sim.pick(id, raftOrBench(), rng.next() < 0.5 ? Math.floor(rng.next() * 5) : undefined)
+            sim.pick(id, raftOrBench())
             break
           case 4:
-            sim.swapSpot(id, rng.next() < 0.5 ? -1 : 1)
+            sim.host = rng.next() < 0.7 ? id : null
             break
           case 5:
             sim.setReady(id, rng.next() < 0.8)

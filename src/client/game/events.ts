@@ -137,7 +137,7 @@ export function handleEvent(e: SimEvent, menu: boolean) {
       window.clearTimeout(resultsTimer)
       fx.clear()
       app.setResults(null)
-      if (app.overlay === 'results' || (app.overlay === 'crews' && mine !== null)) app.setOverlay(null)
+      if (app.overlay === 'results' || app.overlay === 'crews') app.setOverlay(null)
       break
     case 'go':
       audio.countdown(true)
