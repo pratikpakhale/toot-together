@@ -46,6 +46,7 @@ src/client/
   ui/             Menus, HUD, level select, results, settings (Tailwind) + the icon set
   state/          App store and saved progress (best times, medals, unlocks)
   lab/            /lab: a showroom of the hippos, rafts, hazards and rivers (loaded only on that route)
+  guide/          /how-to-play (modes, rules, controls, rivers) and the 404 page as plain HTML, built by scripts/pages.ts
 tests/            Vitest: every course is intact and finishable by bots with hazards live, deaths/respawn, stamina,
                   each hazard, race rules and a random-action fuzz against the room's invariants, chat, the snapshot clock,
                   and rooms surviving a server restart (the room tests spawn real servers on spare ports)

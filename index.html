@@ -33,8 +33,42 @@
     <meta name="twitter:title" content="Toot Together" />
     <meta name="twitter:description" content="Steer together. Toot together. Blame each other. A free co-op hippo raft party game." />
     <meta name="twitter:image" content="https://toottogether.fun/og.jpg" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "Toot Together",
+            "url": "https://toottogether.fun/"
+          },
+          {
+            "@type": "VideoGame",
+            "name": "Toot Together",
+            "url": "https://toottogether.fun/",
+            "image": "https://toottogether.fun/og.jpg",
+            "description": "A free co-op physics party game for the browser. Up to four hippos share one inflatable raft and steer it by tooting. Play solo, on the couch, or online with friends, and race up to four rafts.",
+            "genre": ["Party", "Co-op", "Racing", "Physics"],
+            "gamePlatform": ["Web browser", "Android", "iOS", "Windows", "macOS", "Linux"],
+            "applicationCategory": "Game",
+            "operatingSystem": "Any",
+            "playMode": ["SinglePlayer", "CoOp", "MultiPlayer"],
+            "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 16 },
+            "inLanguage": "en",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "author": { "@type": "Person", "name": "Pratik Pakhale" },
+            "license": "https://opensource.org/licenses/MIT"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
+    <header class="sr-only">
+      <h1>Toot Together: a co-op hippo raft party game</h1>
+      <p>Up to four hippos share one inflatable raft, and the only way to move it is to toot. A free party game for your browser: play solo, on the couch, or online with friends. <a href="/how-to-play">How to play</a></p>
+    </header>
     <div id="root"></div>
     <noscript>Toot Together needs JavaScript to run.</noscript>
     <script type="module" src="/src/client/main.tsx"></script>

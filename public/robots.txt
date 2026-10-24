@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /hippocam
+Disallow: /lab
+
+Sitemap: https://toottogether.fun/sitemap.xml

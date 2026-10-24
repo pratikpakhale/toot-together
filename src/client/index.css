@@ -35,6 +35,18 @@ body,
   touch-action: none;
 }
 
+/* The plain pages from scripts/pages.ts (/how-to-play, the 404) scroll and let you select text. */
+html.page,
+html.page body {
+  height: auto;
+  overflow: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+  overscroll-behavior: auto;
+  touch-action: auto;
+}
+
 button,
 input,
 label {

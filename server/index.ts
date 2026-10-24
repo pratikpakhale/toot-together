@@ -481,7 +481,11 @@ const MIME: Record<string, string> = {
   '.woff2': 'font/woff2',
   '.json': 'application/json',
   '.webmanifest': 'application/manifest+json',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml',
 }
+/** The paths the client routes itself (see src/client/game/controller.ts; vercel.json rewrites the same ones). */
+const GAME_PAGES = new Set(['/', '/hippocam', '/lab'])
 
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost')
@@ -511,8 +515,13 @@ const server = createServer((req, res) => {
   }
   const safe = normalize(decoded).replace(/^(\.\.[/\\])+/, '')
   let file = join(distDir, safe)
-  if (!file.startsWith(distDir) || !existsSync(file) || statSync(file).isDirectory()) file = join(distDir, 'index.html')
-  res.writeHead(200, {
+  if (file.startsWith(distDir) && existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html')
+  let status = 200
+  if (!file.startsWith(distDir) || !existsSync(file)) {
+    if (GAME_PAGES.has(url.pathname)) file = join(distDir, 'index.html')
+    else [file, status] = [join(distDir, '404.html'), 404]
+  }
+  res.writeHead(status, {
     'content-type': MIME[extname(file)] ?? 'application/octet-stream',
     'cache-control': file.startsWith(assetsDir) ? 'public, max-age=31536000, immutable' : 'no-cache',
   })
