@@ -2,20 +2,22 @@ import type { CSSProperties, ReactNode } from 'react'
 import { audio } from '../src/client/audio/audio'
 import { Icon } from '../src/client/ui/Icon'
 import type { IconName } from '../src/client/ui/icons'
+import { CUT } from './cuts'
+import type { Caption as CaptionCue } from './director'
 
 export interface Beat {
   t: number
   intro: number | null
   outro: number | null
   shotT: number | null
-  caption: { text: string; at: number; color: string } | null
+  caption: CaptionCue | null
   sinceShotStarts: number[]
 }
 
 const INK = '#1c3557'
 const WIPE = 0.4
-const STAGE_W = 1920
-const STAGE_H = 1080
+const { w: STAGE_W, h: STAGE_H } = CUT.stage
+const reel = CUT.id === 'reel'
 
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x))
 const prog = (t: number, at: number, len: number) => clamp((t - at) / len)
@@ -24,6 +26,9 @@ const outBack = (x: number) => {
   return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1) ** 2
 }
 const outCubic = (x: number) => 1 - (1 - x) ** 3
+
+/** Just below Instagram's top bar, above the chat lines and toasts. */
+const REEL_CAPTION_TOP = 290
 
 const fired = new Set<string>()
 
@@ -43,15 +48,16 @@ function sounds(b: Beat) {
   cue(i, 2.85, 'tag2', () => audio.click())
   cue(i, 3.3, 'longToot', () => audio.fartStart('introLong', 3))
   cue(i, 3.85, 'longTootEnd', () => audio.fartStop('introLong'))
-  b.sinceShotStarts.forEach((w, n) => {
-    cue(w, -WIPE, `wipe${n}`, () => audio.whoosh())
-  })
+  if (CUT.wipes)
+    b.sinceShotStarts.forEach((w, n) => {
+      cue(w, -WIPE, `wipe${n}`, () => audio.whoosh())
+    })
   const o = b.outro
   cue(o, 0.25, 'oSlam', () => audio.burst(2, 0))
   cue(o, 0.6, 'oBoing', () => audio.boing())
   cue(o, 1.7, 'oUrl', () => audio.checkpoint())
   ;[2.3, 2.5, 2.7].forEach((at, n) => cue(o, at, `oChip${n}`, () => audio.click()))
-  cue(o, 4.3, 'oMusic', () => audio.setMusic(false))
+  if (CUT.musicStopsAt !== null) cue(o, CUT.musicStopsAt, 'oMusic', () => audio.setMusic(false))
 }
 
 function Cloud({ size, style, color = '#c8f27d' }: { size: number; style?: CSSProperties; color?: string }) {
@@ -188,17 +194,17 @@ function Wipe({ w }: { w: number }) {
   )
 }
 
-function Caption({ t, caption }: { t: number; caption: { text: string; at: number; color: string } }) {
+function Caption({ t, caption }: { t: number; caption: CaptionCue }) {
   const k = t - caption.at
   if (k < 0 || k > 2.8) return null
   const inK = outBack(prog(k, 0, 0.28))
   const out = prog(k, 2.45, 0.35)
   return (
-    <div style={{ position: 'absolute', left: 0, right: 0, bottom: '7%', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ position: 'absolute', left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', ...(reel ? { top: REEL_CAPTION_TOP } : { bottom: '7%' }) }}>
       <div
         className="font-display stroke-text"
         style={{
-          fontSize: 112,
+          fontSize: reel ? 104 : 112,
           color: caption.color,
           WebkitTextStrokeWidth: 10,
           filter: `drop-shadow(0 8px 0 rgba(28,53,87,.55))`,
@@ -209,6 +215,23 @@ function Caption({ t, caption }: { t: number; caption: { text: string; at: numbe
       >
         {caption.text}
       </div>
+      {caption.sub && (
+        <div
+          className="font-display stroke-text"
+          style={{
+            marginTop: 6,
+            fontSize: 60,
+            color: '#ffcf3f',
+            WebkitTextStrokeWidth: 8,
+            filter: `drop-shadow(0 6px 0 rgba(28,53,87,.55))`,
+            transform: `scale(${outBack(prog(k, 0.35, 0.28))}) rotate(-2deg) translateY(${out * 60}px)`,
+            opacity: clamp(prog(k, 0.35, 0.12)) * (1 - out),
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {caption.sub}
+        </div>
+      )}
     </div>
   )
 }
@@ -226,7 +249,7 @@ function Outro({ t }: { t: number }) {
   const dim = outCubic(prog(t, 0, 0.5))
   return (
     <div style={{ ...center, background: `rgba(28,53,87,${0.42 * dim})`, backdropFilter: `blur(${10 * dim}px) saturate(${1 + 0.2 * dim})` }}>
-      {t >= 0.25 && <Logo t={t - 0.25} scale={0.92} />}
+      {t >= 0.25 && <Logo t={t - 0.25} scale={reel ? 1.2 : 0.92} />}
       <div style={{ marginTop: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
         <Pop t={t} at={1.1}>
           <div className="font-display stroke-text text-white" style={{ fontSize: 52, WebkitTextStrokeWidth: 8, letterSpacing: '0.04em' }}>
@@ -238,7 +261,7 @@ function Outro({ t }: { t: number }) {
             toottogether.fun
           </div>
         </Pop>
-        <div style={{ display: 'flex', gap: 22, marginTop: 14 }}>
+        <div style={{ display: 'flex', gap: reel ? 16 : 22, marginTop: 14 }}>
           <Pop t={t} at={2.3}>
             <Chip icon="hippo" text="SOLO" />
           </Pop>
@@ -261,9 +284,10 @@ export function Overlay({ beat }: { beat: Beat }) {
       {beat.intro !== null && beat.intro < 4.4 && <Intro t={beat.intro} />}
       {beat.shotT !== null && beat.caption && <Caption t={beat.shotT} caption={beat.caption} />}
       {beat.outro !== null && <Outro t={beat.outro} />}
-      {beat.sinceShotStarts.map((w, n) => (
-        <Wipe key={n} w={w} />
-      ))}
+      {CUT.wipes &&
+        beat.sinceShotStarts.map((w, n) => (
+          <Wipe key={n} w={w} />
+        ))}
     </div>
   )
 }

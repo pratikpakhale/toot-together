@@ -6,15 +6,18 @@ import { parseArgs } from 'node:util'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
 
-const { values: opts } = parseArgs({ options: { from: { type: 'string' }, to: { type: 'string' }, step: { type: 'string' } } })
+const { values: opts } = parseArgs({ options: { cut: { type: 'string', default: 'trailer' }, from: { type: 'string' }, to: { type: 'string' }, step: { type: 'string' } } })
 const stills = opts.from !== undefined
 
-const MASTER = 'trailer/out/toot-together-trailer.mp4'
-const SOCIAL = 'trailer/out/toot-together-trailer-1080p.mp4'
-const PREVIEW = 'trailer/preview.webp'
-const WORK = join(tmpdir(), 'toot-trailer')
-const VIEWPORT = { width: 1280, height: 720 }
-const SCALE = 1.5
+/** The reel renders at a phone-sized viewport so the game's labels come out phone-sized. */
+const CUTS = {
+  trailer: { master: 'trailer/out/toot-together-trailer.mp4', social: 'trailer/out/toot-together-trailer-1080p.mp4', preview: 'trailer/preview.webp', viewport: { width: 1280, height: 720 }, scale: 1.5 },
+  reel: { master: 'trailer/out/toot-together-reel-master.mp4', social: 'trailer/out/toot-together-reel.mp4', preview: null, viewport: { width: 360, height: 640 }, scale: 3 },
+}
+const cut = CUTS[opts.cut]
+if (!cut) throw new Error(`unknown cut "${opts.cut}", expected ${Object.keys(CUTS).join(' or ')}`)
+const { master: MASTER, social: SOCIAL, preview: PREVIEW } = cut
+const WORK = join(tmpdir(), `toot-${opts.cut}`)
 const WARM_UP_MS = 300
 
 function run(cmd, argv, opts = {}) {
@@ -27,11 +30,11 @@ function run(cmd, argv, opts = {}) {
 
 const server = await createServer({ configFile: 'trailer/vite.config.ts', server: { port: 0, strictPort: false }, logLevel: 'warn' })
 await server.listen()
-const url = new URL('trailer/', server.resolvedUrls.local[0]).href
+const url = new URL(`trailer/?cut=${opts.cut}`, server.resolvedUrls.local[0]).href
 
 const browser = await chromium.launch({ headless: true, args: ['--use-angle=metal'] })
 try {
-  const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: SCALE })
+  const page = await browser.newPage({ viewport: cut.viewport, deviceScaleFactor: cut.scale })
   page.on('pageerror', (e) => {
     if (!e.message.includes('cannot resume an offline context')) console.error('page error:', e.message)
   })
@@ -99,10 +102,13 @@ try {
     const q = ['-y', '-loglevel', 'error']
     await run('ffmpeg', [...q, '-i', join(WORK, 'video.mp4'), '-i', join(WORK, 'audio.wav'), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '256k', '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11', '-ar', '48000', '-shortest', '-movflags', '+faststart', MASTER])
     await run('ffmpeg', [...q, '-i', MASTER, '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-maxrate', '12M', '-bufsize', '24M', '-vf', 'scale=out_range=tv', '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-c:a', 'copy', '-movflags', '+faststart', SOCIAL])
-    const cuts = highlights.map(([a, b], n) => `[0:v]trim=${a.toFixed(3)}:${b.toFixed(3)},setpts=PTS-STARTPTS[h${n}]`)
-    const chain = highlights.map((_, n) => `[h${n}]`).join('')
-    await run('ffmpeg', [...q, '-i', MASTER, '-filter_complex', `${cuts.join(';')};${chain}concat=n=${highlights.length}:v=1:a=0,fps=15,scale=800:-1:flags=lanczos[v]`, '-map', '[v]', '-c:v', 'libwebp_anim', '-lossless', '0', '-quality', '60', '-compression_level', '5', '-loop', '0', PREVIEW])
-    console.log(`wrote ${MASTER}, ${SOCIAL} and ${PREVIEW}`)
+    if (!PREVIEW) console.log(`wrote ${MASTER} and ${SOCIAL}`)
+    else {
+      const cuts = highlights.map(([a, b], n) => `[0:v]trim=${a.toFixed(3)}:${b.toFixed(3)},setpts=PTS-STARTPTS[h${n}]`)
+      const chain = highlights.map((_, n) => `[h${n}]`).join('')
+      await run('ffmpeg', [...q, '-i', MASTER, '-filter_complex', `${cuts.join(';')};${chain}concat=n=${highlights.length}:v=1:a=0,fps=15,scale=800:-1:flags=lanczos[v]`, '-map', '[v]', '-c:v', 'libwebp_anim', '-lossless', '0', '-quality', '60', '-compression_level', '5', '-loop', '0', PREVIEW])
+      console.log(`wrote ${MASTER}, ${SOCIAL} and ${PREVIEW}`)
+    }
   }
 } finally {
   await browser.close()

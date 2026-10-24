@@ -15,6 +15,13 @@ interface ChatCue {
   text: string
 }
 
+export interface Caption {
+  text: string
+  sub?: string
+  at: number
+  color: string
+}
+
 export interface Shot {
   name: string
   course: string
@@ -23,7 +30,7 @@ export interface Shot {
   seconds: number
   highlight?: [number, number]
   chat: ChatCue[]
-  caption?: { text: string; at: number; color: string }
+  caption?: Caption
   steer?: (sim: Sim, id: number, t: number) => PlayerInput | undefined
   everyoneToots?: boolean
 }
@@ -95,6 +102,28 @@ export const SHOTS: Shot[] = [
     highlight: [7.8, 10],
     everyoneToots: true,
     chat: [{ at: 9.4, seat: 0, text: 'GG 🦛' }],
+  },
+]
+
+const [, spinner, crusher, kabir] = SHOTS
+
+/** The vertical cut for Reels: hard cuts, captions up top, one beat per shot. */
+export const REEL_SHOTS: Shot[] = [
+  {
+    ...spinner,
+    seconds: 5.4,
+    caption: { text: '4 HIPPOS, 1 RAFT', sub: 'YOU STEER IT TOGETHER', at: -0.3, color: '#ffffff' },
+  },
+  { ...crusher, seconds: 5.5, caption: { text: 'TIME IT RIGHT…', at: 0, color: '#a6e84a' } },
+  { ...kabir, seconds: 5, caption: { text: '…OR BLAME KABIR', at: 0, color: '#ff6b6b' } },
+  {
+    name: 'Finish line',
+    course: 'volcano-peak',
+    seed: 5,
+    startWhen: (sim) => sim.rafts[0].s >= volcano.finishS - 18,
+    seconds: 6,
+    caption: { text: 'FINISH TOGETHER', at: 0, color: '#7fe3ff' },
+    chat: [{ at: 4.6, seat: 0, text: 'GG 🦛' }],
   },
 ]
 

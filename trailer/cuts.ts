@@ -1,0 +1,51 @@
+import { REEL_SHOTS, type Shot, SHOTS } from './director'
+
+interface Cut {
+  id: 'trailer' | 'reel'
+  shots: Shot[]
+  /** Seconds of title card before the first shot; 0 opens straight on gameplay. */
+  intro: number
+  outro: number
+  stage: { w: number; h: number }
+  fov: number
+  /** Blob wipes between shots; off means hard cuts. */
+  wipes: boolean
+  /** Outro second the music stops, or null to play to the last frame so the video loops. */
+  musicStopsAt: number | null
+  mix: { master: number; music: number; sfx: number }
+  /** The chat log under the HUD; speech bubbles over the hippos show either way. */
+  chatLog: boolean
+  /** How many hippos can be heard tooting at once. */
+  tootVoices: number
+}
+
+const CUTS: Record<Cut['id'], Cut> = {
+  trailer: {
+    id: 'trailer',
+    shots: SHOTS,
+    intro: 4.4,
+    outro: 6.4,
+    stage: { w: 1920, h: 1080 },
+    fov: 46,
+    wipes: true,
+    musicStopsAt: 4.3,
+    mix: { master: 0.9, music: 0.62, sfx: 0.9 },
+    chatLog: true,
+    tootVoices: 4,
+  },
+  reel: {
+    id: 'reel',
+    shots: REEL_SHOTS,
+    intro: 0,
+    outro: 4.8,
+    stage: { w: 1080, h: 1920 },
+    fov: 60,
+    wipes: false,
+    musicStopsAt: null,
+    mix: { master: 0.9, music: 0.8, sfx: 0.6 },
+    chatLog: false,
+    tootVoices: 1,
+  },
+}
+
+export const CUT = CUTS[new URLSearchParams(location.search).get('cut') === 'reel' ? 'reel' : 'trailer']

@@ -18,6 +18,7 @@
     "level-shots": "tsx scripts/level-shots.ts",
     "og": "tsx scripts/og.ts",
     "trailer": "node trailer/record.mjs",
+    "reel": "node trailer/record.mjs --cut reel",
     "trailer:dryrun": "tsx trailer/dryrun.ts"
   },
   "dependencies": {

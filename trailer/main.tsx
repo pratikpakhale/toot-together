@@ -26,13 +26,15 @@ import { useApp } from '../src/client/state/store'
 import { ChatDock } from '../src/client/ui/Chat'
 import { NameTags } from '../src/client/ui/NameTags'
 import { Toasts } from '../src/client/ui/Toasts'
-import { CREW, prime, type Shot, SHOTS, steer } from './director'
+import { CUT } from './cuts'
+import { CREW, prime, type Shot, steer } from './director'
 import { Overlay, type Beat } from './Overlay'
 
 const FPS = 60
 const SAMPLE_RATE = 48000
-const INTRO = 4.4
-const OUTRO = 6.4
+const SHOTS = CUT.shots
+const INTRO = CUT.intro
+const OUTRO = CUT.outro
 
 const starts = [INTRO]
 for (const shot of SHOTS) starts.push(starts[starts.length - 1] + shot.seconds)
@@ -96,6 +98,22 @@ function adopt(session: GameSession) {
   useApp.getState().setOverlay(null)
 }
 
+/** Drops toot sounds beyond `max` at once; a hippo that's cut off is heard as soon as a voice frees up. */
+function limitTootVoices(max: number) {
+  const playing = new Set<string>()
+  const start = audio.fartStart.bind(audio)
+  const stop = audio.fartStop.bind(audio)
+  audio.fartStart = (key, ...rest) => {
+    if (playing.size >= max) return
+    start(key, ...rest)
+    if (audio.isFarting(key)) playing.add(key)
+  }
+  audio.fartStop = (key) => {
+    playing.delete(key)
+    stop(key)
+  }
+}
+
 let shown = -2
 
 function direct(t: number): Beat {
@@ -119,7 +137,7 @@ function direct(t: number): Beat {
   const shot = n >= 0 && outro === null ? SHOTS[n] : null
   return {
     t,
-    intro: t < INTRO + 0.4 ? t : null,
+    intro: INTRO > 0 && t < INTRO + 0.4 ? t : null,
     outro,
     shotT: shot ? t - starts[n] : null,
     caption: shot?.caption ?? null,
@@ -139,7 +157,7 @@ function Scene() {
       frameloop={preview ? 'always' : 'never'}
       dpr={window.devicePixelRatio}
       gl={{ antialias: true, powerPreference: 'high-performance', stencil: false }}
-      camera={{ fov: 46, near: 0.2, far: 1400, position: [0, 8, -12] }}
+      camera={{ fov: CUT.fov, near: 0.2, far: 1400, position: [0, 8, -12] }}
     >
       <Suspense fallback={null}>
         <Driver mode={mode} />
@@ -169,7 +187,7 @@ function Trailer() {
       {screen === 'game' && (
         <>
           <Toasts />
-          <ChatDock />
+          {CUT.chatLog && <ChatDock />}
         </>
       )}
       <div id="flash" className="pointer-events-none fixed inset-0 bg-white opacity-0" />
@@ -180,7 +198,8 @@ function Trailer() {
 
 const preview = new URLSearchParams(location.search).has('preview')
 
-useApp.getState().updateSettings({ name: CREW[0], quality: 'high', shake: true, chat: true, musicOn: true, master: 0.9, music: 0.62, sfx: 0.9 })
+useApp.getState().updateSettings({ name: CREW[0], quality: 'high', shake: true, chat: true, musicOn: true, ...CUT.mix })
+limitTootVoices(CUT.tootVoices)
 const firstBeat = direct(0)
 createRoot(document.getElementById('root')!).render(<Trailer />)
 
