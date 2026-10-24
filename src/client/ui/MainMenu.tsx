@@ -57,6 +57,7 @@ export function MainMenu() {
         <input
           className="field w-0 flex-1 text-center uppercase tracking-[0.3em] short:py-1.5"
           placeholder="CODE"
+          aria-label="Room code"
           value={code}
           maxLength={4}
           onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}

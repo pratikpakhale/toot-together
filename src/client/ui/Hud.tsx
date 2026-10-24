@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { BUFF_DURATION, CREW_SIZE, MAX_RAFTS } from '../../sim/constants'
 import { BUFF_CODE, BUFF_NAMES } from '../../sim/types'
 import { audio } from '../audio/audio'
@@ -21,10 +21,10 @@ export function Hud() {
   const setOverlay = useApp((s) => s.setOverlay)
   const course = session?.course
   const localIds = session?.localPlayers.map((p) => p.id) ?? []
+  const localKey = localIds.join(',')
   const roster = info?.roster ?? []
   const short = useShortScreen()
-  const shortRef = useRef(short)
-  shortRef.current = short
+  const isShort = useEffectEvent(() => short)
   const race = useRace()
   const phase = usePhase()
   useSeatToast(session)
@@ -47,13 +47,14 @@ export function Hud() {
 
   useEffect(() => {
     let raf = 0
+    const local = new Set(localKey.split(',').map(Number))
     const loop = () => {
       raf = requestAnimationFrame(loop)
       const v = frame.view
       if (!v || !course) return
       const mine = myRaft(v, session)
       const shown = v.rafts[mine ?? frame.follow] ?? v.rafts[0]
-      if (timerRef.current) timerRef.current.textContent = formatTime(v.phase === 'pond' || v.phase === 'countdown' ? 0 : v.raceTime, shortRef.current ? 1 : 2)
+      if (timerRef.current) timerRef.current.textContent = formatTime(v.phase === 'pond' || v.phase === 'countdown' ? 0 : v.raceTime, isShort() ? 1 : 2)
       if (deathRef.current && shown.d !== lastDeaths.current) {
         lastDeaths.current = shown.d
         deathRef.current.textContent = String(shown.d)
@@ -80,7 +81,7 @@ export function Hud() {
       }
 
       for (const p of v.players) {
-        if (!localIds.includes(p.id) && !crewRefs.current.has(p.id)) continue
+        if (!local.has(p.id) && !crewRefs.current.has(p.id)) continue
         const meter = meterRefs.current.get(p.id)
         if (meter) {
           meter.style.width = `${Math.max(0, Math.min(1, p.stam)) * 100}%`
@@ -117,7 +118,7 @@ export function Hud() {
     }
     loop()
     return () => cancelAnimationFrame(raf)
-  }, [course, session, localIds.join(',')])
+  }, [course, session, localKey])
 
   if (!course || !session) return null
   const localPlayers = session.localPlayers.flatMap((lp) => {
@@ -413,7 +414,6 @@ function PondHint({ localCount, localIds }: { localCount: number; localIds: numb
 function Tutorial({ localIds }: { localIds: number[] }) {
   const [done, setDone] = useState<Record<string, boolean>>({})
   const doneRef = useRef(done)
-  doneRef.current = done
   const key = localIds.join(',')
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { MAX_CHAT_LENGTH } from '../../sim/protocol'
 import type { RosterEntry } from '../../sim/types'
@@ -351,8 +351,7 @@ function Wheel({ aimed, setAimed, calls, say }: WheelProps) {
   const [opened] = useState(() => performance.now())
   const origin = useRef<{ x: number; y: number } | null>(null)
   const pressed = useRef(false)
-  const latest = useRef({ aimed, calls, say })
-  latest.current = { aimed, calls, say }
+  const latest = useEffectEvent(() => ({ aimed, calls, say }))
   const aiming = panel === 'aim'
 
   useEffect(() => () => setAimed(null), [setAimed])
@@ -362,11 +361,12 @@ function Wheel({ aimed, setAimed, calls, say }: WheelProps) {
       const n = /^(?:Digit|Numpad)([1-8])$/.exec(e.code)
       if (!n) return
       e.preventDefault()
-      latest.current.say(latest.current.calls[Number(n[1]) - 1].line)
+      const { calls, say } = latest()
+      say(calls[Number(n[1]) - 1].line)
     }
     const onUp = (e: KeyboardEvent) => {
       if (e.code !== 'KeyQ' || useApp.getState().chatPanel !== 'aim') return
-      const { aimed, calls, say } = latest.current
+      const { aimed, calls, say } = latest()
       if (performance.now() - opened < HOLD_MS) {
         setAimed(null)
         setPanel('wheel')
@@ -549,6 +549,7 @@ function TypePanel({ roster, myId, say }: { roster: RosterEntry[]; myId: number 
   const others = roster.filter((p) => p.id !== myId)
   const mutedHere = others.filter((p) => muted.includes(p.id)).length
 
+  // react-doctor-disable-next-line react-doctor/effect-needs-cleanup -- input.on returns its unsubscribe
   useEffect(() => {
     typeField.current?.focus()
     return input.on((action) => action === 'chat' && typeField.current?.focus())
@@ -584,6 +585,7 @@ function TypePanel({ roster, myId, say }: { roster: RosterEntry[]; myId: number 
         value={text}
         maxLength={MAX_CHAT_LENGTH}
         placeholder="Say something…"
+        aria-label="Chat message"
         enterKeyHint="send"
         autoComplete="off"
         onChange={(e) => {
@@ -600,7 +602,7 @@ function TypePanel({ roster, myId, say }: { roster: RosterEntry[]; myId: number 
           setPanel(null)
         }}
       />
-      <button tabIndex={-1} className="btn btn-green shrink-0 px-4 py-1 text-base" disabled={!text.trim()}>
+      <button type="submit" tabIndex={-1} className="btn btn-green shrink-0 px-4 py-1 text-base" disabled={!text.trim()}>
         Send
       </button>
     </form>

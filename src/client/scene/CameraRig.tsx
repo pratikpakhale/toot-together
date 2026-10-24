@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { useRef } from 'react'
+import { useState } from 'react'
 import * as THREE from 'three'
 import { angleDiff } from '../../sim/math'
 import { pointAt, type BakedCourse } from '../../sim/track'
@@ -12,13 +12,12 @@ const lookAt = new THREE.Vector3()
 
 export function CameraRig({ course, mode }: { course: BakedCourse; mode: 'menu' | 'game' }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
-  const st = useRef({ yaw: 0, init: false, focus: new THREE.Vector3(), orbit: 0, cut: frame.cameraCuts })
+  const [s] = useState(() => ({ yaw: 0, init: false, focus: new THREE.Vector3(), orbit: 0, cut: frame.cameraCuts }))
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05)
     const v = frame.view
     if (!v) return
-    const s = st.current
     const r = v.rafts[frame.follow] ?? v.rafts[0]
     const ahead = pointAt(course, r.s + 6)
     const farAhead = pointAt(course, r.s + 14)

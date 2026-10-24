@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import type { Snapshot } from '../../sim/types'
 import { frame } from './frame'
 
@@ -9,14 +9,13 @@ type Key = string | number | boolean | null
  * latest one changes, so a component can read `frame.view` while rendering and stay current.
  */
 export function useViewKey<K extends Key>(key: (v: Snapshot) => K, fallback: K): K {
-  const read = useRef(key)
-  read.current = key
+  const read = useEffectEvent((v: Snapshot) => key(v))
   const [value, setValue] = useState<K>(() => (frame.view ? key(frame.view) : fallback))
   useEffect(() => {
     let raf = 0
     const loop = () => {
       raf = requestAnimationFrame(loop)
-      const next = frame.view ? read.current(frame.view) : fallback
+      const next = frame.view ? read(frame.view) : fallback
       setValue((prev) => (Object.is(prev, next) ? prev : next))
     }
     loop()

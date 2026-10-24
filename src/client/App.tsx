@@ -91,6 +91,7 @@ export function App() {
     if (overlay || sideways) audio.stopAllFarts()
   }, [session, overlay, sideways])
 
+  // react-doctor-disable-next-line react-doctor/effect-needs-cleanup -- input.on returns its unsubscribe
   useEffect(
     () =>
       input.on((action) => {

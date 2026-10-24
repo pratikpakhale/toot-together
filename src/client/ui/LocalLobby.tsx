@@ -35,8 +35,8 @@ export function LocalLobby() {
   const name = useApp((s) => s.settings.name)
   const [devices, setDevices] = useState<DeviceId[]>([])
   const devicesRef = useRef(devices)
-  devicesRef.current = devices
 
+  // react-doctor-disable-next-line react-doctor/effect-needs-cleanup -- input.on returns its unsubscribe
   useEffect(
     () =>
       input.on((action, device) => {

@@ -16,6 +16,7 @@ type Feed =
 
 function useRoomFeed(): Feed {
   const [feed, setFeed] = useState<Feed>({ status: 'connecting' })
+  // react-doctor-disable-next-line react-doctor/effect-needs-cleanup -- the cleanup closes the socket and clears the retry timer
   useEffect(() => {
     let ws: WebSocket
     let retry = 0
