@@ -46,10 +46,18 @@ function expectLockstep(a: Sim, b: Sim, seconds: number) {
 }
 
 describe('saving and restoring a run', () => {
-  it('carries on exactly where it left off, randomness included', () => {
-    const original = new Sim(course, 1234)
-    for (const seat of [0, 1, 2]) original.addPlayer(seat + 1, `Hippo${seat}`, seat)
-    for (let k = 0; k < 25 / DT; k++) {
+  it('carries on exactly where it left off mid-race, randomness included', () => {
+    const original = new Sim(course, 9, 3)
+    let next = 1
+    for (const [raft, crew] of [2, 1, 1].entries()) {
+      for (let k = 0; k < crew; k++, next++) {
+        original.addPlayer(next, `R${raft}H${k}`, null)
+        expect(original.pick(next, raft)).toBeNull()
+      }
+    }
+    original.addPlayer(9, 'Bench', null)
+    expect(original.start()).toBeNull()
+    for (let k = 0; k < 30 / DT; k++) {
       for (const id of original.players.keys()) original.setInput(id, botInput(original, id))
       original.step()
       original.drainEvents()

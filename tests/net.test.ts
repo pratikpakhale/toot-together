@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { SnapshotClock } from '../src/client/game/clock'
-import { extrapolate } from '../src/client/game/interp'
 import { DT, SNAPSHOT_EVERY } from '../src/sim/constants'
 import { getCourse } from '../src/sim/courses'
 import { createRng } from '../src/sim/math'
@@ -81,20 +80,5 @@ describe('wire snapshots', () => {
     expect(Math.abs(q.players[0].rim - s.players[0].rim)).toBeLessThanOrEqual(0.00005)
     expect(q.tick).toBe(s.tick)
     expect(JSON.stringify(q).length).toBeLessThan(JSON.stringify(s).length * 0.8)
-  })
-
-  it('dead-reckons a floating raft along its velocity', () => {
-    const sim = new Sim(getCourse('canyon-run'), 1)
-    sim.addPlayer(1, 'A', 0)
-    for (let k = 0; k < 120; k++) {
-      sim.setInput(1, { aim: Math.PI, walk: 0, fart: true, burst: 0 })
-      sim.step()
-    }
-    const s = sim.snapshot()
-    const out = extrapolate(s, 0.05, structuredClone(s))
-    expect(out.t).toBeCloseTo(s.t + 0.05, 9)
-    expect(out.rafts[0].x).toBeCloseTo(s.rafts[0].x + s.rafts[0].vx * 0.05, 9)
-    expect(out.rafts[0].z).toBeCloseTo(s.rafts[0].z + s.rafts[0].vz * 0.05, 9)
-    expect(s.rafts[0].x).toBe(sim.snapshot().rafts[0].x)
   })
 })

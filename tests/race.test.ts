@@ -223,7 +223,11 @@ describe('rafts touching', () => {
     expect(sim.rafts[1].s).toBeLessThan(before - 0.05)
     expect(sim.rafts[1].shovedBy).toBe(1)
     sim.drainEvents()
-    ;(sim as unknown as { kill(r: number, cause: string): void }).kill(1, 'spikes')
+    // Past the start gate, which is a wall until GO, and onto the first mine.
+    sim.phase = 'racing'
+    const { s, def } = lazy.items.find((item) => item.def.kind === 'mine')!
+    place(sim, 1, s, def.kind === 'mine' ? def.d : 0)
+    sim.step()
     const death = sim.drainEvents().find((e) => e.type === 'death')
     expect(death?.type === 'death' && [death.blame, death.rival]).toEqual([1, true])
     expect(tooter.stats.snipes).toBe(1)
@@ -296,27 +300,6 @@ describe('crews', () => {
     sim.addPlayer(1, 'A', 0)
     expect(sim.pick(1, null)).not.toBeNull()
     expect(sim.start()).not.toBeNull()
-  })
-})
-
-describe('saving a race', () => {
-  it('restores mid-race and carries on in lockstep', () => {
-    const sim = raceRoom([2, 1, 1], 9, getCourse('canyon-run'))
-    sim.addPlayer(9, 'Bench', null)
-    sim.start()
-    run(sim, 30)
-    const restored = Sim.restore(sim.course, JSON.parse(JSON.stringify(sim.save())) as SimState)!
-    expect(restored).not.toBeNull()
-    for (let k = 0; k < 10 / DT; k++) {
-      for (const id of sim.players.keys()) {
-        const input = botInput(sim, id)
-        sim.setInput(id, input)
-        restored.setInput(id, input)
-      }
-      sim.step()
-      restored.step()
-      expect(restored.snapshot()).toEqual(sim.snapshot())
-    }
   })
 })
 

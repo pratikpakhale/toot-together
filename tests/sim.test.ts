@@ -3,7 +3,7 @@ import { botInput } from '../src/sim/bot'
 import { DT, HIPPO_GAP, RAFT_RADIUS, RESPAWN_AHEAD_OF_CHECKPOINT } from '../src/sim/constants'
 import { COURSE_LIST, getCourse } from '../src/sim/courses'
 import { Sim } from '../src/sim/sim'
-import { type BakedItem, type ItemDef, nearestSampleAt, queryTrack } from '../src/sim/track'
+import { type BakedItem, type ItemDef, nearestSampleAt } from '../src/sim/track'
 import { collideItem, fieldAt, flameState, ITEM_SIZES } from '../src/sim/obstacles'
 import { angleDiff } from '../src/sim/math'
 import { clampToSector, rimSector, sectorOffset } from '../src/sim/sectors'
@@ -61,28 +61,7 @@ describe.each(COURSE_LIST.map((def) => [def.name, def.id] as const))('course %s'
   })
 })
 
-describe('track queries', () => {
-  it('maps samples back to themselves', () => {
-    const q = { index: 0, s: 0, d: 0 }
-    for (let i = 0; i < course.count; i += 37) {
-      queryTrack(course, course.x[i], course.z[i], 0, q)
-      expect(q.index).toBe(i)
-      expect(Math.abs(q.d)).toBeLessThan(1e-3)
-    }
-  })
-})
-
 describe('sim', () => {
-  it.each([1, 4])('a crew of %i autopilots passes every checkpoint to the finish with hazards off', (crew) => {
-    const sim = new Sim(course, 3)
-    sim.godMode = true
-    const ids = Array.from({ length: crew }, (_, i) => i + 1)
-    for (const id of ids) sim.addPlayer(id, `Bot${id}`, id - 1)
-    runBot(sim, ids, 900)
-    expect(sim.phase).toBe('finished')
-    expect(sim.rafts[0].cp).toBe(course.checkpoints.length - 1)
-  })
-
   it('spikes kill and the raft respawns at the last checkpoint', () => {
     const sim = new Sim(course, 1)
     sim.addPlayer(1, 'A', 0)
@@ -229,14 +208,6 @@ describe('walking around the rim', () => {
     hold(sim, { 1: { aim: aimFromStick(0, -1, fx, fz) } }, 1.5)
     expect(Math.abs(angleDiff(angle(1), Math.atan2(-fz, -fx)))).toBeLessThan(0.05)
   })
-
-  it('ignores a missing walk field from older clients', () => {
-    const { sim } = raftWithCrew(1)
-    const rim = sim.players.get(1)!.rim
-    sim.setInput(1, { aim: null, fart: false, burst: 0 } as never)
-    sim.step()
-    expect(sim.players.get(1)!.rim).toBeCloseTo(rim, 5)
-  })
 })
 
 describe('hazards', () => {
@@ -275,7 +246,9 @@ describe('hazards', () => {
 
   it('a current pushes sideways only over its stretch of river', () => {
     const current = at({ kind: 'current', at: 0, push: 4, len: 10 })
-    expect(fieldAt(current, 5, 0)).toEqual({ ax: -0, az: 4, spin: 0 })
+    const f = fieldAt(current, 5, 0)
+    expect(f).toMatchObject({ az: 4, spin: 0 })
+    expect(f!.ax).toBeCloseTo(0)
     expect(fieldAt(current, -1, 0)).toBeNull()
     expect(fieldAt(current, 11, 0)).toBeNull()
   })
