@@ -9,7 +9,10 @@ import {
   fenceGapCentre,
   flameLength,
   flameState,
+  gateState,
+  geyserState,
   ITEM_SIZES,
+  lightningState,
   maceOffset,
   pistonState,
   sliderOffset,
@@ -21,12 +24,31 @@ import {
 import type { BakedCourse, BakedItem, ItemDef } from '../../sim/track'
 import { audio } from '../audio/audio'
 import { crewed, frame } from '../game/frame'
+import { fx } from './Fx'
 import { CHASE_CAM_HEIGHT } from './CameraRig'
-import { boulder, bracket, chain, dome, glowTexture, GOLD, hazardStripes, lumber, METAL, painted, spikeBall, turnedPost, woodMat, woodTexture } from './hazardKit'
-import { beansCan, chili, crusherDetail, flameGeo, flameTrim, mushroomCap, mushroomStem, pistonTrim, prune, rotor, spikedLog, wheel } from './hazardShapes'
-import { PALETTE, softGradient } from './materials'
+import { boulder, bracket, chain, dome, foamMat, foamRing, glowTexture, GOLD, hazardStripes, lumber, matte, METAL, painted, spikeBall, turnedPost, woodMat, woodTexture } from './hazardKit'
+import {
+  beansCan,
+  boltGeo,
+  chili,
+  crusherDetail,
+  flameGeo,
+  flameTrim,
+  gateGrille,
+  kelpFronds,
+  mushroomCap,
+  mushroomStem,
+  pistonTrim,
+  prune,
+  rotor,
+  spikedLog,
+  stormCloud,
+  ventRocks,
+  wheel,
+} from './hazardShapes'
+import { calmMotion, PALETTE, soft, softGradient, swaying, windTime } from './materials'
 import { useFogCull } from './fogCull'
-import { merge as mergeParts, tint } from './sculpt'
+import { blob, lumps, merge as mergeParts, paint as paintGeo, smoothstep, tint } from './sculpt'
 import { BlobShadow } from './shadow'
 
 type Def<K extends ItemDef['kind']> = Extract<ItemDef, { kind: K }>
@@ -43,6 +65,14 @@ function nearRaft(item: BakedItem) {
   const r = frame.view?.rafts[frame.follow]
   return !!r && Math.hypot(r.x - item.x, r.z - item.z) < 22
 }
+
+/** Whether `item` is close enough to the camera for its splashes and sparks to be worth spawning. */
+function inView(item: BakedItem, camera: THREE.Camera) {
+  return Math.hypot(camera.position.x - item.x, camera.position.z - item.z) < 45
+}
+
+/** Where a spot `d` across the river from `item` is in the world. */
+const worldAt = (item: BakedItem, d: number) => ({ x: item.x - item.hz * d, y: item.y, z: item.z + item.hx * d })
 
 export function Obstacles({ course }: { course: BakedCourse }) {
   const pickupSlots = useMemo(() => {
@@ -106,16 +136,41 @@ function ItemView({ item, slot }: { item: BakedItem; slot: number }) {
       return <Flame def={def} item={item} />
     case 'fence':
       return <Fence def={def} hw={item.hw} />
+    case 'gate':
+      return <Gate def={def} item={item} />
+    case 'kelp':
+      return <Kelp def={def} item={item} />
+    case 'lightning':
+      return <Lightning def={def} item={item} />
+    case 'geyser':
+      return <Geyser def={def} item={item} />
   }
 }
 
 
 /** The one vertex-coloured material every merged hazard part uses. */
 const paint = painted()
+/** Its matte twin, for stone and weed. */
+const stone = matte()
 
-/** A per-hazard material whose emissive flashes as a warning (optionally grained timber). */
+/** A per-hazard material whose emissive flashes as a warning: enamelled metal, or grained timber. */
 function flashMaterial(color: string, grain = false) {
-  return new THREE.MeshToonMaterial({ color, emissive: '#000000', gradientMap: softGradient(), map: grain ? woodTexture() : null })
+  const m = soft(color, { gloss: grain ? 0 : 0.5, rim: grain ? 0.15 : 0.3 }).clone()
+  if (grain) m.map = woodTexture()
+  return m
+}
+
+/** White water churning round something that stands in the river, from `inner` out to `outer`. */
+function Foam({ inner, outer, spin = 0.3 }: { inner: number; outer: number; spin?: number }) {
+  const ring = useRef<THREE.Mesh>(null)
+  const phase = useMemo(() => Math.random() * 10, [])
+  useFrame(() => {
+    if (!ring.current || calmMotion) return
+    const t = simTime() + phase
+    ring.current.rotation.y = t * spin
+    ring.current.scale.setScalar(1 + Math.sin(t * 2.1) * 0.04)
+  })
+  return <mesh ref={ring} geometry={foamRing(inner, outer)} material={foamMat()} position={[0, 0.06, 0]} renderOrder={1} />
 }
 
 const footingGeo = tint(new THREE.CylinderGeometry(0.55, 0.7, 0.5, 8), '#8d8994')
@@ -162,6 +217,7 @@ function Spinner({ def }: { def: Def<'spinner'> }) {
         {/* Arms run 0.35 → arm, knob at the tip, spikes from 0.5: the same as the hit shape. */}
         <mesh geometry={rotor(def.arm, arms, ITEM_SIZES.spinnerArm, 0.35, 0.5, PALETTE.spikeTube, 0.28)} material={paint} />
       </group>
+      <Foam inner={0.6} outer={1.7} spin={-0.5} />
       <BlobShadow size={def.arm * 2.2} opacity={0.18} />
     </group>
   )
@@ -259,7 +315,7 @@ function Crusher({ def, item }: { def: Def<'crusher'>; item: BakedItem }) {
     },
     [mat, body, band],
   )
-  useFrame(() => {
+  useFrame(({ camera }) => {
     const t = simTime()
     const inner = crusherInner(crusherOpen(def, t), hw)
     left.current?.position.set(0, 0, -(inner + width / 2))
@@ -268,7 +324,10 @@ function Crusher({ def, item }: { def: Def<'crusher'>; item: BakedItem }) {
     mat.emissive.setRGB(warn && Math.sin(t * 30) > 0 ? 0.5 : 0, 0, 0)
     const closed = inner < 0.15
     if (warn && !sound.current.warn && nearRaft(item)) audio.rumble()
-    if (closed && !sound.current.closed && nearRaft(item)) audio.slam()
+    if (closed && !sound.current.closed) {
+      if (nearRaft(item)) audio.slam()
+      if (inView(item, camera)) fx.splash(item.x, item.y, item.z, 0.8)
+    }
     sound.current.warn = warn
     sound.current.closed = closed
   })
@@ -293,14 +352,21 @@ function Piston({ def, item }: { def: Def<'piston'>; item: BakedItem }) {
   const ring = useRef<THREE.Mesh>(null)
   const headGeo = useMemo(() => new THREE.CylinderGeometry(r, r, PISTON_HEAD_LEN, 32, 1), [r])
   useEffect(() => () => headGeo.dispose(), [headGeo])
-  useFrame(() => {
+  useFrame(({ camera }) => {
     const t = simTime()
     const st = pistonState(def, t)
     const y = PISTON_REST_Y + st.height * PISTON_RISE
     const shake = st.warn ? Math.sin(t * 70) * 0.07 : 0
     const down = st.height < 0.05
     if (st.warn && !sound.current.warn && nearRaft(item)) audio.rumble()
-    if (down && !sound.current.down && nearRaft(item)) audio.slam()
+    if (down && !sound.current.down) {
+      if (nearRaft(item)) audio.slam()
+      if (inView(item, camera)) {
+        const at = worldAt(item, def.d)
+        fx.splash(at.x, at.y, at.z, 1.2)
+        fx.ring(at.x, at.y, at.z, r * 2.6, '#ffffff', 0.8)
+      }
+    }
     sound.current.warn = st.warn
     sound.current.down = down
     head.current?.position.set(shake, y, def.d)
@@ -331,8 +397,9 @@ function Piston({ def, item }: { def: Def<'piston'>; item: BakedItem }) {
   )
 }
 
-/** Every mine's beacon blinks together, off the shared clock. */
+/** Every mine's beacon blinks together, off the shared clock, with a halo that blinks with it. */
 const mineLamp = new THREE.MeshBasicMaterial({ color: '#ff3b2f' })
+const mineHalo = new THREE.SpriteMaterial({ map: glowTexture(), color: '#ff5a3c', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
 const lampGeo = tint(new THREE.SphereGeometry(0.09, 10, 8), '#ffffff')
 const lampBase = tint(new THREE.CylinderGeometry(0.1, 0.13, 0.12, 12), METAL)
 
@@ -346,6 +413,7 @@ function Mine({ def }: { def: Def<'mine'> }) {
     g.current?.rotation.set(Math.sin(t) * 0.3, t * 0.6, 0)
     const on = Math.sin(simTime() * 6) > 0.2
     mineLamp.color.set(on ? '#ff5a3c' : '#5a1a14')
+    mineHalo.opacity = on ? 0.8 : 0
   })
   return (
     <>
@@ -353,9 +421,11 @@ function Mine({ def }: { def: Def<'mine'> }) {
         <mesh geometry={spikeBall(r, '#e2444f')} material={paint} />
         <mesh geometry={lampBase} position={[0, r + 0.02, 0]} material={paint} />
         <mesh geometry={lampGeo} position={[0, r + 0.12, 0]} material={mineLamp} />
+        <sprite material={mineHalo} position={[0, r + 0.14, 0]} scale={0.75} />
       </group>
       <group position={[0, 0, def.d]}>
         <BlobShadow size={2} opacity={0.25} />
+        <Foam inner={r * 0.75} outer={r * 1.9} spin={0.4} />
       </group>
     </>
   )
@@ -383,6 +453,7 @@ function Bumper({ def, item }: { def: Def<'bumper'>; item: BakedItem }) {
   return (
     <group position={[0, 0, def.d]}>
       <mesh geometry={mushroomStem(r)} material={paint} />
+      <Foam inner={r * 0.5} outer={r * 1.45} spin={0.25} />
       <group ref={cap} position={[0, 0.55, 0]}>
         <mesh geometry={mushroomCap(r)} material={paint} />
       </group>
@@ -395,33 +466,11 @@ function Rock({ def }: { def: Def<'rock'> }) {
   const look = useMemo(() => ({ rot: [Math.random() * 0.3, Math.random() * 6, Math.random() * 0.3] as [number, number, number], seed: Math.floor(Math.random() * 3) }), [])
   return (
     <group position={[0, 0, def.d]}>
-      <mesh geometry={boulder(look.seed, PALETTE.rock, '#7fa86a')} position={[0, 0.15, 0]} scale={[r, r * 0.75, r]} rotation={look.rot} material={paint} />
-      <mesh geometry={boulder((look.seed + 1) % 3, '#a39ea8')} position={[r * 0.5, 0.05, r * 0.4]} scale={[r * 0.45, r * 0.35, r * 0.45]} material={paint} />
-      <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]} material={foamMat()}>
-        <ringGeometry args={[r * 0.85, r * 1.35, 40]} />
-      </mesh>
+      <mesh geometry={boulder(look.seed, PALETTE.rock, '#7fa86a')} position={[0, 0.15, 0]} scale={[r, r * 0.75, r]} rotation={look.rot} material={stone} />
+      <mesh geometry={boulder((look.seed + 1) % 3, '#a39ea8')} position={[r * 0.5, 0.05, r * 0.4]} scale={[r * 0.45, r * 0.35, r * 0.45]} material={stone} />
+      <Foam inner={r * 0.8} outer={r * 1.7} spin={0.15} />
     </group>
   )
-}
-
-let foam: THREE.MeshBasicMaterial | null = null
-/** A soft white wash round anything standing in the water. */
-const foamMat = () => (foam ??= new THREE.MeshBasicMaterial({ map: ringTexture(), color: '#ffffff', transparent: true, opacity: 0.7, depthWrite: false }))
-
-function ringTexture() {
-  const c = document.createElement('canvas')
-  c.width = 128
-  c.height = 8
-  const ctx = c.getContext('2d')!
-  const g = ctx.createLinearGradient(0, 0, 128, 0)
-  g.addColorStop(0, 'rgba(255,255,255,0.95)')
-  g.addColorStop(0.35, 'rgba(255,255,255,0.45)')
-  g.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, 128, 8)
-  const tex = new THREE.CanvasTexture(c)
-  tex.colorSpace = THREE.SRGBColorSpace
-  return tex
 }
 
 const chevronShape = (() => {
@@ -749,30 +798,73 @@ function Sweeper({ def, hw }: { def: Def<'sweeper'>; hw: number }) {
 
 const nozzleGlowMat = () => new THREE.MeshBasicMaterial({ color: '#ff7a2f', map: glowTexture(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
 
+/** Fire-jet shading clock, shared by every jet. */
+const fireTime = { value: 0 }
+
+/**
+ * One layer of a fire jet: white-hot at the nozzle cooling to `cool` at the tip, with tongues of brighter flame
+ * licking outwards along it. Its silhouette is the cone's own, tip included, so the whole lethal reach reads as fire.
+ */
+function fireLayer(hot: string, cool: string, opacity: number, speed: number) {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    uniforms: { uTime: fireTime, uHot: { value: new THREE.Color(hot) }, uCool: { value: new THREE.Color(cool) }, uOpacity: { value: opacity } },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform float uTime;
+      uniform vec3 uHot;
+      uniform vec3 uCool;
+      uniform float uOpacity;
+      varying vec2 vUv;
+      void main() {
+        float along = vUv.y;
+        float lick = sin(vUv.x * 37.7 + along * 9.0 - uTime * ${speed.toFixed(1)}) * 0.5 + 0.5;
+        lick *= sin(vUv.x * 18.85 - along * 6.0 - uTime * ${(speed * 0.6).toFixed(1)} + 1.3) * 0.5 + 0.5;
+        vec3 col = mix(uHot, uCool, smoothstep(0.05, 0.85, along));
+        col = mix(col, uHot, lick * 0.45 * (1.0 - along * 0.5));
+        gl_FragColor = vec4(col, uOpacity * (0.8 + 0.2 * lick));
+        #include <colorspace_fragment>
+      }
+    `,
+  })
+}
+
+let fire: { outer: THREE.ShaderMaterial; middle: THREE.ShaderMaterial; core: THREE.ShaderMaterial } | null = null
+const fireMats = () => (fire ??= { outer: fireLayer('#ffb03a', '#ff3d1a', 0.82, 16), middle: fireLayer('#ffe27a', '#ff7a1f', 0.85, 22), core: fireLayer('#ffffff', '#ffd24a', 0.95, 28) })
+
 function Flame({ def, item }: { def: Def<'flame'>; item: BakedItem }) {
   const hw = item.hw
   const len = flameLength(def, hw)
   const jet = useRef<THREE.Group>(null)
   const mid = useRef<THREE.Mesh>(null)
   const sound = useRef(false)
+  const emit = useRef(0)
   const housing = useMemo(() => new RoundedBoxGeometry(1.5, 1.1, 1.1, 3, 0.12), [])
   const nozzle = useMemo(() => flashMaterial(METAL), [])
   const glow = useMemo(nozzleGlowMat, [])
-  const outer = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ff5a1f', transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }), [])
-  const middle = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ff9a2a', transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }), [])
-  const core = useMemo(() => new THREE.MeshBasicMaterial({ color: '#fff0a0', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }), [])
+  const { outer, middle, core } = fireMats()
   useEffect(
     () => () => {
       housing.dispose()
-      for (const m of [nozzle, glow, outer, middle, core]) m.dispose()
+      for (const m of [nozzle, glow]) m.dispose()
     },
-    [housing, nozzle, glow, outer, middle, core],
+    [housing, nozzle, glow],
   )
-  useFrame(() => {
+  useFrame(({ camera }, dt) => {
     const t = simTime()
+    fireTime.value = t
     const st = flameState(def, t)
     const lit = st.reach > 0
-    const flicker = 1 + Math.sin(t * 47) * 0.08 + Math.sin(t * 31) * 0.06
+    // Flickers outwards only: the drawn cone never shrinks inside the hit cone (0.45 → 1 × flameHalf).
+    const flicker = 1.07 + Math.sin(t * 47) * 0.04 + Math.sin(t * 31) * 0.03
     const puff = st.warn ? 0.35 + Math.sin(t * 40) * 0.15 : 0
     const reach = Math.max(st.reach * len, puff)
     if (jet.current) {
@@ -783,6 +875,15 @@ function Flame({ def, item }: { def: Def<'flame'>; item: BakedItem }) {
     if (mid.current) mid.current.rotation.y = -t * 14
     nozzle.emissive.setRGB(st.warn && Math.sin(t * 30) > 0 ? 0.6 : lit ? 0.4 : 0, lit ? 0.15 : 0, 0)
     glow.opacity = lit ? 0.9 : st.warn ? 0.4 + Math.sin(t * 30) * 0.3 : 0
+    // Embers off the jet, scattered along its length and rising from it.
+    if (lit && reach > 1 && inView(item, camera)) {
+      emit.current += Math.min(dt, 0.05) * 22
+      while (emit.current >= 1) {
+        emit.current -= 1
+        const at = worldAt(item, def.side * (hw - Math.random() * reach))
+        fx.ember(at.x, at.y + 0.85, at.z)
+      }
+    }
     if (lit && !sound.current && nearRaft(item)) audio.flame()
     sound.current = lit
   })
@@ -838,5 +939,350 @@ function Fence({ def, hw }: { def: Def<'fence'>; hw: number }) {
         </group>
       ))}
     </>
+  )
+}
+
+const GATE_UP = CHASE_CAM_HEIGHT + 0.4
+const GATE_HEIGHT = 2.2
+const GATE_BEAM = 0.3
+
+function Gate({ def, item }: { def: Def<'gate'>; item: BakedItem }) {
+  const hw = item.hw
+  const width = 2 * hw + 1.4
+  const panel = useRef<THREE.Group>(null)
+  const mark = useRef<THREE.MeshBasicMaterial>(null)
+  const sound = useRef({ warn: false, down: false })
+  const band = useMemo(() => flashMaterial(GOLD), [])
+  useEffect(() => () => band.dispose(), [band])
+  useFrame(({ camera }) => {
+    const t = simTime()
+    const st = gateState(def, t)
+    const shake = st.warn ? Math.sin(t * 60) * 0.06 : 0
+    panel.current?.position.set(shake, st.lift * GATE_UP, 0)
+    band.emissive.setRGB(st.warn && Math.sin(t * 30) > 0 ? 0.6 : 0, 0, 0)
+    // A red line on the water where the gate comes down.
+    if (mark.current) mark.current.opacity = st.warn ? 0.4 + Math.sin(t * 20) * 0.25 : 0.55 * (1 - st.lift)
+    const down = st.lift < 0.05
+    if (st.warn && !sound.current.warn && nearRaft(item)) audio.rumble()
+    if (down && !sound.current.down) {
+      if (nearRaft(item)) audio.slam()
+      // The beam hits the water all the way across.
+      if (inView(item, camera))
+        for (const k of [-0.66, 0, 0.66]) {
+          const at = worldAt(item, k * hw)
+          fx.splash(at.x, at.y, at.z, 0.7)
+        }
+    }
+    sound.current.warn = st.warn
+    sound.current.down = down
+  })
+  return (
+    <group>
+      <Gantry half={hw + 0.9} post={0.7} beam={0.8} postTop={GANTRY_TOP + 0.75} beamY={GANTRY_TOP + 0.3} />
+      <group ref={panel}>
+        <mesh geometry={gateGrille(width, GATE_HEIGHT, GATE_BEAM)} material={paint} />
+        <mesh position={[0, GATE_HEIGHT * 0.45 + 0.17, 0]} material={band}>
+          <boxGeometry args={[0.26, 0.12, width + 0.25]} />
+        </mesh>
+      </group>
+      <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[1.4, 2 * hw]} />
+        <meshBasicMaterial ref={mark} color="#ff3b30" transparent opacity={0} depthWrite={false} />
+      </mesh>
+    </group>
+  )
+}
+
+let weeds: THREE.CanvasTexture | null = null
+
+/** A tangle of dark weed strands on murky water, tiling. */
+function kelpTexture() {
+  if (weeds) return weeds
+  const size = 256
+  const c = document.createElement('canvas')
+  c.width = c.height = size
+  const ctx = c.getContext('2d')!
+  ctx.fillStyle = 'rgba(38,70,34,0.55)'
+  ctx.fillRect(0, 0, size, size)
+  ctx.lineCap = 'round'
+  for (let k = 0; k < 90; k++) {
+    const x = (Math.sin(k * 12.9898) * 0.5 + 0.5) * size
+    const y = (Math.sin(k * 78.233) * 0.5 + 0.5) * size
+    const a = k * 2.4
+    ctx.strokeStyle = k % 3 ? 'rgba(74,128,52,0.8)' : 'rgba(120,160,70,0.7)'
+    ctx.lineWidth = 3 + (k % 4)
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.bezierCurveTo(x + Math.cos(a) * 30, y + Math.sin(a) * 30, x + Math.cos(a + 1) * 50, y + Math.sin(a + 1) * 20, x + Math.cos(a) * 60, y + Math.sin(a) * 60)
+    ctx.stroke()
+  }
+  weeds = new THREE.CanvasTexture(c)
+  weeds.colorSpace = THREE.SRGBColorSpace
+  weeds.wrapS = weeds.wrapT = THREE.RepeatWrapping
+  return weeds
+}
+
+/**
+ * The bed under the fronds, `len` along the river and `w` across: a strip whose edges thin out in lumps, so it
+ * reads as weed growing in the water rather than a mat laid on it. Still mostly there right at the edge,
+ * where the drag starts.
+ */
+function kelpBed(len: number, w: number) {
+  const g = new THREE.PlaneGeometry(len, w, Math.max(4, Math.round(len * 2)), Math.max(2, Math.round(w)))
+  const pos = g.attributes.position
+  const col = new Float32Array(pos.count * 4)
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i) + len / 2
+    const y = pos.getY(i)
+    const ends = THREE.MathUtils.smoothstep(Math.min(x, len - x), 0, 1 + 0.45 * Math.sin(y * 1.7 + x))
+    const sides = THREE.MathUtils.smoothstep(Math.min(y + w / 2, w / 2 - y), 0, 0.7 + 0.3 * Math.sin(x * 1.3))
+    col.set([1, 1, 1, 0.3 + 0.7 * ends * sides], i * 4)
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 4))
+  return g
+}
+
+function Kelp({ def, item }: { def: Def<'kelp'>; item: BakedItem }) {
+  const len = def.len ?? ITEM_SIZES.kelpLen
+  const w = def.w ?? 2 * item.hw
+  const { mat, bed } = useMemo(() => {
+    const map = kelpTexture().clone()
+    map.repeat.set(len / 4, w / 4)
+    map.needsUpdate = true
+    return { mat: new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, vertexColors: true }), bed: kelpBed(len, w) }
+  }, [len, w])
+  useEffect(
+    () => () => {
+      mat.map?.dispose()
+      mat.dispose()
+      bed.dispose()
+    },
+    [mat, bed],
+  )
+  // The fronds lean and wave with the current; wet weed keeps the painted sheen.
+  useFrame(({ clock }) => {
+    windTime.value = clock.elapsedTime
+  })
+  return (
+    <group position={[0, 0, def.d ?? 0]}>
+      <mesh geometry={bed} position={[len / 2, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mat} />
+      <mesh geometry={kelpFronds(len, w, item.index)} material={swaying(paint, 0.35)} />
+    </group>
+  )
+}
+
+const BOLT_TOP = GANTRY_TOP + 1
+const boltCore = new THREE.MeshBasicMaterial({ color: '#fffbe0', toneMapped: false })
+const boltGlow = new THREE.MeshBasicMaterial({ color: '#ffe066', transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })
+
+function Lightning({ def, item }: { def: Def<'lightning'>; item: BakedItem }) {
+  const hw = item.hw
+  const r = def.r ?? ITEM_SIZES.bolt
+  const target = useRef<THREE.Group>(null)
+  const ring = useRef<THREE.Mesh>(null)
+  const ringMat = useRef<THREE.MeshBasicMaterial>(null)
+  const scorch = useRef<THREE.MeshBasicMaterial>(null)
+  const bolts = useRef<(THREE.Group | null)[]>([])
+  const glowSpot = useRef<THREE.Sprite>(null)
+  const struck = useRef(false)
+  const { glow, impact, cloud } = useMemo(
+    () => ({
+      glow: new THREE.SpriteMaterial({ map: glowTexture(), color: '#fff2a0', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
+      impact: new THREE.SpriteMaterial({ map: glowTexture(), color: '#fff6c0', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
+      // The cloud lights up from inside as the strike charges, and blazes as it lands.
+      cloud: Object.assign(stone.clone(), { emissive: new THREE.Color('#000000') }),
+    }),
+    [],
+  )
+  useEffect(
+    () => () => {
+      for (const m of [glow, impact, cloud]) m.dispose()
+    },
+    [glow, impact, cloud],
+  )
+  useFrame(({ camera }) => {
+    const t = simTime()
+    const st = lightningState(def, t, hw)
+    target.current?.position.set(0, 0, st.d)
+    const charging = st.charge < 1
+    if (ring.current) ring.current.scale.setScalar(charging ? 1 + (1 - st.charge) * 1.3 : 1)
+    // The ring closes in on the spot as the strike charges, over a danger zone that fills in.
+    if (ringMat.current) ringMat.current.opacity = charging ? 0.35 + 0.6 * st.charge * (0.7 + 0.3 * Math.sin(t * (10 + st.charge * 30))) : st.flash
+    if (scorch.current) {
+      scorch.current.color.set(charging ? '#ffd23a' : '#fff8d0')
+      scorch.current.opacity = charging ? 0.12 + 0.3 * st.charge : 0.25 + st.flash * 0.6
+    }
+    const variant = Math.floor(t / def.beat) % bolts.current.length
+    bolts.current.forEach((b, k) => b && (b.visible = st.flash > 0.25 && k === variant))
+    glowSpot.current?.position.set(0, BOLT_TOP - 0.5, st.d)
+    glow.opacity = charging ? st.charge * 0.6 : st.flash
+    impact.opacity = charging ? 0 : st.flash
+    const flicker = charging && st.charge > 0.5 && Math.sin(t * 53) > 0.6 ? 0.25 * st.charge : 0
+    const k = Math.max(flicker, charging ? 0 : st.flash * 0.9)
+    cloud.emissive.setRGB(k * 0.85, k * 0.8, k * 0.55)
+    if (st.lethal && !struck.current) {
+      if (nearRaft(item)) audio.thunder()
+      if (inView(item, camera)) {
+        const at = worldAt(item, st.d)
+        fx.splash(at.x, at.y, at.z, 0.9)
+        fx.ring(at.x, at.y, at.z, r * 2.4, '#fff07a', 0.6)
+        for (let e = 0; e < 10; e++) fx.ember(at.x, at.y + 0.3, at.z)
+      }
+    }
+    struck.current = st.lethal
+  })
+  return (
+    <group>
+      <mesh geometry={stormCloud(2 * hw + 2)} material={cloud} position={[0, BOLT_TOP, 0]} />
+      <sprite ref={glowSpot} material={glow} scale={4} />
+      <group ref={target}>
+        <mesh ref={ring} position={[0, 0.07, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[r * 0.78, r, 48]} />
+          <meshBasicMaterial ref={ringMat} color="#fff07a" transparent opacity={0} depthWrite={false} toneMapped={false} />
+        </mesh>
+        <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[r, 40]} />
+          <meshBasicMaterial ref={scorch} color="#fff8d0" transparent opacity={0} depthWrite={false} />
+        </mesh>
+        <sprite material={impact} position={[0, 0.6, 0]} scale={r * 2.6} />
+        {[0, 1, 2].map((k) => (
+          <group key={k} ref={(g) => void (bolts.current[k] = g)} visible={false}>
+            <mesh geometry={boltGeo(BOLT_TOP, k, 0.09)} material={boltCore} />
+            <mesh geometry={boltGeo(BOLT_TOP, k, 0.28)} material={boltGlow} />
+          </group>
+        ))}
+      </group>
+    </group>
+  )
+}
+
+/** Geyser shading clock, shared by every geyser. */
+const geyserTime = { value: 0 }
+/** The column: pale blue at the vent, white higher up, with streaks of white water racing up it. */
+const geyserWater = new THREE.ShaderMaterial({
+  transparent: true,
+  depthWrite: false,
+  uniforms: { uTime: geyserTime },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform float uTime;
+    varying vec2 vUv;
+    void main() {
+      float streak = sin(vUv.x * 50.27 + sin(vUv.y * 7.0 - uTime * 9.0) * 1.5) * 0.5 + 0.5;
+      streak = smoothstep(0.55, 0.9, streak) * (sin(vUv.y * 11.0 - uTime * 14.0 + vUv.x * 18.85) * 0.5 + 0.5);
+      vec3 col = mix(vec3(0.62, 0.86, 0.97), vec3(0.93, 0.98, 1.0), smoothstep(0.0, 0.6, vUv.y));
+      col = mix(col, vec3(1.0), streak * 0.8);
+      gl_FragColor = vec4(col, 0.72 + 0.2 * streak);
+      #include <colorspace_fragment>
+    }
+  `,
+})
+const geyserColumn = (() => {
+  const g = new THREE.CylinderGeometry(0.75, 1, 1, 20, 4, true)
+  const pos = g.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    const a = Math.atan2(pos.getZ(i), pos.getX(i))
+    const k = 1 + 0.12 * Math.sin(a * 6 + pos.getY(i) * 5)
+    pos.setXYZ(i, pos.getX(i) * k, pos.getY(i), pos.getZ(i) * k)
+  }
+  g.computeVertexNormals()
+  return g.translate(0, 0.5, 0)
+})()
+/** A lit lump of foam, shaded grey underneath: the crown of a blast and the bubbles before one. */
+const foamLump = paintGeo(blob(12, 8, (p, u) => p.multiplyScalar(1 + lumps(u.x * 3, u.y * 3, u.z * 3, 2) * 0.12)), (p, _n, out) => out.setScalar(0.78 + 0.25 * smoothstep(-0.8, 0.6, p.y)))
+/** The crown: a ring of foam lumps round a domed middle, base at y = 0. */
+const foamCrown = mergeParts([
+  foamLump.clone().scale(1, 0.45, 1),
+  ...Array.from({ length: 7 }, (_, k) => {
+    const a = (k / 7) * Math.PI * 2
+    return foamLump.clone().scale(0.42, 0.3, 0.42).translate(Math.cos(a) * 0.85, -0.05, Math.sin(a) * 0.85)
+  }),
+])
+
+function Geyser({ def, item }: { def: Def<'geyser'>; item: BakedItem }) {
+  const r = def.r ?? ITEM_SIZES.geyser
+  const column = useRef<THREE.Group>(null)
+  const crown = useRef<THREE.Mesh>(null)
+  const ringMat = useRef<THREE.MeshBasicMaterial>(null)
+  const bubbles = useRef<THREE.Group>(null)
+  const sound = useRef({ warn: false, blast: false })
+  const spray = useRef(0)
+  const at = useMemo(() => worldAt(item, def.d), [item, def.d])
+  useFrame(({ camera }, dt) => {
+    const t = simTime()
+    geyserTime.value = t
+    const st = geyserState(def, t)
+    const height = 0.2 + st.blast * 7
+    if (column.current) {
+      column.current.visible = st.blast > 0.02
+      column.current.scale.set(r * 0.45 * (0.7 + 0.3 * st.blast), height, r * 0.45 * (0.7 + 0.3 * st.blast))
+    }
+    if (crown.current) {
+      const wob = 1 + Math.sin(t * 17) * 0.08
+      crown.current.visible = st.blast > 0.02
+      crown.current.position.y = height
+      crown.current.scale.set(r * 0.5 * wob, r * 0.5 * (0.8 + 0.4 * st.blast) / wob, r * 0.5 * wob)
+    }
+    // The ring shows how far the blast reaches: faint while it sleeps, pulsing while it bubbles.
+    if (ringMat.current) ringMat.current.opacity = st.blast > 0 ? 0.7 * st.blast : st.warn ? 0.45 + Math.sin(t * 22) * 0.3 : 0.18
+    if (bubbles.current) {
+      bubbles.current.visible = st.warn
+      bubbles.current.children.forEach((b, k) => {
+        const u = (t * 2.2 + k * 0.37) % 1
+        b.position.set(Math.cos(k * 2.4) * 0.5 * (1 - u), 0.1 + u * 0.6, Math.sin(k * 2.4) * 0.5 * (1 - u))
+        b.scale.setScalar(0.12 + u * 0.18)
+      })
+    }
+    const blast = st.blast > 0
+    const near = inView(item, camera)
+    // Spray off the crown all through the blast, falling back round the vent.
+    if (blast && near && st.blast > 0.3) {
+      spray.current += Math.min(dt, 0.05) * 60
+      const n = Math.floor(spray.current)
+      spray.current -= n
+      if (n) fx.spray(at.x, at.y + height, at.z, n, 3 + st.blast * 3, 3.5, at.y)
+    }
+    if (st.warn && !sound.current.warn && nearRaft(item)) audio.rumble()
+    if (blast && !sound.current.blast) {
+      if (nearRaft(item)) {
+        audio.whoosh()
+        audio.splash(0.8)
+      }
+      if (near) {
+        fx.splash(at.x, at.y, at.z, 1.3)
+        fx.ring(at.x, at.y, at.z, r * 2, '#ffffff', 0.9)
+      }
+    }
+    sound.current.warn = st.warn
+    sound.current.blast = blast
+  })
+  return (
+    <group position={[0, 0, def.d]}>
+      <mesh geometry={ventRocks(0.9)} material={stone} />
+      <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.9, 24]} />
+        <meshBasicMaterial color="#13212b" transparent opacity={0.85} depthWrite={false} />
+      </mesh>
+      <Foam inner={1.05} outer={2} spin={0.2} />
+      <mesh position={[0, 0.07, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[r * 0.92, r, 48]} />
+        <meshBasicMaterial ref={ringMat} color="#ffffff" transparent opacity={0.18} depthWrite={false} />
+      </mesh>
+      <group ref={bubbles} visible={false}>
+        {[0, 1, 2, 3, 4, 5].map((k) => (
+          <mesh key={k} geometry={foamLump} material={stone} />
+        ))}
+      </group>
+      <group ref={column} visible={false}>
+        <mesh geometry={geyserColumn} material={geyserWater} />
+      </group>
+      <mesh ref={crown} geometry={foamCrown} material={stone} visible={false} />
+    </group>
   )
 }

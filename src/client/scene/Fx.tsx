@@ -279,6 +279,44 @@ export const fx = {
       })
     }
   },
+  /** A glowing fleck of fire that drifts up off a jet or a bolt strike and burns out. */
+  ember(x: number, y: number, z: number, vx = 0, vz = 0) {
+    spawn(flames, {
+      x: x + rand(-0.3, 0.3),
+      y: y + rand(-0.2, 0.2),
+      z: z + rand(-0.3, 0.3),
+      vx: vx + rand(-0.8, 0.8),
+      vy: rand(1.5, 3.2),
+      vz: vz + rand(-0.8, 0.8),
+      life: rand(0.5, 0.9),
+      size: rand(0.06, 0.11),
+      drag: 1.4,
+      color: '#ffffff',
+      spin: rand(-6, 6),
+    })
+  },
+  /** Droplets thrown up and out from (x, y, z), `up` m/s at most, falling back to the water at `floor`. */
+  spray(x: number, y: number, z: number, count: number, up: number, spread: number, floor = -1e9) {
+    for (let k = 0; k < count; k++) {
+      const a = Math.random() * Math.PI * 2
+      const sp = rand(0.3, 1) * spread
+      spawn(bits, {
+        x: x + Math.cos(a) * 0.3,
+        y,
+        z: z + Math.sin(a) * 0.3,
+        vx: Math.cos(a) * sp,
+        vy: rand(0.4, 1) * up,
+        vz: Math.sin(a) * sp,
+        life: rand(0.6, 1.1),
+        size: rand(0.1, 0.22),
+        gravity: 18,
+        drag: 0.6,
+        color: k % 3 ? '#ffffff' : '#bfeaff',
+        spin: rand(-6, 6),
+        floorY: floor,
+      })
+    }
+  },
   ring(x: number, y: number, z: number, size: number, color = '#ffffff', life = 1.1) {
     spawn(rings, { x, y: y + 0.05, z, life, size: size * 0.35, grow: size, color })
   },

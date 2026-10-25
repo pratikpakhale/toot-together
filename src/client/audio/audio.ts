@@ -598,6 +598,35 @@ class AudioEngine {
     n.stop(t + 0.95)
   }
 
+  /** A lightning strike: a sharp crack, then a low roll of thunder. */
+  thunder() {
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    const crack = this.noise()
+    const hp = ctx.createBiquadFilter()
+    hp.type = 'highpass'
+    hp.frequency.value = 1800
+    const cg = ctx.createGain()
+    cg.gain.setValueAtTime(0.45, t)
+    cg.gain.exponentialRampToValueAtTime(0.001, t + 0.18)
+    crack.connect(hp).connect(cg).connect(this.sfx)
+    crack.start(t)
+    crack.stop(t + 0.2)
+    const roll = this.noise()
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.setValueAtTime(380, t)
+    lp.frequency.exponentialRampToValueAtTime(90, t + 1.2)
+    const rg = ctx.createGain()
+    rg.gain.setValueAtTime(0, t)
+    rg.gain.linearRampToValueAtTime(0.4, t + 0.06)
+    rg.gain.exponentialRampToValueAtTime(0.001, t + 1.3)
+    roll.connect(lp).connect(rg).connect(this.sfx)
+    roll.start(t)
+    roll.stop(t + 1.35)
+  }
+
   slam() {
     const ctx = this.ctx
     if (!ctx) return

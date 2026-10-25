@@ -14,7 +14,7 @@ import { Gates } from '../scene/Gates'
 import { Hippo, type HippoHandle } from '../scene/Hippo'
 import { PALETTE, soft } from '../scene/materials'
 import { Obstacles } from '../scene/Obstacles'
-import { HIPPO_SCALE, hullKit, SEAT_R, SEAT_Y, SLICE_GAP } from '../scene/raftKit'
+import { HIPPO_SCALE, hullKit, SEAT_R, SEAT_Y, SLICE_GAP, vinyl } from '../scene/raftKit'
 import { RaftHull } from '../scene/RaftHull'
 import { lumps, paint, smoothstep } from '../scene/sculpt'
 import { BlobShadow } from '../scene/shadow'
@@ -202,7 +202,7 @@ function ShowRaft({ crew, team, position = [0, 0, 0] }: { crew: number; team?: n
     belt.current!.visible = true
     rope.current!.visible = false
     pennant.current!.visible = true
-    band.current!.material = soft(TEAMS[team].color)
+    band.current!.material = vinyl(TEAMS[team].color)
     const geo = hullKit.slices[crew]
     rims.forEach((rim, seat) => {
       const slice = slices.current[seat]

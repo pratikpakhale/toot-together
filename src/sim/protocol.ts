@@ -2,7 +2,7 @@ import { REGION_ID_LENGTH } from './regions'
 import type { Phase, PlayerInput, Results, RosterEntry, SimEvent, Snapshot } from './types'
 
 /** Bumped whenever client and server stop understanding each other; older pages are told to reload. */
-export const PROTOCOL_VERSION = 3
+export const PROTOCOL_VERSION = 4
 
 /** A room code is its server's region id and then this many random letters, like INBEAN. */
 export const ROOM_CODE_RANDOM = 4

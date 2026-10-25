@@ -32,6 +32,8 @@ export const EXHIBITS: Exhibit[] = [
   { id: 'walls', name: 'Walls', blurb: 'A sliding spike log, a crusher and a fence with a moving gap.', stage: 'walls', poses: false, view: { dist: 28, lift: 1, pitch: 0.55, yaw: 1.9 } },
   { id: 'floaters', name: 'Floaters', blurb: 'Mines, a rock, a bouncy mushroom, pickups, a boost pad and a whirlpool.', stage: 'floaters', poses: false, view: { dist: 26, lift: 0.5, pitch: 0.6, yaw: 1.9 } },
   { id: 'flames', name: 'Fire jets', blurb: 'Fire jets on both banks, and a sideways current.', stage: 'flames', poses: false, view: { dist: 24, lift: 1, pitch: 0.45, yaw: 1.9 } },
+  { id: 'rapids', name: 'Rapids & sluice', blurb: 'Rapids running back upstream, a kelp bed and a spiked sluice gate.', stage: 'rapids', poses: false, view: { dist: 28, lift: 2, pitch: 0.45, yaw: 1.9 } },
+  { id: 'storm', name: 'Storm', blurb: 'Lightning that marches across the river, and two geysers.', stage: 'storm', poses: false, view: { dist: 28, lift: 2, pitch: 0.45, yaw: 1.9 } },
   { id: 'gates', name: 'Gates', blurb: 'The start, a checkpoint and the finish.', stage: 'gates', poses: false, view: { dist: 34, lift: 4, pitch: 0.35, yaw: 2.3 } },
   { id: 'river', name: 'Rivers', blurb: 'A stretch of the real river, as you play it.', stage: 'river', poses: true, view: { dist: 16, lift: 1, pitch: 0.42, yaw: 3.5 } },
 ]

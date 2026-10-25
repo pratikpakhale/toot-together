@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import { bandedTube, GOLD, METAL, METAL_DARK, placedSpike, rivets, spikeRow } from './hazardKit'
+import { bandedTube, boulder, GOLD, METAL, METAL_DARK, placedSpike, rivets, spikeRow } from './hazardKit'
 import { PALETTE } from './materials'
 import { blob, lumps, merge, paint, smoothstep, tint } from './sculpt'
 
@@ -233,16 +233,153 @@ export function flameTrim(side: number) {
   })
 }
 
-/** The flame: an open cone from the nozzle (y = 0, half width 0.45) out to y = 1, with a wobbly lip. */
+/**
+ * The flame: an open cone from the nozzle (y = 0, half width 0.45) out to y = 1, as the hit shape, with a lip
+ * that only ever wobbles outwards from it.
+ */
 export const flameGeo = (() => {
   const g = new THREE.CylinderGeometry(1, 0.45, 1, 24, 6, true)
   const pos = g.attributes.position
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i) + 0.5
     const a = Math.atan2(pos.getZ(i), pos.getX(i))
-    const k = 1 + 0.1 * Math.sin(a * 5 + y * 6) * y
+    const k = 1 + 0.05 * (1 + Math.sin(a * 5 + y * 6)) * y
     pos.setXYZ(i, pos.getX(i) * k, pos.getY(i), pos.getZ(i) * k)
   }
   g.computeVertexNormals()
   return g.translate(0, 0.5, 0)
 })()
+
+/**
+ * A sluice gate's iron grille, `width` across (along z) and `height` tall from y = 0, with gold-capped bars,
+ * riveted straps and its spiked bottom beam (along z at y = 0, radius `beam`).
+ */
+export function gateGrille(width: number, height: number, beam: number) {
+  return cached(`gate|${width}|${height}|${beam}`, () => {
+    const parts: THREE.BufferGeometry[] = []
+    const bars = Math.max(3, Math.round(width / 0.9))
+    for (let k = 0; k <= bars; k++) {
+      const z = -width / 2 + (k * width) / bars
+      parts.push(tint(new THREE.CylinderGeometry(0.09, 0.09, height, 10).translate(0, height / 2, z), METAL))
+      parts.push(tint(new THREE.SphereGeometry(0.14, 10, 8).translate(0, height, z), GOLD))
+    }
+    for (const y of [height * 0.45, height * 0.9]) {
+      parts.push(tint(new RoundedBoxGeometry(0.22, 0.2, width + 0.2, 2, 0.05).translate(0, y, 0), METAL_DARK))
+      for (let k = 0; k <= bars; k++) parts.push(tint(new THREE.SphereGeometry(0.05, 8, 4).translate(0.12, y, -width / 2 + (k * width) / bars), '#c9c4d2'))
+    }
+    parts.push(spikedLog(width, beam).clone().rotateY(Math.PI / 2))
+    return merge(parts)
+  })
+}
+
+/**
+ * A jagged lightning bolt from y = `top` down to the water at the origin; `variant` picks its zigzag. Two short
+ * forks split off it high up and die out in the air, well inside the strike's ring.
+ */
+export function boltGeo(top: number, variant: number, radius: number) {
+  return cached(`bolt|${top}|${variant}|${radius}`, () => {
+    let seed = variant * 7919 + 13
+    const rand = () => {
+      seed = (seed * 16807) % 2147483647
+      return seed / 2147483647 - 0.5
+    }
+    const steps = 9
+    const pts: THREE.Vector3[] = [new THREE.Vector3(0, top, 0)]
+    for (let k = 1; k <= steps; k++) {
+      const spread = k === steps ? 0 : 0.9
+      pts.push(new THREE.Vector3(rand() * spread * 2, top * (1 - k / steps), rand() * spread * 2))
+    }
+    const zigzag = (from: THREE.Vector3[], r: number) => {
+      const path = new THREE.CurvePath<THREE.Vector3>()
+      for (let k = 1; k < from.length; k++) path.add(new THREE.LineCurve3(from[k - 1], from[k]))
+      return new THREE.TubeGeometry(path, (from.length - 1) * 4, r, 6, false)
+    }
+    const parts = [zigzag(pts, radius)]
+    for (const [at, dir] of [
+      [2, 1],
+      [4, -1],
+    ]) {
+      const a = pts[at]
+      const out = (0.7 + rand() * 0.3) * dir
+      parts.push(zigzag([a, a.clone().add(new THREE.Vector3(out, -top * 0.08, rand())), a.clone().add(new THREE.Vector3(out * 1.6, -top * 0.15, rand() * 1.4))], radius * 0.6))
+    }
+    return merge(parts)
+  })
+}
+
+/** A storm cloud bank `width` across (along z), puffy and pale on top, bruise-dark and flat underneath. Base at y = 0. */
+export function stormCloud(width: number) {
+  return cached(`storm|${width}`, () => {
+    const top = new THREE.Color('#77738f')
+    const belly = new THREE.Color('#2b2840')
+    const n = Math.max(3, Math.ceil(width / 1.6))
+    const parts: THREE.BufferGeometry[] = []
+    for (let k = 0; k < n; k++) {
+      const z = -width / 2 + (k / (n - 1)) * width
+      for (let j = 0; j < 3; j++) {
+        const s = (1.1 + Math.abs(Math.sin(k * 1.7 + j)) * 0.7) * (j ? 0.7 : 1)
+        const x = Math.sin(k * 2.1 + j * 2.4) * 0.9
+        const y = j ? 0.35 + 0.2 * Math.sin(k + j) : 0
+        const seed = k * 3 + j
+        parts.push(
+          blob(14, 10, (p, u) => {
+            p.multiplyScalar(1 + lumps(u.x * 2.4, u.y * 2.4, u.z * 2.4, seed) * 0.12)
+            if (p.y < -0.3) p.y = -0.3 + (p.y + 0.3) * 0.3
+          })
+            .scale(s, s * 0.62, s)
+            .translate(x, y, z + (j - 1) * 0.6),
+        )
+      }
+    }
+    const g = merge(parts)
+    return paint(g, (p, _n, out) => out.copy(belly).lerp(top, smoothstep(-0.25, 1.1, p.y)))
+  })
+}
+
+/** A geyser's vent: a ring of craggy rocks round a dark mouth of radius `r`. */
+export function ventRocks(r: number) {
+  return cached(`vent|${r}`, () => {
+    const parts: THREE.BufferGeometry[] = []
+    const n = 9
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + Math.sin(k * 2.3) * 0.15
+      const s = 0.38 + 0.14 * Math.abs(Math.sin(k * 1.7))
+      parts.push(boulder(k % 3, '#6f6872').clone().scale(s, s * 0.8, s).rotateY(a).translate(Math.cos(a) * (r + 0.15), 0.08, Math.sin(a) * (r + 0.15)))
+    }
+    return merge(parts)
+  })
+}
+
+/** Weed fronds poking out of a kelp bed `len` × `w` (along x, across z, starting at x = 0), seeded by `seed`. */
+export function kelpFronds(len: number, w: number, seed: number) {
+  return cached(`kelp|${len}|${w}|${seed}`, () => {
+    let s = seed * 9973 + 7
+    const rand = () => {
+      s = (s * 16807) % 2147483647
+      return s / 2147483647
+    }
+    const parts: THREE.BufferGeometry[] = []
+    const greens = ['#3f7a35', '#4f8f3b', '#2f6230', '#6a9a3f']
+    const count = Math.round(len * w * 0.35)
+    for (let k = 0; k < count; k++) {
+      const x = rand() * len
+      const z = (rand() - 0.5) * (w - 0.6)
+      const h = 0.35 + rand() * 0.5
+      const blade = new THREE.ConeGeometry(0.07, h, 4, 3)
+      const pos = blade.attributes.position
+      // Bend each blade over as it rises.
+      const bend = 0.5 + rand() * 0.6
+      for (let i = 0; i < pos.count; i++) {
+        const y = pos.getY(i) + h / 2
+        pos.setX(i, pos.getX(i) + bend * (y / h) * (y / h) * 0.6)
+      }
+      blade.computeVertexNormals()
+      parts.push(tint(blade.translate(0, h / 2, 0).rotateY(rand() * Math.PI * 2).translate(x, 0, z), greens[k % greens.length]))
+      if (k % 5 === 0) {
+        const pad = new THREE.CylinderGeometry(0.32 + rand() * 0.2, 0.32, 0.04, 12, 1, false, 0.4, Math.PI * 2 - 0.4)
+        parts.push(tint(pad.translate(rand() * len, 0.04, (rand() - 0.5) * (w - 1)), '#5fa043'))
+      }
+    }
+    return merge(parts)
+  })
+}

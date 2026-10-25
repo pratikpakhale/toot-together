@@ -1,12 +1,12 @@
 import { RAFT_RADIUS, SPIKE_REACH } from './constants'
-import { angleDiff, rightOffset } from './math'
-import { collideItem } from './obstacles'
+import { angleDiff, rightOffset, type Rng } from './math'
+import { collideItem, geyserState, ITEM_SIZES } from './obstacles'
 import type { Sim } from './sim'
 import { type BakedCourse, type BakedItem, EDGE_CODE, nearestSampleAt, pointAt } from './track'
 import type { PlayerInput } from './types'
 
 const DODGE_KINDS = new Set(['mine', 'rock', 'piston', 'bumper', 'spinner', 'whirlpool'])
-const TIMED_KINDS = new Set(['mine', 'spinner', 'mace', 'slider', 'crusher', 'piston', 'whirlpool', 'sweeper', 'flame', 'fence'])
+const TIMED_KINDS = new Set(['mine', 'spinner', 'mace', 'slider', 'crusher', 'piston', 'whirlpool', 'sweeper', 'flame', 'fence', 'gate', 'lightning', 'geyser'])
 /** How far along the river a timed hazard can reach from where it stands (a sweeper's boom swings up and downstream). */
 const reachAlong = (item: BakedItem) => (item.def.kind === 'sweeper' ? item.def.len + 3 : 6)
 
@@ -129,7 +129,7 @@ function clearFor(sim: Sim, raft: Raft, timed: BakedItem[], fromD: number, d: nu
     const pt = pointAt(c, s, lane)
     for (const item of timed) {
       if (Math.abs(item.s - s) > reachAlong(item) + RAFT_RADIUS) continue
-      if (collideItem(item, sim.t + tau, pt.x, pt.z, RAFT_RADIUS + SAFETY)?.type === 'kill') return tau
+      if (blocks(item, sim.t + tau, pt.x, pt.z)) return tau
     }
     v = approach(v, speed)
     w = approach(w, lateralSpeed(d - lane))
@@ -137,4 +137,50 @@ function clearFor(sim: Sim, raft: Raft, timed: BakedItem[], fromD: number, d: nu
     lane += w * STEP
   }
   return LOOKAHEAD
+}
+
+/** Whether a raft centred at (x, z) at time `t` should keep away from `item`: it would die, or a geyser is about to throw it. */
+function blocks(item: BakedItem, t: number, x: number, z: number) {
+  const def = item.def
+  if (def.kind !== 'geyser') return collideItem(item, t, x, z, RAFT_RADIUS + SAFETY)?.type === 'kill'
+  const st = geyserState(def, t)
+  if (!st.warn && st.blast <= 0) return false
+  const dx = x - item.x
+  const dz = z - item.z
+  const across = rightOffset(dx, dz, item.hx, item.hz)
+  return Math.hypot(dx * item.hx + dz * item.hz, across - def.d) < (def.r ?? ITEM_SIZES.geyser) + RAFT_RADIUS + SAFETY
+}
+
+/**
+ * A player driving with the autopilot's intent but human slop: late to react, shaky aim, now and then not
+ * tooting when they should or tooting the wrong way. For fuzz tests and balance runs.
+ */
+export function sloppyBot(rng: Rng) {
+  let held: PlayerInput = { aim: null, walk: 0, fart: false, burst: 0 }
+  let wait = 0
+  let lapse = 0
+  let lapseFart = false
+  let lapseAim = 0
+  let bursts = 0
+  // Each hippo has its own reaction time, 50–130 ms.
+  const reaction = 3 + Math.floor(rng.next() * 6)
+  return (sim: Sim, id: number): PlayerInput => {
+    if (rng.next() < 0.002) bursts++
+    if (lapse > 0) {
+      lapse--
+      return { aim: lapseAim, walk: 0, fart: lapseFart, burst: bursts }
+    }
+    if (rng.next() < 0.004) {
+      // A moment's lapse: stops tooting for up to half a second, or toots the wrong way for a beat.
+      lapseFart = rng.next() < 0.4
+      lapse = lapseFart ? 4 + Math.floor(rng.next() * 10) : 10 + Math.floor(rng.next() * 20)
+      lapseAim = rng.next() * Math.PI * 2
+    }
+    if (wait-- <= 0) {
+      const want = botInput(sim, id)
+      held = { ...want, aim: want.aim === null ? null : want.aim + (rng.next() - 0.5) * 0.3 }
+      wait = reaction
+    }
+    return { ...held, burst: bursts }
+  }
 }

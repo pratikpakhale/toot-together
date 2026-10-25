@@ -46,7 +46,7 @@ import {
   WATER_DRAG,
 } from './constants'
 import { angleDiff, clamp, createRng, type Rng, wrapAngle } from './math'
-import { collideItem, FIELD_KINDS, fieldAt, type KillCause } from './obstacles'
+import { collideItem, FIELD_KINDS, fieldAt, fieldSpan, type KillCause } from './obstacles'
 import { homeRim, type RimSector, rimSector, walkRim } from './sectors'
 import { type BakedCourse, EDGE_CODE, type PickupKind, pointAt, queryTrack, type TrackQuery } from './track'
 import {
@@ -786,8 +786,10 @@ export class Sim {
     az += drag * (hz * flow - raft.vz) + SLOPE_GRAVITY * c.slope[i] * hz
 
     for (const item of c.items) {
-      if (!FIELD_KINDS.has(item.def.kind) || Math.abs(item.s - q.s) > item.hw + 14) continue
-      const field = fieldAt(item, raft.x, raft.z)
+      if (!FIELD_KINDS.has(item.def.kind)) continue
+      const [from, to] = fieldSpan(item)
+      if (q.s < item.s + from - item.hw - 4 || q.s > item.s + to + item.hw + 4) continue
+      const field = fieldAt(item, this.t, raft.x, raft.z, raft.vx, raft.vz)
       if (!field) continue
       ax += field.ax
       az += field.az
@@ -901,7 +903,7 @@ export class Sim {
     for (let k = 0; k < items.length; k++) {
       const item = items[k]
       if (Math.abs(item.s - raft.s) > item.hw + 10) continue
-      if (item.def.kind === 'boost' || item.def.kind === 'current') continue
+      if (FIELD_KINDS.has(item.def.kind) && item.def.kind !== 'whirlpool') continue
       if (item.def.kind === 'pickup') {
         const slot = this.pickupItems.indexOf(k)
         if (this.pickupReadyAt[slot] > this.t) continue

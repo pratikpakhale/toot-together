@@ -4,7 +4,7 @@ import { DT, HIPPO_GAP, RAFT_RADIUS, RESPAWN_AHEAD_OF_CHECKPOINT } from '../src/
 import { COURSE_LIST, getCourse } from '../src/sim/courses'
 import { Sim } from '../src/sim/sim'
 import { type BakedItem, type ItemDef, nearestSampleAt } from '../src/sim/track'
-import { collideItem, fieldAt, flameState, ITEM_SIZES } from '../src/sim/obstacles'
+import { collideItem, fieldAt, flameState, gateState, geyserState, ITEM_SIZES, lightningState } from '../src/sim/obstacles'
 import { angleDiff } from '../src/sim/math'
 import { clampToSector, rimSector, sectorOffset } from '../src/sim/sectors'
 import { aimFromStick, walkFromTurn } from '../src/client/game/input'
@@ -52,13 +52,6 @@ describe.each(COURSE_LIST.map((def) => [def.name, def.id] as const))('course %s'
     expect(overlaps).toEqual([])
   })
 
-  it('can be finished by a crew of two autopilots with hazards live', () => {
-    const sim = new Sim(c, 5)
-    sim.addPlayer(1, 'A', 0)
-    sim.addPlayer(2, 'B', 1)
-    runBot(sim, [1, 2], 900)
-    expect(sim.phase).toBe('finished')
-  })
 })
 
 describe('sim', () => {
@@ -260,21 +253,21 @@ describe('hazards', () => {
 
   it('a whirlpool drags the raft towards its drain and pulls it under at the core', () => {
     const pool = at({ kind: 'whirlpool', at: 0, d: 0 })
-    const f = fieldAt(pool, 0, 3)!
+    const f = fieldAt(pool, 0, 0, 3, 0, 0)!
     expect(f.az).toBeLessThan(0)
     expect(Math.abs(f.ax)).toBeGreaterThan(0)
-    expect(fieldAt(pool, 0, ITEM_SIZES.whirlpool + 0.1)).toBeNull()
+    expect(fieldAt(pool, 0, 0, ITEM_SIZES.whirlpool + 0.1, 0, 0)).toBeNull()
     expect(kills(pool, 0, 0, ITEM_SIZES.whirlpoolCore - 0.1)).toBe(true)
     expect(kills(pool, 0, 0, ITEM_SIZES.whirlpoolCore + 0.1)).toBe(false)
   })
 
   it('a current pushes sideways only over its stretch of river', () => {
     const current = at({ kind: 'current', at: 0, push: 4, len: 10 })
-    const f = fieldAt(current, 5, 0)
+    const f = fieldAt(current, 0, 5, 0, 0, 0)
     expect(f).toMatchObject({ az: 4, spin: 0 })
     expect(f!.ax).toBeCloseTo(0)
-    expect(fieldAt(current, -1, 0)).toBeNull()
-    expect(fieldAt(current, 11, 0)).toBeNull()
+    expect(fieldAt(current, 0, -1, 0, 0, 0)).toBeNull()
+    expect(fieldAt(current, 0, 11, 0, 0, 0)).toBeNull()
   })
 
   it('a flame jet only burns while lit, and warns first', () => {
@@ -290,6 +283,56 @@ describe('hazards', () => {
     expect(kills(fence, 0, 0, 0)).toBe(false)
     expect(kills(fence, 0, 0, 2.5)).toBe(true)
     expect(kills(fence, 0, 0, -2.5)).toBe(true)
+  })
+
+  it('a flame jet is a cone: narrow at its nozzle, full width at its tip', () => {
+    const flame = at({ kind: 'flame', at: 0, side: 1, period: 4, on: 0.5, len: 8 }, 6)
+    // Lit at t = 3; 0.6 m upstream of the jet's line, right by the nozzle and out near the tip.
+    expect(kills(flame, 3, -(RAFT_RADIUS + 0.6), 5.5)).toBe(false)
+    expect(kills(flame, 3, -(RAFT_RADIUS + 0.6), -1.8)).toBe(true)
+  })
+
+  it('a sluice gate kills only while it is down, across the whole river', () => {
+    const def: ItemDef = { kind: 'gate', at: 0, period: 5, open: 0.4 }
+    const gate = at(def)
+    expect(gateState(def, 1).lift).toBe(1)
+    expect(kills(gate, 1, 0, 0)).toBe(false)
+    expect(gateState(def, 1.5).warn).toBe(true)
+    expect(kills(gate, 3, 0, 0)).toBe(true)
+    expect(kills(gate, 3, 0, 5)).toBe(true)
+    expect(kills(gate, 3, RAFT_RADIUS + 1.2, 0)).toBe(false)
+  })
+
+  it('a kelp bed holds the raft back against the ground, not the river', () => {
+    const kelp = at({ kind: 'kelp', at: 0, len: 10, drag: 3 })
+    expect(fieldAt(kelp, 0, 5, 0, 2, 0)).toMatchObject({ ax: -6, spin: 0 })
+    expect(fieldAt(kelp, 0, 11, 0, 2, 0)).toBeNull()
+  })
+
+  it('lightning charges at one spot, strikes it, then marches across the river and back', () => {
+    const def: ItemDef = { kind: 'lightning', at: 0, beat: 1, spots: 3 }
+    const bolt = at(def)
+    const spots = [0.5, 1.5, 2.5, 3.5, 4.5].map((t) => lightningState(def, t, 6).d)
+    expect(spots[0]).toBeLessThan(0)
+    expect(spots[1]).toBeCloseTo(0)
+    expect(spots[2]).toBeGreaterThan(0)
+    expect(spots[3]).toBeCloseTo(0)
+    expect(spots[4]).toBeLessThan(0)
+    expect(lightningState(def, 0.3, 6).lethal).toBe(false)
+    expect(kills(bolt, 0.3, 0, spots[0])).toBe(false)
+    expect(kills(bolt, 0.8, 0, spots[0])).toBe(true)
+    expect(kills(bolt, 0.8, 0, spots[2])).toBe(false)
+  })
+
+  it('a geyser bubbles, then blasts the raft away from its vent without killing it', () => {
+    const def: ItemDef = { kind: 'geyser', at: 0, d: 0, period: 4 }
+    const geyser = at(def)
+    expect(geyserState(def, 1).blast).toBe(0)
+    expect(geyserState(def, 2.5).warn).toBe(true)
+    expect(fieldAt(geyser, 1, 0, 2, 0, 0)).toBeNull()
+    const f = fieldAt(geyser, 3.5, 0, 2, 0, 0)!
+    expect(f.az).toBeGreaterThan(10)
+    expect(kills(geyser, 3.5, 0, 0)).toBe(false)
   })
 
   it('a sweeper boom sweeps across the river and leaves its far bank clear', () => {

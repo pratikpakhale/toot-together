@@ -571,9 +571,14 @@ export function createWaterMaterial(theme: Theme) {
         float lace = (1.0 - smoothstep(0.0, 0.035, abs(au - 0.74 - wob * 0.1))) * smoothstep(0.45, 0.7, noise(vec2(vS * 1.6 - drift * 2.0, vU * 6.0)));
         col = mix(col, uFoam, max(edge * 0.92, lace * 0.6));
 
-        float rapid = smoothstep(0.03, 0.18, vSlope);
+        // White water down a steep drop, and over rapids running back upstream.
+        float rapid = max(smoothstep(0.03, 0.18, vSlope), smoothstep(0.5, 2.5, -vFlow));
         float churn = smoothstep(0.45, 0.8, noise(vec2(vU * 4.0, ph * 1.4)));
-        col = mix(col, uFoam, rapid * churn * 0.85);
+        // Standing waves across it: darker troughs, crests that break white and boil along their length.
+        float crest = sin(vS * 1.6 + noise(vec2(vU * 2.0, vS * 0.3)) * 2.5);
+        float boil = noise(vec2(vU * 6.0 + uTime * 0.7, vS * 2.0 - uTime * vFlow * 0.8));
+        col *= 1.0 - rapid * 0.14 * (1.0 - smoothstep(-0.9, 0.2, crest));
+        col = mix(col, uFoam, rapid * max(churn * 0.6, smoothstep(0.55, 0.95, crest) * (0.5 + 0.5 * boil)));
 
         // The sky in the water at grazing angles.
         float facing = clamp(dot(normalize(vUp), normalize(vView)), 0.0, 1.0);

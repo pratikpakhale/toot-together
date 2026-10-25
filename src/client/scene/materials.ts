@@ -29,6 +29,11 @@ export interface SoftOpts {
   emissive?: string
   /** Strength of the bright fresnel edge that lifts a prop off the background (0 = none). */
   rim?: number
+  /**
+   * Strength of a crisp painted highlight from the sun (0 = none): the sheen that says vinyl, glossy
+   * plastic or enamelled metal. Matte things (grass, rock, wood, foliage) leave it off.
+   */
+  gloss?: number
 }
 
 const softCache = new Map<string, THREE.MeshToonMaterial>()
@@ -40,7 +45,8 @@ const softCache = new Map<string, THREE.MeshToonMaterial>()
  */
 export function soft(color: THREE.ColorRepresentation, opts: SoftOpts = {}) {
   const rim = opts.rim ?? 0.35
-  const key = `${new THREE.Color(color).getHexString()}|${opts.vertexColors ? 1 : 0}|${opts.emissive ?? ''}|${rim}`
+  const gloss = opts.gloss ?? 0
+  const key = `${new THREE.Color(color).getHexString()}|${opts.vertexColors ? 1 : 0}|${opts.emissive ?? ''}|${rim}|${gloss}`
   let m = softCache.get(key)
   if (!m) {
     m = new THREE.MeshToonMaterial({
@@ -49,28 +55,84 @@ export function soft(color: THREE.ColorRepresentation, opts: SoftOpts = {}) {
       vertexColors: !!opts.vertexColors,
       emissive: opts.emissive ?? '#000000',
     })
-    if (rim > 0) addRim(m, rim)
+    if (rim > 0 || gloss > 0) addSheen(m, rim, gloss)
     softCache.set(key, m)
   }
   return m
 }
 
-function addRim(m: THREE.MeshToonMaterial, strength: number) {
+function addSheen(m: THREE.MeshToonMaterial, rim: number, gloss: number) {
   m.onBeforeCompile = (shader) => {
-    shader.uniforms.uRim = { value: strength }
+    shader.uniforms.uRim = { value: rim }
+    shader.uniforms.uGloss = { value: gloss }
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uRim;')
+      .replace('#include <common>', '#include <common>\nuniform float uRim;\nuniform float uGloss;')
       .replace(
         '#include <opaque_fragment>',
         `{
-          float facing = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
-          float rim = smoothstep(0.62, 0.98, 1.0 - facing);
-          outgoingLight += mix(diffuseColor.rgb, vec3(1.0, 0.97, 0.9), 0.55) * rim * uRim;
+          vec3 n = normalize(normal);
+          vec3 view = normalize(vViewPosition);
+          float facing = clamp(dot(n, view), 0.0, 1.0);
+          float rim = smoothstep(0.64, 0.98, 1.0 - facing);
+          outgoingLight += mix(diffuseColor.rgb, vec3(1.0, 0.97, 0.9), 0.5) * rim * uRim;
+          #if NUM_DIR_LIGHTS > 0
+            // A toy's highlight is a shape, not a blur: a soft-edged blob where the sun bounces to the eye.
+            vec3 h = normalize(directionalLights[0].direction + view);
+            float spec = smoothstep(0.55, 0.75, pow(max(dot(n, h), 0.0), 48.0));
+            outgoingLight += directionalLights[0].color * spec * uGloss * 0.32;
+          #endif
         }
         #include <opaque_fragment>`,
       )
   }
-  m.customProgramCacheKey = () => `soft-rim-${strength}`
+  m.customProgramCacheKey = () => `soft-sheen-${rim}-${gloss}`
+}
+
+/** Players who asked for less motion get still foliage, weeds and water dressing. */
+export const calmMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+/** The clock every swaying material reads; whoever draws one sets it each frame. */
+export const windTime = { value: 0 }
+
+const swayCache = new Map<string, THREE.MeshToonMaterial>()
+
+/**
+ * `base` with its vertices nodding in the breeze: each one moves by `amp` × (height above `from`)², height in the
+ * shape's own units, so roots and trunks stay put while tips and crowns sway. Instances (and separate meshes)
+ * sway out of step, phased by where they stand. Still for players who asked for less motion.
+ */
+export function swaying(base: THREE.MeshToonMaterial, amp: number, from = 0) {
+  if (calmMotion) return base
+  const key = `${base.uuid}|${amp}|${from}`
+  let m = swayCache.get(key)
+  if (!m) {
+    const sway = base.clone()
+    const before = base.onBeforeCompile.bind(base)
+    sway.onBeforeCompile = (shader, renderer) => {
+      before(shader, renderer)
+      shader.uniforms.uWind = windTime
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float uWind;').replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        {
+          vec4 root = vec4(0.0, 0.0, 0.0, 1.0);
+          #ifdef USE_INSTANCING
+            root = instanceMatrix * root;
+          #endif
+          root = modelMatrix * root;
+          float lift = max(0.0, position.y - (${from.toFixed(3)}));
+          float ph = uWind * 1.6 + root.x * 0.31 + root.z * 0.23;
+          transformed.x += sin(ph) * ${amp.toFixed(4)} * lift * lift;
+          transformed.z += sin(ph * 0.83 + 1.7) * ${(amp * 0.6).toFixed(4)} * lift * lift;
+        }`,
+      )
+    }
+    const key0 = base.customProgramCacheKey.bind(base)
+    sway.customProgramCacheKey = () => `${key0()}-sway-${amp}-${from}`
+    swayCache.set(key, sway)
+    m = sway
+  }
+  return m
 }
 
 export const PALETTE = {

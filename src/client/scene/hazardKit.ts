@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import { PALETTE, soft, softGradient } from './materials'
+import { PALETTE, soft } from './materials'
 import { blob, merge, paint, smoothstep, tint } from './sculpt'
 
 /**
@@ -15,8 +15,11 @@ export const GOLD = '#ffcf3f'
 const RIVET = '#c9c4d2'
 const BAND = '#8a8299'
 
-/** The material every painted (vertex-coloured) hazard part uses. */
-export const painted = () => soft('#ffffff', { vertexColors: true, rim: 0.3 })
+/** The material every painted (vertex-coloured) hazard part uses: enamelled toy metal and plastic, with a sheen. */
+export const painted = () => soft('#ffffff', { vertexColors: true, rim: 0.3, gloss: 0.55 })
+
+/** The same without the sheen, for stone, weed and cloud. */
+export const matte = () => soft('#ffffff', { vertexColors: true, rim: 0.2 })
 
 const cache = new Map<string, THREE.BufferGeometry>()
 function cached(key: string, build: () => THREE.BufferGeometry) {
@@ -184,11 +187,12 @@ export function woodTexture() {
 
 const woodMats = new Map<string, THREE.MeshToonMaterial>()
 
-/** Grained timber in `color`. */
+/** Grained timber in `color`, with a faint rim so beams stand off the sky. */
 export function woodMat(color: string) {
   let m = woodMats.get(color)
   if (!m) {
-    m = new THREE.MeshToonMaterial({ color, map: woodTexture(), gradientMap: softGradient() })
+    m = soft(color, { rim: 0.15 }).clone()
+    m.map = woodTexture()
     woodMats.set(color, m)
   }
   return m
@@ -351,3 +355,82 @@ export function glowTexture() {
   halo.colorSpace = THREE.SRGBColorSpace
   return halo
 }
+
+let foamTex: THREE.CanvasTexture | null = null
+
+/**
+ * White water for a foam ring: across the texture runs from the ring's inner edge (dense, against whatever
+ * stands in the river) out to nothing; down it runs round the ring. The rim is a lumpy edge of round
+ * bubbles, never points, so foam round a harmless rock can't read as spikes.
+ */
+function foamTexture() {
+  if (foamTex) return foamTex
+  const w = 64
+  const h = 256
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  const ctx = c.getContext('2d')!
+  const reach = (y: number) => {
+    const a = (y / h) * Math.PI * 2
+    return w * (0.5 + 0.12 * Math.sin(a * 3 + 1) + 0.07 * Math.sin(a * 7 + 2))
+  }
+  // The dense wash against the hazard, fading outwards to its lumpy edge.
+  for (let y = 0; y < h; y++) {
+    const g = ctx.createLinearGradient(0, 0, reach(y), 0)
+    g.addColorStop(0, 'rgba(255,255,255,0.95)')
+    g.addColorStop(0.5, 'rgba(255,255,255,0.6)')
+    g.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, y, w, 1)
+  }
+  // Bubbles round the edge, drawn on both sides of the seam so the ring wraps cleanly.
+  let seed = 11
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  for (let k = 0; k < 70; k++) {
+    const y = rnd() * h
+    const x = reach(y) * (0.55 + rnd() * 0.5)
+    const r = 2 + rnd() * 4
+    ctx.fillStyle = `rgba(255,255,255,${0.45 + rnd() * 0.45})`
+    for (const dy of [-h, 0, h]) {
+      ctx.beginPath()
+      ctx.ellipse(x, y + dy, r, r * 1.8, 0, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+  foamTex = new THREE.CanvasTexture(c)
+  foamTex.colorSpace = THREE.SRGBColorSpace
+  foamTex.wrapT = THREE.RepeatWrapping
+  return foamTex
+}
+
+/** A flat ring of foam on the water from `inner` to `outer`, mapped round the ring (u out, v round). */
+export function foamRing(inner: number, outer: number) {
+  return cached(`foam|${inner}|${outer}`, () => {
+    const seg = 48
+    const pos: number[] = []
+    const uv: number[] = []
+    const idx: number[] = []
+    for (let k = 0; k <= seg; k++) {
+      const a = (k / seg) * Math.PI * 2
+      for (const [r, u] of [
+        [inner, 0],
+        [outer, 1],
+      ]) {
+        pos.push(Math.cos(a) * r, 0, -Math.sin(a) * r)
+        uv.push(u, k / seg)
+      }
+    }
+    for (let k = 0; k < seg; k++) idx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2)
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+    g.setIndex(idx)
+    g.computeBoundingSphere()
+    return g
+  })
+}
+
+let foamMaterial: THREE.MeshBasicMaterial | null = null
+/** White water where something stands in the river. */
+export const foamMat = () => (foamMaterial ??= new THREE.MeshBasicMaterial({ map: foamTexture(), transparent: true, opacity: 0.85, depthWrite: false }))

@@ -4,16 +4,17 @@
 
 - **Eight rivers that ramp up**, each with its own look, and each harder towards its end:
   1. **Lazy River** (meadow): introduces each hazard on its own, with room to recover.
-  2. **Canyon Run** (desert canyon): spike alley, spinner plaza, the drop, the ice shelf, crusher canyon and the sky-ribbon finale.
-  3. **Volcano Peak** (lava): spinner gauntlet, lava chute, obsidian ice, the crusher corridor and the caldera rim.
-  4. **Bayou Bends** (swamp at dusk): introduces sideways currents, whirlpools and spike fences.
-  5. **Frostbite Falls** (glacier): ice runs, sweeper booms, fences over open edges and two frozen falls.
-  6. **Sunken Temple** (jungle ruins): introduces fire jets, mixed with crushers, sweepers and pistons.
-  7. **Dragon's Gullet** (lava): fire-jet waves, whirlpool pairs, open-edged drops and a double sweeper.
-  8. **Thunder Run** (storm): every hazard in the game, back to back.
+  2. **Canyon Run** (desert canyon): spike alley, spinner plaza, the drop, the first rapids, the ice shelf, crusher canyon and the sky-ribbon finale.
+  3. **Volcano Peak** (lava): spinner gauntlet, lava chute with the first geyser, obsidian ice, the crusher corridor and the caldera rim.
+  4. **Bayou Bends** (swamp at dusk): introduces sideways currents, kelp beds, whirlpools and spike fences.
+  5. **Frostbite Falls** (glacier): ice runs, sweeper booms, ice geysers, fences over open edges and two frozen falls.
+  6. **Sunken Temple** (jungle ruins): introduces fire jets and sluice gates (one straight after a drop, so you have to brake), mixed with crushers, sweepers and pistons.
+  7. **Dragon's Gullet** (lava): fire-jet waves, geysers by open edges, whirlpool pairs, a climb up rapids through fire and a double sweeper.
+  8. **Thunder Run** (storm): introduces lightning, then every hazard in the game stacked back to back, finishing with a lightning climb up the rapids.
+  Each river is harder than the one before: hazards get quicker and tighter and stack up more, and the balance script's sloppy crews die roughly 0, 8, 13, 9, 12, 9, 23 and 32 times down rivers 1–8.
 - **Progression**: finishing a river unlocks the next. Best times and bronze/silver/gold medals are saved per river, and the results screen has *Next river*, *Again* and *Share*.
 - **Hippo school**: first-time players get a hands-on checklist in the practice pond (walk, toot, burst, then START).
-- **Hazards**: spiked walls, spinning spike crosses, swinging maces, sliding spike logs, crusher doors, slamming pistons, floating mines, sweeper booms hinged on a bank, wall-mounted fire jets, spike fences with a sliding gap, whirlpools that drag the raft in, sideways currents, bouncy mushrooms, rocks, boost pads, and open edges you can fall off. Hit shapes cover the spikes you can see, so a raft that looks like it touched them did.
+- **Hazards**: spiked walls, spinning spike crosses, swinging maces, sliding spike logs, crusher doors, slamming pistons, floating mines, sweeper booms hinged on a bank, wall-mounted fire jets, spike fences with a sliding gap, spiked sluice gates that slam shut across the whole river, lightning that marches across the river strike by strike, geysers that blast the raft away, whirlpools that drag the raft in, sideways currents, kelp beds that hold the raft back, rapids running back upstream, bouncy mushrooms, rocks, boost pads, and open edges you can fall off. Hit shapes cover the spikes you can see, so a raft that looks like it touched them did.
 - **Gas tank**: tooting drains stamina. Run dry and you wheeze until it refills.
 - **Toot Sync**: two or more hippos tooting the same way at the same moment get a rainbow speed boost and a chord.
 - **Snacks**: beans (turbo), chili (endless fire farts), prune (you can't stop tooting).
@@ -32,8 +33,9 @@
 src/sim/        Deterministic, framework-free game simulation (runs in browser AND server)
   track.ts        Turtle-style course pieces → baked samples; track-relative queries
   courses.ts      The eight rivers (pieces, difficulty, medal times)
-  bot.ts          Autopilot: plans a lane and speed (or waits, or backs off) clear of timed hazards (tests, balance, menu raft)
-  obstacles.ts    Hazards as pure functions of time (+ collision shapes, and the force fields of boosts, currents and whirlpools)
+  bot.ts          Autopilot: plans a lane and speed (or waits, or backs off) clear of timed hazards (tests, balance, menu raft),
+                  and a sloppy, human-ish version of it for fuzz tests and balance runs
+  obstacles.ts    Hazards as pure functions of time (+ collision shapes, and the force fields of boosts, currents, whirlpools, kelp and geysers)
   sim.ts          Raft physics, hippos, stamina, sync, pickups, deaths, checkpoints; crews, countdown, places and the rest of a race
                   (co-op is simply a race with one raft)
   sectors.ts      Which slice of the rim each hippo in a crew may stand on
@@ -47,7 +49,8 @@ src/client/
   state/          App store and saved progress (best times, medals, unlocks)
   lab/            /lab: a showroom of the hippos, rafts, hazards and rivers (loaded only on that route)
   guide/          /how-to-play (modes, rules, controls, rivers) and the 404 page as plain HTML, built by scripts/pages.ts
-tests/            Vitest: every course is intact and finishable by bots with hazards live, deaths/respawn, stamina,
+tests/            Vitest: every course is intact, respawns on calm clear water and is finished by sloppy, human-ish bot crews of 1–4
+                  with hazards live (every death checked against its hazard), deaths/respawn, stamina,
                   each hazard, race rules and a random-action fuzz against the room's invariants, chat, the snapshot clock,
                   and rooms surviving a server restart (the room tests spawn real servers on spare ports)
 trailer/          The launch trailer: shot list, title cards and the frame-by-frame recorder
@@ -64,7 +67,7 @@ pnpm test                 # sim, race, chat, netcode and restart hand-off tests
 pnpm typecheck
 pnpm react-doctor         # React Doctor lint (errors fail it)
 pnpm knip                 # unused files, exports and dependencies
-pnpm balance [course-id]  # autopilot timings / death stats per river for tuning
+pnpm balance [course-id]  # clean and sloppy autopilot crews per river: times and deaths, for tuning
 pnpm level-shots [id...]  # re-render level-select thumbnails (public/levels/) in headless Chromium
 pnpm trailer              # re-render the README preview (trailer/preview.webp), the 1080p master and a 1080p copy for social (trailer/out/)
 pnpm reel                 # the vertical 1080×1920 cut of the trailer for phones (trailer/out/)

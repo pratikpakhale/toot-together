@@ -7,10 +7,10 @@ import { type BakedCourse, bakeCourse, type CourseDef, type ItemDef, type ThemeI
  */
 export const FOCUS_S = 40
 
-type Stage = 'pond' | 'gates' | 'spinners' | 'gantries' | 'walls' | 'floaters' | 'flames'
+type Stage = 'pond' | 'gates' | 'spinners' | 'gantries' | 'walls' | 'floaters' | 'flames' | 'rapids' | 'storm'
 
 /** Hazards spread over a 60 m stretch whose middle lands on FOCUS_S; `x` is metres from that middle. */
-const HAZARDS: Record<Exclude<Stage, 'pond' | 'gates'>, { width: number; items: { x: number; def: ItemDef }[] }> = {
+const HAZARDS: Record<Exclude<Stage, 'pond' | 'gates'>, { width: number; flow?: number; items: { x: number; def: ItemDef }[] }> = {
   spinners: {
     width: 14,
     items: [
@@ -54,6 +54,22 @@ const HAZARDS: Record<Exclude<Stage, 'pond' | 'gates'>, { width: number; items: 
       { x: 12, def: { kind: 'current', at: 0, push: 3, len: 9 } },
     ],
   },
+  rapids: {
+    width: 12,
+    flow: -3,
+    items: [
+      { x: -14, def: { kind: 'kelp', at: 0, len: 12 } },
+      { x: 8, def: { kind: 'gate', at: 0, period: 4 } },
+    ],
+  },
+  storm: {
+    width: 13,
+    items: [
+      { x: -8, def: { kind: 'lightning', at: 0, beat: 1.2 } },
+      { x: 6, def: { kind: 'geyser', at: 0, d: -2.8, period: 3.2 } },
+      { x: 12, def: { kind: 'geyser', at: 0, d: 2.8, period: 3.2, phase: 0.5 } },
+    ],
+  },
 }
 
 function define(stage: Stage, theme: ThemeId): CourseDef {
@@ -70,12 +86,12 @@ function define(stage: Stage, theme: ThemeId): CourseDef {
         { len: 20, width: 14 },
       ],
     }
-  const { width, items } = HAZARDS[stage]
+  const { width, flow, items } = HAZARDS[stage]
   return {
     ...base,
     pieces: [
       { len: FOCUS_S - 30, width },
-      { len: 60, width, items: items.map(({ x, def }) => ({ ...def, at: 30 + x })) },
+      { len: 60, width, flow, items: items.map(({ x, def }) => ({ ...def, at: 30 + x })) },
       { len: 20, width },
     ],
   }

@@ -28,6 +28,14 @@ export type ItemDef =
   | { kind: 'flame'; at: number; side: Side; period: number; len?: number; on?: number; phase?: number }
   /** Spiked fence across the whole river with one `gap` that slides `amp` metres either way. */
   | { kind: 'fence'; at: number; gap?: number; amp: number; period: number; phase?: number; d?: number }
+  /** Spiked sluice gate across the whole river, up for the `open` share of each period and slammed shut the rest. */
+  | { kind: 'gate'; at: number; period: number; open?: number; phase?: number }
+  /** Weed bed over `len` metres that drags the raft to a crawl (`drag` per second) unless the crew toots through. */
+  | { kind: 'kelp'; at: number; len?: number; d?: number; w?: number; drag?: number }
+  /** Lightning that strikes `spots` places across the river in turn, back and forth, one every `beat` seconds. */
+  | { kind: 'lightning'; at: number; beat: number; spots?: number; r?: number; phase?: number }
+  /** Vent that bubbles, then erupts and blasts the raft away from it (`power` m/s² at the vent). */
+  | { kind: 'geyser'; at: number; d: number; period: number; r?: number; power?: number; phase?: number }
 
 type Side = 1 | -1
 
@@ -40,6 +48,7 @@ interface PieceDef {
   width?: number
   left?: EdgeKind
   right?: EdgeKind
+  /** Speed of the water downstream, m/s; negative runs it back upstream (rapids the crew must climb). */
   flow?: number
   ice?: boolean
   /** Place a checkpoint gate at the start of this piece. */

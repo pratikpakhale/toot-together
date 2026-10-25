@@ -1,10 +1,11 @@
+import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { createRng } from '../../sim/math'
 import { type BakedCourse, EDGE_CODE, nearestSampleAt } from '../../sim/track'
 import { useApp } from '../state/store'
 import { useFogCull } from './fogCull'
-import { soft } from './materials'
+import { soft, swaying, windTime } from './materials'
 import { blob, lumps, merge, paint, smoothstep } from './sculpt'
 import { type Theme, themeFor } from './themes'
 import { SHELF_H } from './trackGeometry'
@@ -32,6 +33,9 @@ export function Decor({ course }: { course: BakedCourse }) {
   )
   const root = useRef<THREE.Group>(null)
   useFogCull(root)
+  useFrame(({ clock }) => {
+    if (detail) windTime.value = clock.elapsedTime
+  })
   return (
     <group ref={root}>
       {meshes.map((m) => (
@@ -287,6 +291,7 @@ function buildDecor(c: BakedCourse, theme: Theme, detail: boolean): THREE.Instan
   const trunk: Batch = { geo: shapes.trunk, items: [] }
   const canopy: Batch = { geo: shapes.canopy, items: [] }
   const blob: Batch = { geo: shapes.puff, items: [] }
+  const snow: Batch = { geo: shapes.puff, items: [] }
   const rock: Batch = { geo: shapes.rock, items: [] }
   const cane: Batch = { geo: shapes.cane, items: [] }
   const pad: Batch = { geo: shapes.pad, items: [] }
@@ -398,7 +403,7 @@ function buildDecor(c: BakedCourse, theme: Theme, detail: boolean): THREE.Instan
             put(rock, x, y + s * 0.2, z, s * 1.2, s * 0.7, s, rc.pick(look.rock), yaw)
           } else {
             const s = rc.range(0.2, 0.45)
-            put(blob, x, y, z, s * 1.4, s * 0.6, s * 1.4, '#f4fbff', yaw)
+            put(snow, x, y, z, s * 1.4, s * 0.6, s * 1.4, '#f4fbff', yaw)
           }
         }
         // Reeds by the water and mushrooms in the shade, here and there.
@@ -434,14 +439,25 @@ function buildDecor(c: BakedCourse, theme: Theme, detail: boolean): THREE.Instan
     }
   }
 
-  const batches = [trunk, canopy, blob, rock, cane, pad, flower, glow, pine, dead, tuft, cattail, mushroom]
+  const batches = [trunk, canopy, blob, snow, rock, cane, pad, flower, glow, pine, dead, tuft, cattail, mushroom]
+  // Leaves, canes and grass nod in the breeze on the high setting: amount and the height they sway from, in each shape's own units.
+  const sway = new Map<Batch, [number, number]>([
+    [canopy, [0.012, -1]],
+    [blob, [0.012, -1]],
+    [pine, [0.01, 0]],
+    [cane, [0.12, -0.5]],
+    [tuft, [0.5, 0]],
+    [cattail, [0.06, 0]],
+  ])
   const used = new Set(batches.filter((b) => b.items.length).map((b) => b.geo))
   for (const g of Object.values(shapes)) if (g instanceof THREE.BufferGeometry && !used.has(g)) g.dispose()
   if (!used.has(pine.geo)) pine.geo.dispose()
   const meshes: THREE.InstancedMesh[] = []
   for (const b of batches) {
     if (!b.items.length) continue
-    const mat = b === glow && look.glow ? soft(look.glow, { emissive: look.glow, vertexColors: true }) : soft('#ffffff', { vertexColors: true, rim: b === pad ? 0 : 0.25 })
+    const base = b === glow && look.glow ? soft(look.glow, { emissive: look.glow, vertexColors: true }) : soft('#ffffff', { vertexColors: true, rim: b === pad ? 0 : 0.25 })
+    const breeze = detail ? sway.get(b) : undefined
+    const mat = breeze ? swaying(base, ...breeze) : base
     const byChunk = new Map<number, Batch['items']>()
     for (const it of b.items) byChunk.set(it.chunk, [...(byChunk.get(it.chunk) ?? []), it])
     for (const items of byChunk.values()) {

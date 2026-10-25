@@ -13,8 +13,8 @@ import { setTagContent } from '../ui/NameTags'
 import { crewLabel, ordinal } from '../ui/format'
 import { fx } from './Fx'
 import { Hippo, type HippoHandle } from './Hippo'
-import { PALETTE, soft } from './materials'
-import { HIPPO_SCALE, hullKit, SEAT_R, SEAT_Y, SLICE_GAP } from './raftKit'
+import { PALETTE } from './materials'
+import { HIPPO_SCALE, hullKit, SEAT_R, SEAT_Y, SLICE_GAP, vinyl } from './raftKit'
 import { RaftHull } from './RaftHull'
 import { BlobShadow } from './shadow'
 
@@ -141,7 +141,7 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
 
     if (st.team !== race) {
       st.team = race
-      band.current.material = soft(race ? TEAMS[index].color : PALETTE.raftBand)
+      band.current.material = vinyl(race ? TEAMS[index].color : PALETTE.raftBand)
     }
     belt.current.visible = race
     rope.current.visible = !race

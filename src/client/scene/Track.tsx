@@ -13,7 +13,8 @@ export function Track({ course }: { course: BakedCourse }) {
   const theme = themeFor(course)
   const meshes = useMemo(() => buildTrack(course, theme), [course, theme])
   const water = useMemo(() => createWaterMaterial(theme), [theme])
-  const tubeMat = soft('#ffffff', { vertexColors: true, rim: 0.2 })
+  // Rails and spike tubes are padded vinyl bumpers, with the raft's sheen.
+  const tubeMat = soft('#ffffff', { vertexColors: true, rim: 0.2, gloss: 0.5 })
   const groundMat = useMemo(() => {
     const m = soft('#ffffff', { vertexColors: true, rim: 0 }).clone()
     m.side = THREE.DoubleSide
@@ -21,7 +22,7 @@ export function Track({ course }: { course: BakedCourse }) {
   }, [])
 
   const spikeGeo = useMemo(() => spikeGeometry(), [])
-  const spikeMat = soft(PALETTE.spike, { vertexColors: true, rim: 0.3 })
+  const spikeMat = soft(PALETTE.spike, { vertexColors: true, rim: 0.3, gloss: 0.55 })
   const spikes = useMemo(
     () =>
       meshes.chunks.map((chunk) => {

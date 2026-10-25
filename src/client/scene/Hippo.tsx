@@ -77,8 +77,8 @@ const shapes = (() => {
     nails: merge([-0.065, 0, 0.065].map((z) => part(tiny, '#f6e7cf', [0.022, 0.024, 0.026], [0, 0, z]))),
     smile: mouthLine(0.07, 1.5),
     grit: mouthLine(-0.05, 1.1),
-    leg: new THREE.CapsuleGeometry(0.14, 0.16, 4, 12),
-    arm: new THREE.CapsuleGeometry(0.105, 0.28, 4, 10),
+    leg: new THREE.CapsuleGeometry(0.14, 0.16, 4, 12).deleteAttribute('uv'),
+    arm: new THREE.CapsuleGeometry(0.105, 0.28, 4, 10).deleteAttribute('uv'),
     tail: new THREE.CylinderGeometry(0.025, 0.06, 0.26, 7).translate(0, 0.13, 0),
     tusk: new THREE.CapsuleGeometry(0.028, 0.05, 2, 6),
     brow: new THREE.CapsuleGeometry(0.016, 0.07, 2, 6).rotateX(Math.PI / 2),
@@ -89,31 +89,100 @@ const shapes = (() => {
   }
 })()
 
-const bodyGeos = new Map<string, THREE.BufferGeometry>()
+/** Where the muzzle's surface is in direction `dir` from its middle (the muzzle blob's own squash, then its scale). */
+function onMuzzle(dir: THREE.Vector3) {
+  const u = dir.clone().normalize()
+  const f = (x: number, k: number) => Math.sign(x) * Math.abs(x) ** k
+  return new THREE.Vector3(f(u.x, 0.78) * 0.3, f(u.y, 0.85) * 0.25, f(u.z, 0.78) * 0.37)
+}
 
-/** The body with its belly patch and a little shade underneath painted in, one per hippo colour. */
-function bodyFor(color: string) {
-  let g = bodyGeos.get(color)
+const tinted = new Map<string, THREE.BufferGeometry>()
+
+/**
+ * Each hippo colour gets its own copies of the skin parts with shading painted in: what a light can't
+ * do on a toon material, like the shade under a chin, a darker foot or the belly patch.
+ */
+function skinned(part: string, color: string, build: () => THREE.BufferGeometry) {
+  const key = `${part}|${color}`
+  let g = tinted.get(key)
   if (!g) {
-    const skin = new THREE.Color(color)
-    const belly = lighten(color, 0.4)
-    const unit = new THREE.Vector3()
-    g = paint(shapes.body.clone(), (p, _n, out) => {
-      unit.copy(p).normalize()
-      const patch = smoothstep(0.3, 0.38, unit.x - 0.3 * Math.min(0, unit.y) - 0.3 * Math.max(0, unit.y))
-      out.copy(skin).lerp(belly, patch)
-      out.multiplyScalar(0.9 + 0.1 * smoothstep(-0.8, -0.4, unit.y))
-    })
-    bodyGeos.set(color, g)
+    g = build()
+    tinted.set(key, g)
   }
   return g
 }
+
+const unit = new THREE.Vector3()
+
+/** The body with its belly patch, shade underneath and where the head sits, and a lit back. */
+const bodyFor = (color: string) =>
+  skinned('body', color, () => {
+    const skin = new THREE.Color(color)
+    const belly = lighten(color, 0.4)
+    return paint(shapes.body.clone(), (p, _n, out) => {
+      unit.copy(p).normalize()
+      const patch = smoothstep(0.3, 0.38, unit.x - 0.3 * Math.min(0, unit.y) - 0.3 * Math.max(0, unit.y))
+      out.copy(skin).lerp(belly, patch)
+      // Darker underneath where it meets the legs, in the crease under the head, lighter across the back.
+      const under = 0.8 + 0.2 * smoothstep(-0.85, -0.35, unit.y)
+      const neck = 1 - 0.12 * smoothstep(0.45, 0.8, unit.y) * smoothstep(0.1, 0.5, unit.x)
+      const back = 1 + 0.06 * smoothstep(0.2, 0.9, unit.y) * smoothstep(0.1, -0.5, unit.x)
+      out.multiplyScalar(under * neck * back)
+    })
+  })
+
+/** The head: a darker jaw where it tucks into the body, a lit crown. */
+const headFor = (color: string) =>
+  skinned('head', color, () => {
+    const skin = new THREE.Color(color)
+    return paint(shapes.sphere.clone(), (p, _n, out) => {
+      out.copy(skin).multiplyScalar((0.84 + 0.16 * smoothstep(-0.9, -0.2, p.y)) * (1 + 0.05 * smoothstep(0.3, 1, p.y)))
+    })
+  })
+
+/** The muzzle: paler on top, a pink flush round the nose, shade under the lip, and whisker freckles. */
+const muzzleFor = (color: string) =>
+  skinned('muzzle', color, () => {
+    const snout = lighten(color, 0.24)
+    const flush = snout.clone().lerp(new THREE.Color('#ff9fb4'), 0.16)
+    const freckle = new THREE.Color(color).multiplyScalar(0.72)
+    const body = paint(shapes.muzzle.clone(), (p, _n, out) => {
+      out.copy(snout).lerp(flush, smoothstep(0.2, 0.9, p.x) * smoothstep(-0.1, 0.6, p.y))
+      out.multiplyScalar((0.82 + 0.18 * smoothstep(-0.95, -0.35, p.y)) * (1 + 0.06 * smoothstep(0.4, 1, p.y)))
+    }).scale(0.3, 0.25, 0.37)
+    const dots = SIDES.flatMap((side) =>
+      [
+        [0.78, -0.12, 0.62],
+        [0.68, -0.28, 0.72],
+        [0.8, -0.36, 0.5],
+      ].map(([x, y, z]) => {
+        const at = onMuzzle(new THREE.Vector3(x, y, side * z))
+        return tint(shapes.tiny.clone().scale(0.014, 0.014, 0.014).translate(at.x, at.y, at.z), freckle)
+      }),
+    )
+    return merge([body, ...dots])
+  })
+
+/** A leg, darker towards the foot. */
+const legFor = (color: string) =>
+  skinned('leg', color, () => {
+    const skin = new THREE.Color(color)
+    return paint(shapes.leg.clone(), (p, _n, out) => out.copy(skin).multiplyScalar(0.8 + 0.2 * smoothstep(-0.2, 0.12, p.y)))
+  })
+
+/** An arm, darker at the shoulder where it meets the body. */
+const armFor = (color: string) =>
+  skinned('arm', color, () => {
+    const skin = new THREE.Color(color)
+    return paint(shapes.arm.clone(), (p, _n, out) => out.copy(skin).multiplyScalar(0.84 + 0.18 * smoothstep(-0.2, 0.15, p.y)))
+  })
 
 function Nails({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
   return <mesh geometry={shapes.nails} position={[x, y, 0]} scale={scale} material={soft('#ffffff', { vertexColors: true, rim: 0 })} />
 }
 
 const SIDES = [1, -1] as const
+const SATIN = 0.4
 const damp = THREE.MathUtils.damp
 
 export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(function Hippo({ color, seat }, ref) {
@@ -136,19 +205,20 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
   useEffect(() => () => cheekMat.dispose(), [cheekMat])
   const { skin, snout, ear, tuft, browMat } = useMemo(
     () => ({
-      skin: soft(color),
-      snout: soft(lighten(color, 0.24)),
+      skin: soft(color, { gloss: SATIN }),
+      snout: soft(lighten(color, 0.24), { gloss: SATIN }),
       ear: soft(lighten(color, 0.1).lerp(new THREE.Color('#ff8fa8'), 0.45), { rim: 0 }),
       tuft: soft(new THREE.Color(color).multiplyScalar(0.6), { rim: 0 }),
       browMat: soft(new THREE.Color(color).multiplyScalar(0.45), { rim: 0 }),
     }),
     [color],
   )
-  const bodyMat = soft('#ffffff', { vertexColors: true })
+  // Skin is a satin vinyl toy: a soft sheen, not a shine. Teeth are glossier.
+  const bodyMat = soft('#ffffff', { vertexColors: true, gloss: SATIN })
   const dark = soft('#2b2236', { rim: 0 })
   const mouthMat = soft('#7a2e3f', { rim: 0 })
   const painted = soft('#ffffff', { vertexColors: true, rim: 0 })
-  const tooth = soft('#fffaf0', { rim: 0 })
+  const tooth = soft('#fffaf0', { rim: 0, gloss: 0.6 })
   const water = soft('#8fdcff', { rim: 0.6 })
 
   useImperativeHandle(ref, () => ({
@@ -162,13 +232,15 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
       const shake = p.farting ? Math.sin(t * 46) * 0.035 : 0
       const squash = p.burst * 0.25
       const cheer = p.celebrate
+      // Each hop lands with a little squash, and a cheer's jumps with a bigger one.
+      const land = walking ? (1 - Math.abs(Math.sin(t * 15))) ** 6 * 0.07 : cheer ? (1 - Math.abs(Math.sin(t * 7))) ** 6 * 0.14 : 0
 
       body.current.position.y = hop
       body.current.rotation.x = walking ? Math.sin(t * 15) * 0.12 * p.walk : 0
       // Tooting lifts the butt; tired slumps forward.
       const lean = p.farting ? -0.22 : p.exhausted ? 0.12 : 0
       body.current.rotation.z = THREE.MathUtils.lerp(body.current.rotation.z, lean - squash * 0.6, 0.25)
-      body.current.scale.set(1 + shake + squash * 0.4, 1 + breathe - squash, 1 - shake + squash * 0.3)
+      body.current.scale.set(1 + shake + squash * 0.4 + land * 0.5, 1 + breathe - squash - land, 1 - shake + squash * 0.3 + land * 0.5)
 
       if (cheer) {
         body.current.position.y = Math.abs(Math.sin(t * 7)) * 0.5
@@ -194,7 +266,7 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
       const flap = p.farting ? Math.sin(t * 38) * 0.35 : 0
       ears.current.forEach((e, i) => {
         const out = p.exhausted ? 0.9 : p.burst > 0.1 ? 0.2 : 0.5
-        e.rotation.x = damp(e.rotation.x, SIDES[i] * -(out + flap + twitch * 0.4), 18, dt)
+        e.rotation.x = damp(e.rotation.x, SIDES[i] * -(out + flap + twitch * 0.4 + land * 3), 18, dt)
         e.rotation.z = damp(e.rotation.z, p.burst > 0.1 ? 0.9 : p.exhausted ? -0.3 : 0, 14, dt)
       })
 
@@ -252,9 +324,9 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
             ref={(m) => {
               if (m) legs.current[i] = m
             }}
-            geometry={shapes.leg}
+            geometry={legFor(color)}
             position={[x, 0.2, z]}
-            material={skin}
+            material={bodyMat}
           >
             <Nails x={0.122} y={-0.16} />
           </mesh>
@@ -267,7 +339,7 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
               }}
               rotation={[0, 0, -1.0]}
             >
-              <mesh geometry={shapes.arm} position={[0, 0.1, 0]} material={skin} />
+              <mesh geometry={armFor(color)} position={[0, 0.1, 0]} material={bodyMat} />
               <group position={[0, 0.3, 0]} rotation={[0, 0, Math.PI / 2]}>
                 <Nails x={0.085} y={0} scale={0.8} />
               </group>
@@ -275,9 +347,9 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
           </group>
         ))}
         <group ref={head} position={[0.32, 1.1, 0]}>
-          <mesh geometry={shapes.sphere} scale={[0.37, 0.34, 0.37]} material={skin} />
+          <mesh geometry={headFor(color)} scale={[0.37, 0.34, 0.37]} material={bodyMat} />
           <group position={[0.3, -0.1, 0]}>
-            <mesh geometry={shapes.muzzle} scale={[0.3, 0.25, 0.37]} material={snout} />
+            <mesh geometry={muzzleFor(color)} material={bodyMat} />
             <mesh ref={smile} geometry={shapes.smile} position={[0, -0.065, 0]} material={dark} />
             <mesh ref={grit} geometry={shapes.grit} position={[0, -0.06, 0]} material={dark} visible={false} />
             <mesh ref={gasp} geometry={shapes.sphere} position={[0.285, -0.07, 0]} scale={[0.03, 0.05, 0.075]} material={mouthMat} visible={false} />

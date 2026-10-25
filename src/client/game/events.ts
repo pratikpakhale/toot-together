@@ -22,6 +22,8 @@ const DEATH_LINES: Record<KillCause, [string, string]> = {
   sweeper: ['SWEPT!', 'That boom had a schedule.'],
   flame: ['TOASTED!', 'Roast hippo, extra crispy.'],
   fence: ['SNAGGED!', 'Aim for the gap, not the spikes.'],
+  gate: ['SHUT OUT!', 'The gate waits for no hippo.'],
+  lightning: ['ZAPPED!', 'Hippos: excellent conductors.'],
   fall: ['OVERBOARD!', 'Hippos cannot fly. Confirmed.'],
   reset: ['RESET!', 'Back to the last checkpoint.'],
 }
