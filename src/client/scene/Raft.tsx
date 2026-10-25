@@ -266,7 +266,7 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
           tag.style.display = 'block'
         } else tag.style.display = 'none'
       }
-      const talking = !!bubble && !!spot && (race || showSlices)
+      const talking = !!bubble && !!spot
       if (bubble) bubble.style.display = talking ? 'block' : 'none'
       const tagShown = !!tag && !!spot && showTags
       if (spot && (tagShown || talking)) {
