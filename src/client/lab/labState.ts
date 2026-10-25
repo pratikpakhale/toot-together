@@ -43,6 +43,8 @@ interface LabState {
   /** Hippo colour for the close-up. */
   seat: number
   spin: boolean
+  /** TOOT held down (Space or the button): the hippos toot, out loud, whatever the pose. */
+  tooting: boolean
   set(patch: Partial<Omit<LabState, 'set'>>): void
 }
 
@@ -59,6 +61,7 @@ export const useLab = create<LabState>((set) => ({
   pose: pick(params.get('pose'), POSES, 'idle'),
   seat: 0,
   spin: !params.has('still'),
+  tooting: false,
   set: (patch) => set(patch),
 }))
 
@@ -72,6 +75,11 @@ useLab.subscribe(({ exhibit, theme, pose }) => {
 })
 
 export const exhibitById = (id: string) => EXHIBITS.find((e) => e.id === id) ?? EXHIBITS[0]
+
+/** The pose the hippos strike right now: the chosen one, or a toot while TOOT is held (a chili one on Chili). */
+export function livePose({ pose, tooting }: { pose: PoseName; tooting: boolean }): PoseName {
+  return tooting && pose !== 'chili' ? 'toot' : pose
+}
 
 /** The pose the hippos strike at time `t`, from the chosen pose button. */
 export function poseAt(t: number, pose: PoseName): HippoPose {

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { audio } from './audio/audio'
+import { audio, unlockOnGesture } from './audio/audio'
 import { isHippocamRoute, joinRoom, roomFromUrl, showMenu, showHippocam } from './game/controller'
 import { frame, isRace } from './game/frame'
 import { input } from './game/input'
@@ -52,15 +52,7 @@ export function App() {
 
   useEffect(boot, [])
 
-  // Browsers only allow audio after a user gesture. iOS only counts the end of a touch.
-  useEffect(() => {
-    const unlock = () => audio.unlock()
-    const events = ['pointerdown', 'pointerup', 'touchend', 'keydown']
-    for (const type of events) window.addEventListener(type, unlock)
-    return () => {
-      for (const type of events) window.removeEventListener(type, unlock)
-    }
-  }, [])
+  useEffect(unlockOnGesture, [])
 
   useEffect(() => {
     const onVisibility = () => {

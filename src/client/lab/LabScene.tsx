@@ -2,6 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { audio } from '../audio/audio'
 import { getCourse } from '../../sim/courses'
 import { rimSector } from '../../sim/sectors'
 import { pointAt } from '../../sim/track'
@@ -19,12 +20,11 @@ import { lumps, paint, smoothstep } from '../scene/sculpt'
 import { BlobShadow } from '../scene/shadow'
 import { type Theme, THEMES } from '../scene/themes'
 import { Track } from '../scene/Track'
-import { type Exhibit, exhibitById, poseAt, useLab } from './labState'
+import { type Exhibit, exhibitById, livePose, poseAt, useLab } from './labState'
 import { FOCUS_S, riverFor, showcaseCourse } from './showcase'
 
 /** Where hippos stand on the island, above the water. */
 const ISLAND_TOP = 0.35
-const BUTT_R = SEAT_R + 0.66 * HIPPO_SCALE
 const FART = SEAT_COLORS.map((c) => '#' + new THREE.Color(PALETTE.fart).lerp(new THREE.Color(c), 0.3).getHexString())
 const SMOKE = '#5e4a46'
 const butt = new THREE.Vector3()
@@ -62,11 +62,13 @@ export function LabScene({ shadows }: { shadows: boolean }) {
  */
 function SimClock() {
   useFrame(({ clock }) => {
+    audio.update()
     frame.view = { t: clock.elapsedTime, tick: 0, phase: 'racing', raceTime: 0, goAt: 0, closeAt: 0, rafts: [], players: [], pickups: [] }
   }, -20)
   useEffect(
     () => () => {
       frame.view = null
+      audio.stopAllFarts()
     },
     [],
   )
@@ -119,7 +121,8 @@ function PosedHippo({ color, seat }: { color: string; seat: number }) {
   const hippo = useRef<HippoHandle>(null)
   const root = useRef<THREE.Group>(null!)
   useCastShadows(root)
-  useFrame(({ clock }) => hippo.current?.pose(poseAt(clock.elapsedTime, useLab.getState().pose)))
+  useFrame(({ clock }) => hippo.current?.pose(poseAt(clock.elapsedTime, livePose(useLab.getState()))))
+  useGas(() => [{ body: root.current, seat }])
   return (
     <group ref={root}>
       <Hippo ref={hippo} color={color} seat={seat} />
@@ -184,13 +187,15 @@ function ShowRaft({ crew, team, position = [0, 0, 0] }: { crew: number; team?: n
   const flag = useRef<THREE.Mesh>(null)
   const slices = useRef<(THREE.Mesh | null)[]>([])
   const hippos = useRef<(HippoHandle | null)[]>([])
+  const bodies = useRef<(THREE.Group | null)[]>([])
   const rims = useMemo(() => {
     const seats = Array.from({ length: crew }, (_, i) => i)
     return seats.map((seat) => rimSector(seat, seats)?.center ?? Math.PI)
   }, [crew])
-  const gas = useRef({ emit: 0, tooting: false })
   const race = team !== undefined
   useCastShadows(root)
+  // Gas from every other hippo, so the crew stays visible through it.
+  useGas(() => rims.map((_, seat) => ({ body: bodies.current[seat], seat, gassy: seat % 2 === 0 })))
 
   useLayoutEffect(() => {
     if (!race) return
@@ -208,37 +213,13 @@ function ShowRaft({ crew, team, position = [0, 0, 0] }: { crew: number; team?: n
     })
   }, [race, team, crew, rims])
 
-  useFrame(({ clock }, dt) => {
+  useFrame(({ clock }) => {
     const t = clock.elapsedTime + (team ?? 0) * 1.3
     tilt.current.rotation.set(Math.sin(t * 1.7) * 0.02, 0, Math.cos(t * 1.3) * 0.02)
     tilt.current.position.y = Math.sin(t * 2.1) * 0.04
     if (flag.current) flag.current.rotation.y = Math.sin(t * 6) * 0.25
-    const { pose } = useLab.getState()
+    const pose = livePose(useLab.getState())
     for (const h of hippos.current) h?.pose(poseAt(clock.elapsedTime, pose))
-
-    // Gas from every other hippo, so the crew stays visible through it.
-    const tooting = pose === 'toot' || pose === 'chili'
-    const start = tooting && !gas.current.tooting
-    gas.current.tooting = tooting
-    if (!tooting) return
-    gas.current.emit += Math.min(dt, 0.05) * 30
-    root.current.updateMatrixWorld()
-    while (gas.current.emit >= 1 || start) {
-      for (let seat = 0; seat < crew; seat += 2) {
-        const rim = rims[seat]
-        butt.set(Math.cos(rim) * BUTT_R, SEAT_Y + 0.62 * HIPPO_SCALE, Math.sin(rim) * BUTT_R).applyMatrix4(root.current.matrixWorld)
-        dir.set(Math.cos(rim), 0, Math.sin(rim)).transformDirection(root.current.matrixWorld)
-        if (pose === 'chili') {
-          fx.flame(butt.x, butt.y, butt.z, dir.x, dir.z)
-          if (Math.random() < 0.25) fx.fart(butt.x, butt.y, butt.z, dir.x, dir.z, SMOKE)
-        } else {
-          if (start) fx.tootStart(butt.x, butt.y, butt.z, dir.x, dir.z, FART[seat])
-          fx.fart(butt.x, butt.y, butt.z, dir.x, dir.z, FART[seat])
-        }
-      }
-      if (start) break
-      gas.current.emit -= 1
-    }
   })
 
   return (
@@ -248,7 +229,12 @@ function ShowRaft({ crew, team, position = [0, 0, 0] }: { crew: number; team?: n
         <group ref={tilt}>
           <RaftHull index={team ?? 0} parts={{ band, belt, rope, pennant, flag, slices }} />
           {rims.map((rim, seat) => (
-            <group key={seat} position={[Math.cos(rim) * SEAT_R, SEAT_Y, Math.sin(rim) * SEAT_R]} rotation={[0, -(rim + Math.PI), 0]} scale={HIPPO_SCALE}>
+            <group
+              key={seat}
+              ref={(g) => {
+                bodies.current[seat] = g
+              }}
+              position={[Math.cos(rim) * SEAT_R, SEAT_Y, Math.sin(rim) * SEAT_R]} rotation={[0, -(rim + Math.PI), 0]} scale={HIPPO_SCALE}>
               <Hippo
                 ref={(h) => {
                   hippos.current[seat] = h
@@ -262,6 +248,63 @@ function ShowRaft({ crew, team, position = [0, 0, 0] }: { crew: number; team?: n
       </group>
     </group>
   )
+}
+
+/**
+ * Gas from each hippo while it toots, and its toot out loud while TOOT is held. `body` is the hippo's own
+ * group (it faces +x); `gassy: false` keeps a hippo's gas in. Voices are one per seat colour, so even the
+ * race rafts make four.
+ */
+function useGas(hippos: () => { body: THREE.Object3D | null; seat: number; gassy?: boolean }[]) {
+  const gas = useRef({ emit: 0, tooting: false })
+  const voices = useRef(new Set<string>())
+
+  useEffect(
+    () => () => {
+      for (const key of voices.current) audio.fartStop(key)
+    },
+    [],
+  )
+
+  useFrame((_, dt) => {
+    const lab = useLab.getState()
+    const pose = livePose(lab)
+    const tooting = pose === 'toot' || pose === 'chili'
+    const start = tooting && !gas.current.tooting
+    gas.current.tooting = tooting
+    const list = hippos()
+
+    for (const { seat } of list) {
+      const key = `lab-${seat}`
+      if (!lab.tooting) {
+        audio.fartStop(key)
+        voices.current.delete(key)
+      } else if (!audio.isFarting(key)) {
+        audio.fartStart(key, seat, { kind: pose === 'chili' ? 'chili' : 'normal' })
+        voices.current.add(key)
+      }
+    }
+
+    if (!tooting) return
+    gas.current.emit += Math.min(dt, 0.05) * 30
+    while (gas.current.emit >= 1 || start) {
+      for (const { body, seat, gassy = true } of list) {
+        if (!body || !gassy) continue
+        body.updateWorldMatrix(true, false)
+        butt.set(-0.66, 0.62, 0).applyMatrix4(body.matrixWorld)
+        dir.set(-1, 0, 0).transformDirection(body.matrixWorld)
+        if (pose === 'chili') {
+          fx.flame(butt.x, butt.y, butt.z, dir.x, dir.z)
+          if (Math.random() < 0.25) fx.fart(butt.x, butt.y, butt.z, dir.x, dir.z, SMOKE)
+        } else {
+          if (start) fx.tootStart(butt.x, butt.y, butt.z, dir.x, dir.z, FART[seat])
+          fx.fart(butt.x, butt.y, butt.z, dir.x, dir.z, FART[seat])
+        }
+      }
+      if (start) break
+      gas.current.emit -= 1
+    }
+  })
 }
 
 /** Orbit camera (drag, pinch, scroll; auto-turns until you grab it), placed for each exhibit. */

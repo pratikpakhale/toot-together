@@ -645,3 +645,13 @@ function makeDrive(amount: number) {
 }
 
 export const audio = new AudioEngine()
+
+/** Browsers only allow audio after a user gesture. iOS only counts the end of a touch. Returns the unsubscribe. */
+export function unlockOnGesture() {
+  const unlock = () => audio.unlock()
+  const events = ['pointerdown', 'pointerup', 'touchend', 'keydown']
+  for (const type of events) window.addEventListener(type, unlock)
+  return () => {
+    for (const type of events) window.removeEventListener(type, unlock)
+  }
+}
