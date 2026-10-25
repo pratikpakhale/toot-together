@@ -41,4 +41,5 @@ Preconditions:
 - Failed joins count against `127.0.0.1` (20 per minute), then every join is refused with `Slow down!`/`Too many attempts`.
 - Every name (on joining, and a mid-room rename from Settings) is run through the profanity filter, and a match is replaced with something like `Bubbles42`; use clean names in assertions.
 - Without the permission grant the clipboard write can be refused; the chip then shows a `Couldn't copy the link` notice instead of turning its icon into a tick.
+- Locally the page reaches every region at its own origin, so the level select's `SERVER` choice changes nothing: rooms always get an `IN` code. A server stamping its region on codes and knowing nothing of another region's is covered by `pnpm test` (`tests/regions.test.ts`).
 - Server restart hand-off (rooms parked to `ROOMS_FILE`, clients reconnecting) is covered by `pnpm test` (`tests/handoff.test.ts`), not by this map.

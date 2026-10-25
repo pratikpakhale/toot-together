@@ -21,7 +21,7 @@ Production is one game server per region plus the page on Vercel. `regions.json`
 
 ## Testing
 
-Test with `pnpm test` (vitest; `tests/handoff.test.ts`, `tests/chat.test.ts` and `tests/race-room.test.ts` spawn real servers), node scripts against `pnpm dev`, `pnpm typecheck`, and `pnpm react-doctor` (React Doctor: errors fail it, warnings are advisory; `--no-score` keeps results off react.doctor's servers).
+Test with `pnpm test` (vitest; `tests/handoff.test.ts`, `tests/chat.test.ts`, `tests/race-room.test.ts` and `tests/regions.test.ts` spawn real servers), node scripts against `pnpm dev`, `pnpm typecheck`, and `pnpm react-doctor` (React Doctor: errors fail it, warnings are advisory; `--no-score` keeps results off react.doctor's servers).
 
 ## Design
 

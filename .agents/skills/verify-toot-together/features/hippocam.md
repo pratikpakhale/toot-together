@@ -6,6 +6,7 @@
 
 - `cam-empty` with no rooms: `No rooms right now. The river is quiet.`
 - `cam-list` each room card shows its code, river name, phase chip (`IN THE POND`, `COUNTDOWN` in race rooms, `RACING`, `FINISHED`, `EMPTY Ns`), crew names with host crown and ping, and a `Watch` button.
+- `cam-regions` with more than one region in `regions.json` a `Server` tablist (one tab per region, the first selected) sits by the title. Locally every tab reads the same room server, so they all list the same rooms.
 - `cam-stats` the bar shows `Rooms`, `Players`, `Spectators`, `Sockets`, `CPU`, `Load`, `Steal`, `Memory`, `Free`, `Tick late`, `Uptime`, `Release`.
 - `cam-watch` `Watch` opens the run with a `SPECTATING` chip, no stamina meter, no touch controls, a `Players` button (the mute list) instead of `Chat`, and the room's chat log visible.
 - `cam-back` the spectator pause menu (`Esc`) says `You're watching room CODE. Nobody can see you.` and `Back to rooms` returns to the list; `Back to the game` on the list goes to the main menu at `/`.

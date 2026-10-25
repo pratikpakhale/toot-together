@@ -62,13 +62,15 @@ Redeploying restarts the server, so **never deploy while anyone is on it**. `/he
 | Menu | Esc / P | Start | Menu button |
 | Chat (online) | Hold Q, move the mouse, let go (or tap Q, then 1–8); T to type | | Chat button: tap to type, hold and slide to pick a line |
 | Ready / start the race / hop on (race rooms) | Y | Y | The big button |
+| Swap spots with a crewmate (race lobby) | [ / ] | | ‹ › on your raft |
+| Watch another raft (on the bench, or once your raft is done) | ← / → or [ / ] | | Arrows on the watch bar |
 | Crews: raft count, shuffle, move hippos (race host) | C | | Crews button |
 
 Hold left or right and your hippo keeps walking around the rim; point the stick and it walks to that spot. Its butt faces outward, so a toot pushes the raft the opposite way. To go forward, stand at the back. The arrow on the water shows where your toot will push.
 
 A lone hippo has the whole rim. In a crew of 2–4, each hippo owns an equal slice (shown in its colour on the raft ring) and stops at the edge of it, so nobody can wander into a teammate's spot. Slices are handed out in seat order and start at the back, so two hippos can always share the forward push.
 
-In a race, each raft has a colour and a shape (Red ▲, Yellow ●, Teal ■, Pink ◆) and its own crew of 1–4. Rafts bump off each other, a toot shoves any rival raft behind it, and snacks go to whoever gets there first. Once the first raft finishes, the rest have 30 seconds to cross the line. Opening the link puts you on the raft with the most room, and one tap switches. Arrive mid-race and you watch from the bench until you hop on.
+In a race, each raft has a colour and a shape (Red ▲, Yellow ●, Teal ■, Pink ◆) and its own crew of 1–4. Rafts bump off each other, a toot shoves any rival raft behind it, and snacks go to whoever gets there first. Once the first raft finishes, the rest have 30 seconds to cross the line. Opening the link puts you on the raft with the most room, one tap switches, and in the lobby you can swap spots round your raft. Arrive mid-race and you watch from the bench until you hop on.
 
 What's in the game and how it's built: [OVERVIEW.md](OVERVIEW.md).
 

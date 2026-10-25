@@ -21,7 +21,7 @@
 - **Blame**: every crash names the hippo whose toots caused it. The results screen hands out awards (Most Toxic, Saboteur, Harmony Hippo, Silent But Deadly…).
 - **Legendary toots**: rare and announced to the whole room.
 - **Chat** (online): a comms wheel of eight lines, one set for co-op crews and one for races (hold Q, nudge the mouse towards a line and let go, or tap Q and press 1–8; on a phone, hold the chat button by TOOT and nudge your thumb towards a line), a row of emoji reactions, or type your own (T, or a tap on the phone's chat button). What a hippo says pops up over its head (reactions as a big emoji) and in a short log, and late joiners get the last 20 lines. Swear words are starred out, each player gets 5 lines per 10 s, and anyone can be muted from the type box's player list (in a race, one column per raft, so a full room never wraps). Settings › Chat turns it all off.
-- **Raft racing** (online): 2–4 rafts with crews of 1–4 race down the same river. Opening the link puts you on the raft with the most room; one tap switches rafts, and the host can also set the raft count, shuffle and move hippos. Everyone readies up in the pond (the host's Start counts as ready), and a 3·2·1 countdown drops the start gate for everyone at once. Rafts bump, toots shove rivals (a rival pushed into a hazard counts as a snipe, for the Gas Assassin award), a respawning raft is a ghost until it's clear, and after the first finish the rest have 30 s before they're out of time. Results rank every raft; races don't touch medals or best times. Someone arriving mid-race watches from the bench and can hop onto any raft that's still racing.
+- **Raft racing** (online): 2–4 rafts with crews of 1–4 race down the same river. Opening the link puts you on the raft with the most room; one tap switches rafts, you can swap spots round your own raft, and the host can also set the raft count, shuffle and move hippos. Everyone readies up in the pond (the host's Start counts as ready), and a 3·2·1 countdown drops the start gate for everyone at once. Rafts bump, toots shove rivals (a rival pushed into a hazard counts as a snipe, for the Gas Assassin award), a respawning raft is a ghost until it's clear, and after the first finish the rest have 30 s before they're out of time. Results rank every raft; races don't touch medals or best times. Someone arriving mid-race watches from the bench and can hop onto any raft that's still racing.
 - **Online play**: a dropped player keeps their seat for 30 s while the game reconnects them; the host (crown) is the only one who can restart mid-run; rooms, connections and join attempts are rate limited; names go through a profanity filter. `/hippocam` (linked from nowhere in the game) lists every live room with the server's stats and lets you watch any of them as an invisible spectator.
 - **Installable**: the game is a PWA that opens full screen from a home screen, and solo games work offline. A new release reloads the page as soon as the player isn't mid-run.
 - **Procedural audio**: every toot, splash, boing and the music loop is synthesised with WebAudio, so there are no audio files and no two toots sound the same.
@@ -47,23 +47,24 @@ src/client/
   audio/          WebAudio synth (farts, sfx) + procedural music
   ui/             Menus, HUD, level select, results, settings (Tailwind) + the icon set
   state/          App store and saved progress (best times, medals, unlocks)
-  lab/            /lab: a showroom of the hippos, rafts, hazards and rivers (loaded only on that route)
+  lab/            /lab: a showroom of the hippos, rafts, hazards and rivers; hold Space or TOOT to make the hippos toot (loaded only on that route)
   guide/          /how-to-play (modes, rules, controls, rivers) and the 404 page as plain HTML, built by scripts/pages.ts
 tests/            Vitest: every course is intact, respawns on calm clear water and is finished by sloppy, human-ish bot crews of 1–4
                   with hazards live (every death checked against its hazard), deaths/respawn, stamina,
                   each hazard, race rules and a random-action fuzz against the room's invariants, chat, the snapshot clock,
-                  and rooms surviving a server restart (the room tests spawn real servers on spare ports)
+                  your own hippo on a laggy link, region-prefixed room codes and rooms surviving a server restart
+                  (the room tests spawn real servers on spare ports)
 trailer/          The launch trailer: shot list, title cards and the frame-by-frame recorder
 ```
 
 - **Multiplayer**: the server owns the only simulation, clients send inputs (where to stand, toot, burst), and the server broadcasts snapshots that clients render slightly in the past with interpolation (one snapshot interval plus the jitter they measure, at most 250 ms). Obstacles are pure functions of the shared clock, so they cost no bandwidth. Your own toots play sound and particles instantly, before the server confirms them, and your own hippo walks round the rim at once (the same step as the sim), easing onto the server's spot once it has caught up.
 - **Regions**: `regions.json` lists the game servers. A room code starts with its server's id (`INBEAN`), so a code or invite link alone says where to connect. New rooms go to the server with the shortest round trip unless the host picks another, and `/hippocam` has a tab per server.
 - **Solo and couch** run the exact same `Sim` in the browser, so every mode shares one code path.
-- **Course authoring**: a course is a list of pieces (`len`, `turn`, `drop`, `width`, `left`/`right` edge: `wall | spikes | open`, `flow`, `ice`, `items`). Baking produces samples used by both physics and rendering. `pnpm test` checks that a course never folds back onto itself and that the autopilot can finish it.
+- **Course authoring**: a course is a list of pieces (`len`, `turn`, `drop`, `width`, `left`/`right` edge: `wall | spikes | open`, `flow` (negative for rapids running upstream), `ice`, `checkpoint`, `items`). Baking produces samples used by both physics and rendering. `pnpm test` checks that a course never folds back onto itself and that the autopilot can finish it.
 - **Trailer**: the real game scene, steered by the autopilot from a shot list (`trailer/director.ts`) with scripted chat. `pnpm trailer` steps it frame by frame in headless Chromium on a fake clock while the game's synth renders into an `OfflineAudioContext`, so every frame and sound lands on time and each render comes out identical. `pnpm trailer:dryrun` plays the shots in Node and prints what happens in each. It needs ffmpeg and `pnpm exec playwright install chromium-headless-shell`.
 
 ```bash
-pnpm test                 # sim, race, chat, netcode and restart hand-off tests
+pnpm test                 # sim, race, chat, netcode, region and restart hand-off tests
 pnpm typecheck
 pnpm react-doctor         # React Doctor lint (errors fail it)
 pnpm knip                 # unused files, exports and dependencies
