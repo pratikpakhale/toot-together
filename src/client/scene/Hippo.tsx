@@ -13,6 +13,8 @@ export interface HippoPose {
   strain: number
   buff: number
   celebrate: boolean
+  /** 0–1: caught in a whirlpool, going round and round. Googly eyes, flailing arms, a wobbling head. */
+  dizzy: number
 }
 
 export interface HippoHandle {
@@ -232,6 +234,7 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
       const shake = p.farting ? Math.sin(t * 46) * 0.035 : 0
       const squash = p.burst * 0.25
       const cheer = p.celebrate
+      const dizzy = p.dizzy
       // Each hop lands with a little squash, and a cheer's jumps with a bigger one.
       const land = walking ? (1 - Math.abs(Math.sin(t * 15))) ** 6 * 0.07 : cheer ? (1 - Math.abs(Math.sin(t * 7))) ** 6 * 0.14 : 0
 
@@ -245,16 +248,22 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
       if (cheer) {
         body.current.position.y = Math.abs(Math.sin(t * 7)) * 0.5
         body.current.rotation.y = Math.sin(t * 3.5) * 0.5
-      } else body.current.rotation.y = 0
+      } else body.current.rotation.y = Math.sin(t * 6) * 0.45 * dizzy
 
-      head.current.rotation.z = p.exhausted ? -0.25 : p.farting ? 0.12 : cheer ? 0.15 : Math.sin(t * 1.3) * 0.05
-      head.current.rotation.x = Math.sin(t * 0.9) * 0.06 + (walking ? Math.sin(t * 15) * 0.05 : 0)
+      // Dizzy, the head rolls round in circles.
+      head.current.rotation.z = (p.exhausted ? -0.25 : p.farting ? 0.12 : cheer ? 0.15 : Math.sin(t * 1.3) * 0.05) + Math.sin(t * 9) * 0.35 * dizzy
+      head.current.rotation.x = Math.sin(t * 0.9) * 0.06 + (walking ? Math.sin(t * 15) * 0.05 : 0) + Math.cos(t * 9) * 0.3 * dizzy
 
       const squint = p.farting ? 0.35 : p.exhausted ? 0.5 : cheer ? 0.25 : Math.sin(t * 0.7) > 0.985 ? 0.1 : 1
-      for (const e of eyes.current) e.scale.y = THREE.MathUtils.lerp(e.scale.y, squint, 0.4)
+      eyes.current.forEach((e, i) => {
+        // Googly: wide open, one eye swelling as the other shrinks.
+        const googly = 1 + 0.3 * dizzy + Math.sin(t * 11 + i * Math.PI) * 0.35 * dizzy
+        e.scale.y = THREE.MathUtils.lerp(e.scale.y, dizzy > 0.2 ? googly : squint, 0.4)
+        e.scale.x = e.scale.z = 1 + 0.25 * dizzy
+      })
 
-      // Brows: knitted while straining, sagging when tired, up when cheering.
-      const knit = p.farting || p.burst > 0.2 ? -0.45 : p.exhausted ? 0.4 : cheer ? 0.15 : 0
+      // Brows: knitted while straining, sagging when tired, up when cheering or dizzy.
+      const knit = p.farting || p.burst > 0.2 ? -0.45 : p.exhausted ? 0.4 : cheer ? 0.15 : 0.4 * dizzy
       const lift = cheer ? 0.01 : p.exhausted ? -0.01 : p.farting ? -0.015 : 0
       brows.current.forEach((b, i) => {
         b.rotation.x = damp(b.rotation.x, knit * SIDES[i], 14, dt)
@@ -263,31 +272,31 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
 
       // Ears: an idle twitch now and then, flapping while tooting, blown back by a burst, droopy when tired.
       const twitch = Math.max(0, Math.sin(t * 0.83) - 0.96) * 12
-      const flap = p.farting ? Math.sin(t * 38) * 0.35 : 0
+      const flap = p.farting ? Math.sin(t * 38) * 0.35 : Math.sin(t * 30) * 0.4 * dizzy
       ears.current.forEach((e, i) => {
         const out = p.exhausted ? 0.9 : p.burst > 0.1 ? 0.2 : 0.5
         e.rotation.x = damp(e.rotation.x, SIDES[i] * -(out + flap + twitch * 0.4 + land * 3), 18, dt)
         e.rotation.z = damp(e.rotation.z, p.burst > 0.1 ? 0.9 : p.exhausted ? -0.3 : 0, 14, dt)
       })
 
-      // Arms: waving overhead when cheering, hanging when tired.
+      // Arms: waving overhead when cheering, flailing when dizzy, hanging when tired.
       arms.current.forEach((a, i) => {
-        const up = cheer ? 1.05 + Math.sin(t * 9 + i * Math.PI) * 0.35 : 0
+        const up = cheer ? 1.05 + Math.sin(t * 9 + i * Math.PI) * 0.35 : dizzy * (1.2 + Math.sin(t * 14 + i * Math.PI) * 0.6)
         a.rotation.z = damp(a.rotation.z, -1.0 + up + (p.exhausted ? -0.35 : 0), 12, dt)
       })
 
       legs.current.forEach((leg, i) => {
-        leg.rotation.z = walking ? Math.sin(t * 15 + (i % 2) * Math.PI) * 0.5 : 0
+        leg.rotation.z = walking ? Math.sin(t * 15 + (i % 2) * Math.PI) * 0.5 : Math.sin(t * 18 + i * 1.7) * 0.6 * dizzy
       })
       tail.current.rotation.y = p.farting ? Math.sin(t * 30) * 0.6 : Math.sin(t * 2) * 0.2
       tailLift.current.rotation.z = damp(tailLift.current.rotation.z, p.farting || p.burst > 0.1 ? 1.15 : 2.2, 12, dt)
 
       // Face: a smile by default, gritted while tooting, a gasp after a burst or when out of puff.
-      const gasping = p.burst > 0.15 || p.exhausted
+      const gasping = p.burst > 0.15 || p.exhausted || dizzy > 0.3
       smile.current.visible = !p.farting && !gasping
       grit.current.visible = p.farting && !gasping
       gasp.current.visible = gasping
-      if (gasping) gasp.current.scale.y = 0.05 + (p.exhausted ? Math.abs(Math.sin(t * 7)) * 0.03 : 0.04 * p.burst)
+      if (gasping) gasp.current.scale.y = 0.05 + (p.exhausted ? Math.abs(Math.sin(t * 7)) * 0.03 : Math.max(0.04 * p.burst, (0.03 + Math.abs(Math.sin(t * 8)) * 0.03) * dizzy))
       const puff = p.farting ? 1.25 + Math.sin(t * 46) * 0.04 : 1
       for (const c of cheeks.current.children) c.scale.set(0.1 * puff, 0.07 * puff, 0.04)
 

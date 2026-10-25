@@ -18,7 +18,7 @@ const DEATH_LINES: Record<KillCause, [string, string]> = {
   slider: ['SKEWERED!', 'That log had places to be.'],
   mine: ['KABOOM!', 'Floaty spiky balls are bad, actually.'],
   piston: ['FLATTENED!', 'Watch for the shadow!'],
-  whirlpool: ['SUCKED UNDER!', 'Round and round and… down.'],
+  whirlpool: ['SUCKED UNDER!', 'Round and round and… *burp*.'],
   sweeper: ['SWEPT!', 'That boom had a schedule.'],
   flame: ['TOASTED!', 'Roast hippo, extra crispy.'],
   fence: ['SNAGGED!', 'Aim for the gap, not the spikes.'],
@@ -104,9 +104,13 @@ export function handleEvent(e: SimEvent, menu: boolean) {
     case 'death': {
       const r = v?.rafts[e.raft]
       const loud = audible(e.raft)
+      frame.deathCause[e.raft] = e.cause
       if (r && e.cause === 'fall') {
         if (loud) audio.fallWhistle()
         fx.splash(r.x, r.y, r.z, 0.6)
+      } else if (r && e.cause === 'whirlpool') {
+        // The raft goes down the drain whole; RaftView plays it out.
+        if (loud) audio.slurp()
       } else if (r) {
         if (loud) audio.pop()
         fx.pop(r.x, r.y, r.z)

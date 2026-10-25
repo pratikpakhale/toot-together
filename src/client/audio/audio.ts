@@ -377,6 +377,101 @@ class AudioEngine {
     n.stop(t + 0.85)
   }
 
+  /** A few bubbles bloop up out of a whirlpool's drain. */
+  gurgle(gain = 1) {
+    const ctx = this.ctx
+    if (!ctx) return
+    for (let k = 0; k < 3; k++) {
+      const t = ctx.currentTime + k * (0.07 + Math.random() * 0.05)
+      const f = 220 + Math.random() * 260
+      const o = ctx.createOscillator()
+      o.frequency.setValueAtTime(f, t)
+      o.frequency.exponentialRampToValueAtTime(f * 2.6, t + 0.07)
+      const g = ctx.createGain()
+      g.gain.setValueAtTime(0, t)
+      g.gain.linearRampToValueAtTime(0.16 * gain, t + 0.01)
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
+      o.connect(g).connect(this.sfx)
+      o.start(t)
+      o.stop(t + 0.09)
+    }
+  }
+
+  /** A raft going down the drain: a long sinking slurp, then the whirlpool burps. */
+  slurp() {
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    const n = this.noise()
+    const bp = ctx.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.Q.value = 6
+    bp.frequency.setValueAtTime(2400, t)
+    bp.frequency.exponentialRampToValueAtTime(260, t + 0.85)
+    const ng = ctx.createGain()
+    ng.gain.setValueAtTime(0, t)
+    ng.gain.linearRampToValueAtTime(0.5, t + 0.08)
+    ng.gain.linearRampToValueAtTime(0, t + 0.9)
+    n.connect(bp).connect(ng).connect(this.sfx)
+    n.start(t)
+    n.stop(t + 0.95)
+    // The gulp: a wobbling tone that drops down the plughole.
+    const o = ctx.createOscillator()
+    o.frequency.setValueAtTime(760, t)
+    o.frequency.exponentialRampToValueAtTime(110, t + 0.85)
+    const vib = ctx.createOscillator()
+    vib.frequency.value = 17
+    const vg = ctx.createGain()
+    vg.gain.value = 70
+    vib.connect(vg).connect(o.frequency)
+    const og = ctx.createGain()
+    og.gain.setValueAtTime(0, t)
+    og.gain.linearRampToValueAtTime(0.14, t + 0.05)
+    og.gain.linearRampToValueAtTime(0, t + 0.9)
+    o.connect(og).connect(this.sfx)
+    o.start(t)
+    vib.start(t)
+    o.stop(t + 0.95)
+    vib.stop(t + 0.95)
+    this.burp(t + 1.15)
+  }
+
+  private burp(t: number) {
+    const ctx = this.ctx!
+    const dur = 0.6
+    const o = ctx.createOscillator()
+    o.type = 'sawtooth'
+    o.frequency.setValueAtTime(95, t)
+    o.frequency.linearRampToValueAtTime(120, t + dur * 0.3)
+    o.frequency.exponentialRampToValueAtTime(62, t + dur)
+    // Gravelly flutter, the way a burp rattles.
+    const flutter = ctx.createGain()
+    flutter.gain.value = 0.5
+    const lfo = ctx.createOscillator()
+    lfo.type = 'square'
+    lfo.frequency.setValueAtTime(34, t)
+    lfo.frequency.linearRampToValueAtTime(22, t + dur)
+    const depth = ctx.createGain()
+    depth.gain.value = 0.5
+    lfo.connect(depth).connect(flutter.gain)
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.Q.value = 5
+    lp.frequency.setValueAtTime(500, t)
+    lp.frequency.linearRampToValueAtTime(900, t + dur * 0.3)
+    lp.frequency.exponentialRampToValueAtTime(300, t + dur)
+    const env = ctx.createGain()
+    env.gain.setValueAtTime(0, t)
+    env.gain.linearRampToValueAtTime(0.6, t + 0.04)
+    env.gain.setValueAtTime(0.6, t + dur * 0.55)
+    env.gain.linearRampToValueAtTime(0, t + dur)
+    o.connect(flutter).connect(lp).connect(env).connect(this.shaper)
+    o.start(t)
+    lfo.start(t)
+    o.stop(t + dur + 0.05)
+    lfo.stop(t + dur + 0.05)
+  }
+
   fallWhistle() {
     const ctx = this.ctx
     if (!ctx) return

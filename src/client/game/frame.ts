@@ -1,4 +1,5 @@
 import { CREW_SIZE } from '../../sim/constants'
+import type { KillCause } from '../../sim/obstacles'
 import { RAFT_RESULT, type Snapshot } from '../../sim/types'
 import type { IconName } from '../ui/icons'
 import type { GameSession } from './session'
@@ -21,6 +22,8 @@ export const frame = {
   follow: 0,
   /** The rival a finished or benched player chose to watch (←/→), if any. */
   watch: null as number | null,
+  /** What each raft last died of, so its death plays out to match. */
+  deathCause: [] as (KillCause | undefined)[],
 }
 
 export const SEAT_COLORS = ['#4aa8ff', '#ff9a3c', '#62d26f', '#b57cf6'] as const

@@ -18,6 +18,7 @@ const POSE_LABEL: Record<(typeof POSES)[number], string> = {
   tired: 'Wheeze',
   burst: 'Burst',
   cheer: 'Cheer',
+  dizzy: 'Dizzy',
 }
 
 /** The asset lab at /lab: every hippo, raft, hazard and river in the game, to turn round and look at. */

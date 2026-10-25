@@ -4,7 +4,7 @@ import { BUFF_CODE } from '../../sim/types'
 import type { HippoPose } from '../scene/Hippo'
 import type { Stage } from './showcase'
 
-export const POSES = ['idle', 'walk', 'toot', 'chili', 'tired', 'burst', 'cheer'] as const
+export const POSES = ['idle', 'walk', 'toot', 'chili', 'tired', 'burst', 'cheer', 'dizzy'] as const
 export type PoseName = (typeof POSES)[number]
 
 export const THEME_IDS: ThemeId[] = ['meadow', 'canyon', 'volcano', 'bayou', 'glacier', 'temple', 'storm']
@@ -95,5 +95,6 @@ export function poseAt(t: number, pose: PoseName): HippoPose {
     strain: tooting ? 1 : 0,
     buff: pose === 'chili' ? BUFF_CODE.chili : BUFF_CODE.none,
     celebrate: pose === 'cheer',
+    dizzy: pose === 'dizzy' ? 1 : 0,
   }
 }

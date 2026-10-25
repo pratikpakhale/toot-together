@@ -2,8 +2,9 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { CREW_SIZE, MAX_RAFTS } from '../../sim/constants'
+import { ITEM_SIZES, whirlpoolSwirl } from '../../sim/obstacles'
 import { rimSector } from '../../sim/sectors'
-import { pointAt, type BakedCourse } from '../../sim/track'
+import { pointAt, type BakedCourse, type BakedItem } from '../../sim/track'
 import { BUFF_CODE, RAFT_RESULT, RAFT_STATE, type PlayerSnap, type RaftStateCode } from '../../sim/types'
 import { audio } from '../audio/audio'
 import { EARSHOT, frame, isRace, myRaft, SEAT_COLORS, standings, tagSlot, TEAMS } from '../game/frame'
@@ -36,6 +37,34 @@ interface TagSpot {
 const TAG_FADE = 25
 
 const FART_COLORS = SEAT_COLORS.map((c) => '#' + new THREE.Color(PALETTE.fart).lerp(new THREE.Color(c), 0.3).getHexString())
+/** How long a raft takes to go down a whirlpool's drain (s), and when the whirlpool burps after. */
+const SINK = 0.9
+const BURP_AT = 1.25
+
+/** Where a whirlpool's drain is, how far it reaches and which way it turns. */
+interface Drain {
+  x: number
+  z: number
+  reach: number
+  swirl: number
+}
+
+function drainOf(item: BakedItem): Drain | null {
+  const def = item.def
+  if (def.kind !== 'whirlpool') return null
+  return { x: item.x - item.hz * def.d, z: item.z + item.hx * def.d, reach: def.r ?? ITEM_SIZES.whirlpool, swirl: Math.sign(whirlpoolSwirl(def)) }
+}
+
+/** The whirlpool whose pull reaches furthest over (x, z), and how hard (0–1), if any. */
+function pullAt(drains: Drain[], x: number, z: number) {
+  let best: { drain: Drain; pull: number } | null = null
+  for (const drain of drains) {
+    const pull = 1 - Math.hypot(x - drain.x, z - drain.z) / drain.reach
+    if (pull > 0 && (!best || pull > best.pull)) best = { drain, pull }
+  }
+  return best
+}
+
 /** Soot that rolls off chili fire. */
 const SMOKE = '#5e4a46'
 
@@ -85,7 +114,8 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
   const slices = useRef<(THREE.Mesh | null)[]>([])
   const arrowMats = useMemo(() => SEAT_COLORS.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.6, depthWrite: false })), [])
   const fartKeys = useMemo(() => SEAT_COLORS.map((_, seat) => `p${index}-${seat}`), [index])
-  const state = useRef({ emit: [0, 0, 0, 0], tooting: [false, false, false, false], wake: 0, tiltX: 0, tiltZ: 0, team: false })
+  const state = useRef({ emit: [0, 0, 0, 0], tooting: [false, false, false, false], wake: 0, tiltX: 0, tiltZ: 0, team: false, gurgle: 0, slurped: false, burped: false })
+  const drains = useMemo(() => course.items.flatMap((item) => drainOf(item) ?? []), [course])
 
   useEffect(() => () => arrowMats.forEach((m) => m.dispose()), [arrowMats])
   // The raft and crew cast sun shadows (drawn only where the renderer has shadows on).
@@ -148,8 +178,35 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
     pennant.current.visible = race
     if (race) flag.current.rotation.y = Math.sin(t * 6 + index) * 0.25
 
-    root.current.position.set(r.x, r.y, r.z)
-    root.current.rotation.y = -r.a
+    const caught = pullAt(drains, r.x, r.z)
+    // Down the drain: the raft spirals in, spinning ever faster, and sinks.
+    const sucked = r.st === RAFT_STATE.popped && frame.deathCause[index] === 'whirlpool' && caught ? caught.drain : null
+    const sink = sucked ? Math.min(1, r.stT / SINK) ** 2 : 0
+    if (sucked) {
+      const turn = sucked.swirl * r.stT * r.stT * 14
+      const ox = (r.x - sucked.x) * (1 - sink)
+      const oz = (r.z - sucked.z) * (1 - sink)
+      const c = Math.cos(turn)
+      const s = Math.sin(turn)
+      root.current.position.set(sucked.x + ox * c - oz * s, r.y - 2.2 * sink, sucked.z + ox * s + oz * c)
+      root.current.rotation.y = -r.a - sucked.swirl * r.stT * r.stT * 25
+      if (r.stT >= SINK && !st.slurped) {
+        st.slurped = true
+        fx.bubbles(sucked.x, r.y, sucked.z, 16)
+        fx.ring(sucked.x, r.y, sucked.z, 2.5, '#ffffff', 0.6)
+      }
+      if (r.stT >= BURP_AT && !st.burped) {
+        st.burped = true
+        fx.burp(sucked.x, r.y, sucked.z)
+      }
+    } else {
+      st.slurped = st.burped = false
+      root.current.position.set(r.x, r.y, r.z)
+      root.current.rotation.y = -r.a
+    }
+    // Caught in a whirlpool, the crew goes dizzy and the raft rocks.
+    const pull = r.st === RAFT_STATE.float && caught ? caught.pull : 0
+    const dizzy = sucked ? 1 : THREE.MathUtils.clamp((pull - 0.1) / 0.5, 0, 1)
 
     let tx = 0
     let tz = 0
@@ -161,13 +218,14 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
     }
     st.tiltX = THREE.MathUtils.damp(st.tiltX, tz * 0.05, 6, dt)
     st.tiltZ = THREE.MathUtils.damp(st.tiltZ, -tx * 0.05, 6, dt)
-    tilt.current.rotation.set(st.tiltX + Math.sin(t * 1.7) * 0.02, 0, st.tiltZ + Math.cos(t * 1.3) * 0.02)
+    tilt.current.rotation.set(st.tiltX + Math.sin(t * 1.7) * 0.02 + Math.sin(t * 8) * 0.08 * pull, 0, st.tiltZ + Math.cos(t * 1.3) * 0.02 + Math.cos(t * 8) * 0.08 * pull)
     tilt.current.position.y = Math.sin(t * 2.1) * 0.04
     // A raft respawning through others flickers; one that's done racing just drifts through.
     tilt.current.visible = !(r.gh && r.res === RAFT_RESULT.none && Math.floor(t * 12) % 2)
 
     let raftScale = 1
-    if (r.st === RAFT_STATE.popped) raftScale = r.stT < 0.1 ? 1 + r.stT * 3 : 0
+    if (sucked) raftScale = r.stT < SINK ? 1 - 0.6 * sink : 0
+    else if (r.st === RAFT_STATE.popped) raftScale = r.stT < 0.1 ? 1 + r.stT * 3 : 0
     else if (r.st === RAFT_STATE.float && r.stT < 0.45) raftScale = elasticOut(r.stT / 0.45)
     raftBody.current.scale.setScalar(Math.max(0.0001, raftScale))
     raftBody.current.visible = raftScale > 0.001
@@ -186,6 +244,11 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
     const followed = v.rafts[frame.follow] ?? r
     const away = Math.hypot(r.x - followed.x, r.z - followed.z)
     const loudness = onCamera ? 1 : Math.max(0, 1 - away / EARSHOT) * 0.8
+    st.gurgle -= dt
+    if (pull > 0.15 && loudness > 0.1 && st.gurgle <= 0) {
+      st.gurgle = 0.45 + Math.random() * 0.4
+      audio.gurgle(pull * loudness)
+    }
 
     if (raftTag) {
       const spot = race && !own && r.st !== RAFT_STATE.popped && !menu ? place(raftTag, root.current, 2.7) : null
@@ -230,7 +293,14 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
       const farting = isFarting(p, r.st, localIds)
       const ca = Math.cos(p.rim)
       const sa = Math.sin(p.rim)
-      if (r.st === RAFT_STATE.popped) {
+      holder.scale.setScalar(1)
+      if (sucked) {
+        // Slurped like noodles: drawn in to the middle and stretched tall, arms flailing as they go under.
+        holder.position.set(ca * SEAT_R * (1 - 0.6 * sink), SEAT_Y + sink * 0.6, sa * SEAT_R * (1 - 0.6 * sink))
+        holder.rotation.set(0, -(p.rim + Math.PI), 0)
+        holder.scale.set(1 - 0.45 * sink, 1 + 1.3 * sink, 1 - 0.45 * sink)
+        holder.visible = r.stT < SINK + 0.1
+      } else if (r.st === RAFT_STATE.popped) {
         const k = r.stT
         const out = SEAT_R + k * 4.5
         const y = SEAT_Y + 7 * k - 12 * k * k
@@ -250,6 +320,7 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
         strain: farting ? 1 : 0,
         buff: p.buff,
         celebrate: v.phase === 'finished' || r.res === RAFT_RESULT.finished,
+        dizzy,
       })
 
       const slot = tagSlot(index, seat)

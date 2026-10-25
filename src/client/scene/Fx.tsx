@@ -279,6 +279,65 @@ export const fx = {
       })
     }
   },
+  /** Bubbles that bob up out of the water at (x, y, z), within `spread` m, `up` m/s at most. */
+  bubbles(x: number, y: number, z: number, count: number, spread = 0.8, up = 3) {
+    for (let k = 0; k < count; k++) {
+      const a = Math.random() * Math.PI * 2
+      const d = Math.random() * spread
+      spawn(puffs, {
+        x: x + Math.cos(a) * d,
+        y,
+        z: z + Math.sin(a) * d,
+        vx: Math.cos(a) * rand(0.2, 1.2),
+        vy: rand(0.4, 1) * up,
+        vz: Math.sin(a) * rand(0.2, 1.2),
+        life: rand(0.5, 0.9),
+        size: rand(0.12, 0.3),
+        grow: rand(0.2, 0.5),
+        drag: 1.5,
+        color: k % 3 ? '#d9f6ff' : '#ffffff',
+      })
+    }
+  },
+  /** A whirlpool that's just swallowed a raft burps: a gust of bubbles and gas, and a few bits of raft spat back out. */
+  burp(x: number, y: number, z: number) {
+    fx.bubbles(x, y, z, 30, 1, 7)
+    for (let k = 0; k < 14; k++) {
+      spawn(puffs, {
+        x: x + rand(-0.4, 0.4),
+        y: y + 0.3,
+        z: z + rand(-0.4, 0.4),
+        vx: rand(-1.2, 1.2),
+        vy: rand(3, 6),
+        vz: rand(-1.2, 1.2),
+        life: rand(0.8, 1.2),
+        size: rand(0.35, 0.55),
+        grow: rand(1, 1.6),
+        drag: 2.2,
+        color: '#b9d97a',
+        spin: rand(-3, 3),
+      })
+    }
+    for (let k = 0; k < 6; k++) {
+      const a = Math.random() * Math.PI * 2
+      spawn(bits, {
+        x,
+        y: y + 0.3,
+        z,
+        vx: Math.cos(a) * rand(1, 3),
+        vy: rand(8, 12),
+        vz: Math.sin(a) * rand(1, 3),
+        life: rand(1.2, 1.6),
+        size: rand(0.18, 0.3),
+        gravity: 22,
+        drag: 0.4,
+        color: k % 3 === 0 ? PALETTE.raftHandle : k % 3 === 1 ? PALETTE.raftFloor : PALETTE.raftRing,
+        spin: rand(-12, 12),
+        floorY: y,
+      })
+    }
+    fx.ring(x, y, z, 4.5, '#ffffff', 0.8)
+  },
   /** A glowing fleck of fire that drifts up off a jet or a bolt strike and burns out. */
   ember(x: number, y: number, z: number, vx = 0, vz = 0) {
     spawn(flames, {
