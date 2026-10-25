@@ -1,1 +1,4 @@
-[{ "id": "IN", "name": "India", "url": "https://in.toottogether.fun" }]
+[
+  { "id": "IN", "name": "India", "url": "https://in.toottogether.fun" },
+  { "id": "US", "name": "US", "url": "https://us.toottogether.fun" }
+]

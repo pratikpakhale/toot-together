@@ -12,12 +12,15 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 APP_DIR=/opt/toot-together
 DEPLOY_USER=${SUDO_USER:-ubuntu}
 
-# Oracle's Ubuntu images reject everything but SSH in iptables, on top of the VCN security list.
-for port in 80 443; do
-  iptables -C INPUT -p tcp --dport "$port" -m state --state NEW -j ACCEPT 2>/dev/null ||
-    iptables -I INPUT 5 -p tcp --dport "$port" -m state --state NEW -j ACCEPT
-done
-netfilter-persistent save
+# Oracle's Ubuntu images reject everything but SSH in iptables, on top of the VCN security list. Other clouds
+# (Jetstream2) leave iptables open and filter in their security groups only.
+if command -v netfilter-persistent >/dev/null; then
+  for port in 80 443; do
+    iptables -C INPUT -p tcp --dport "$port" -m state --state NEW -j ACCEPT 2>/dev/null ||
+      iptables -I INPUT 5 -p tcp --dport "$port" -m state --state NEW -j ACCEPT
+  done
+  netfilter-persistent save
+fi
 
 if [ ! -f /swapfile ]; then
   fallocate -l 1G /swapfile
