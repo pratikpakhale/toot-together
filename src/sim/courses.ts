@@ -481,7 +481,8 @@ const THUNDER_RUN: CourseDef = {
     { len: 26, checkpoint: true, width: 13 },
     { len: 28, width: 14, items: [{ kind: 'whirlpool', at: 9, d: 3.4, pull: 11.5 }, { kind: 'lightning', at: 15, beat: 1.05 }, { kind: 'whirlpool', at: 21, d: -3.4, swirl: -5, pull: 11.5 }] },
     { len: 30, turn: -45, width: 11, right: 'spikes', items: [{ kind: 'flame', at: 10, side: -1, period: 2.8, len: 5, on: 0.45 }, { kind: 'current', at: 16, push: 5, len: 12 }] },
-    { len: 26, width: 12, items: [{ kind: 'gate', at: 7, period: 4, open: 0.35 }, { kind: 'fence', at: 19, gap: 4.8, amp: 2.6, period: 4.2 }] },
+    { len: 16, width: 12, items: [{ kind: 'gate', at: 7, period: 4, open: 0.35 }] },
+    { len: 20, width: 12, items: [{ kind: 'fence', at: 10, gap: 5.2, amp: 2.6, period: 4.4 }] },
     { len: 18, width: 12, items: [{ kind: 'geyser', at: 9, d: 0, period: 3 }] },
 
     { len: 26, checkpoint: true, width: 12 },
