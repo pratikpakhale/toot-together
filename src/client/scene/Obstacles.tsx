@@ -942,7 +942,8 @@ function Fence({ def, hw }: { def: Def<'fence'>; hw: number }) {
   )
 }
 
-const GATE_UP = CHASE_CAM_HEIGHT + 0.4
+/** Raised, the gate hangs below the chase camera, so its shake and drop stay on screen. */
+const GATE_UP = CHASE_CAM_HEIGHT - 3.2
 const GATE_HEIGHT = 2.2
 const GATE_BEAM = 0.3
 
