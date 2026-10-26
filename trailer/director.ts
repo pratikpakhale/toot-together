@@ -36,11 +36,16 @@ export interface Shot {
   everyoneToots?: boolean
   /** A race: our crew is on the first raft, rival crews of two on the rest. */
   rafts?: number
+  /** Names of our four hippos, seat by seat; the trailer's crew if unset. */
+  crew?: readonly string[]
 }
 
-const itemS = (c: BakedCourse, kind: string, nth = 0) => c.items.filter((i) => i.def.kind === kind)[nth].s
+/** Our four hippos for a shot, seat by seat. */
+export const crewOf = (shot: Shot) => shot.crew ?? CREW
 
-function aimTowards(sim: Sim, d: number) {
+export const itemS = (c: BakedCourse, kind: string, nth = 0) => c.items.filter((i) => i.def.kind === kind)[nth].s
+
+export function aimTowards(sim: Sim, d: number) {
   const c = sim.course
   const here = pointAt(c, sim.rafts[0].s + 1.5, d)
   return Math.atan2(here.z - sim.rafts[0].z, here.x - sim.rafts[0].x)
@@ -144,9 +149,10 @@ export const REEL_SHOTS: Shot[] = [
 
 export function prime(shot: Shot): Sim {
   const sim = new Sim(getCourse(shot.course), shot.seed, shot.rafts)
-  CREW.forEach((name, seat) => sim.addPlayer(seat + 1, name, seat))
+  const crew = crewOf(shot)
+  crew.forEach((name, seat) => sim.addPlayer(seat + 1, name, seat))
   if (sim.race) {
-    for (let raft = 1; raft < sim.rafts.length; raft++) for (const seat of [0, 1]) sim.addPlayer(sim.players.size + 1, RIVALS[sim.players.size - CREW.length], seat, raft)
+    for (let raft = 1; raft < sim.rafts.length; raft++) for (const seat of [0, 1]) sim.addPlayer(sim.players.size + 1, RIVALS[sim.players.size - crew.length], seat, raft)
     sim.start()
   }
   for (let i = 0; i < 60 * 240 && !shot.startWhen(sim); i++) {

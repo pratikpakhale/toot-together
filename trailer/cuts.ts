@@ -1,7 +1,8 @@
 import { REEL_SHOTS, type Shot, SHOTS } from './director'
+import { STREAM_SHOTS } from './stream'
 
 interface Cut {
-  id: 'trailer' | 'reel'
+  id: 'trailer' | 'reel' | 'stream'
   shots: Shot[]
   /** Seconds of title card before the first shot; 0 opens straight on gameplay. */
   intro: number
@@ -46,6 +47,21 @@ const CUTS: Record<Cut['id'], Cut> = {
     chatLog: false,
     tootVoices: 1,
   },
+  /** Gameplay for a streamer clip: the bottom panel of a vertical Short, no captions or title cards. */
+  stream: {
+    id: 'stream',
+    shots: STREAM_SHOTS,
+    intro: 0,
+    outro: 0,
+    stage: { w: 1080, h: 1152 },
+    fov: 58,
+    wipes: false,
+    musicStopsAt: null,
+    mix: { master: 0.9, music: 0.7, sfx: 0.8 },
+    chatLog: false,
+    tootVoices: 2,
+  },
 }
 
-export const CUT = CUTS[new URLSearchParams(location.search).get('cut') === 'reel' ? 'reel' : 'trailer']
+const asked = new URLSearchParams(location.search).get('cut')
+export const CUT = CUTS[asked === 'reel' || asked === 'stream' ? asked : 'trailer']

@@ -1,9 +1,11 @@
 import { DT } from '../src/sim/constants'
 import { prime, SHOTS, shotSteps, steer } from './director'
+import { STREAM_SHOTS } from './stream'
 
 const [shotArg, ...seedArgs] = process.argv.slice(2)
 const only = shotArg ? Number(shotArg) : null
-SHOTS.forEach((shot, n) => {
+const shots = process.env.CUT === 'stream' ? STREAM_SHOTS : SHOTS
+shots.forEach((shot, n) => {
   if (only !== null && n !== only) return
   const seeds = seedArgs.length ? seedArgs.map(Number) : [shot.seed]
   for (const seed of seeds) {

@@ -13,6 +13,7 @@ const stills = opts.from !== undefined
 const CUTS = {
   trailer: { master: 'trailer/out/toot-together-trailer.mp4', social: 'trailer/out/toot-together-trailer-1080p.mp4', preview: 'trailer/preview.webp', viewport: { width: 1280, height: 720 }, scale: 1.5 },
   reel: { master: 'trailer/out/toot-together-reel-master.mp4', social: 'trailer/out/toot-together-reel.mp4', preview: null, viewport: { width: 360, height: 640 }, scale: 3 },
+  stream: { master: 'trailer/out/toot-together-stream-master.mp4', social: 'trailer/out/toot-together-stream.mp4', preview: null, viewport: { width: 360, height: 384 }, scale: 3 },
 }
 const cut = CUTS[opts.cut]
 if (!cut) throw new Error(`unknown cut "${opts.cut}", expected ${Object.keys(CUTS).join(' or ')}`)

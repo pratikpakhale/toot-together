@@ -27,7 +27,7 @@ import { ChatDock } from '../src/client/ui/Chat'
 import { NameTags } from '../src/client/ui/NameTags'
 import { Toasts } from '../src/client/ui/Toasts'
 import { CUT } from './cuts'
-import { CREW, prime, type Shot, steer } from './director'
+import { crewOf, prime, type Shot, steer } from './director'
 import { Overlay, type Beat } from './Overlay'
 
 const FPS = 60
@@ -48,7 +48,7 @@ class ShotSession extends LocalSession {
 
   constructor(private readonly shot: Shot) {
     super(
-      CREW.map((name) => ({ name, device: 'any' as const })),
+      crewOf(shot).map((name) => ({ name, device: 'any' as const })),
       shot.course,
     )
     const sim = prime(shot)
@@ -72,7 +72,7 @@ class ShotSession extends LocalSession {
     if (due.length === this.fired) return
     const fresh: ChatEntry[] = due.slice(this.fired).map((c) => {
       const id = c.seat + 1
-      return { key: ++this.chatKey, liveAt: performance.now(), id, seat: c.seat, name: sim.players.get(id)?.name ?? CREW[c.seat], text: c.text }
+      return { key: ++this.chatKey, liveAt: performance.now(), id, seat: c.seat, name: sim.players.get(id)?.name ?? crewOf(this.shot)[c.seat], text: c.text }
     })
     this.fired = due.length
     this.setInfo({ chat: [...this.info.chat, ...fresh].slice(-30) })
@@ -123,7 +123,7 @@ function direct(t: number): Beat {
     if (n === -1) {
       adopt(
         new LocalSession(
-          CREW.map((name) => ({ name, device: 'any' as const })),
+          crewOf(SHOTS[0]).map((name) => ({ name, device: 'any' as const })),
           'lazy-river',
         ),
       )
@@ -198,7 +198,7 @@ function Trailer() {
 
 const preview = new URLSearchParams(location.search).has('preview')
 
-useApp.getState().updateSettings({ name: CREW[0], quality: 'high', shake: true, chat: true, musicOn: true, ...CUT.mix })
+useApp.getState().updateSettings({ name: crewOf(SHOTS[0])[0], quality: 'high', shake: true, chat: true, musicOn: true, ...CUT.mix })
 limitTootVoices(CUT.tootVoices)
 const firstBeat = direct(0)
 createRoot(document.getElementById('root')!).render(<Trailer />)
