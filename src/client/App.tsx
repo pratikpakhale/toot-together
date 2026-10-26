@@ -8,6 +8,7 @@ import { GameScene } from './scene/GameScene'
 import { useApp } from './state/store'
 import { ChatDock } from './ui/Chat'
 import { CrewsPanel } from './ui/Crews'
+import { FeedbackPanel } from './ui/Feedback'
 import { HowToPlay } from './ui/HowToPlay'
 import { Hud } from './ui/Hud'
 import { InstallPrompt } from './ui/InstallPrompt'
@@ -80,7 +81,7 @@ export function App() {
 
   useEffect(() => {
     // The menu's demo raft keeps floating behind Settings and How to play.
-    session?.setPaused((screen === 'game' && (overlay === 'pause' || overlay === 'settings' || overlay === 'howto')) || sideways)
+    session?.setPaused((screen === 'game' && (overlay === 'pause' || overlay === 'settings' || overlay === 'howto' || overlay === 'feedback')) || sideways)
     if (overlay || sideways) audio.stopAllFarts()
   }, [session, screen, overlay, sideways])
 
@@ -102,7 +103,7 @@ export function App() {
           if (app.overlay === null) app.setOverlay('pause')
           // Results come back from the HUD's Results button.
           else if (app.overlay === 'pause' || app.overlay === 'crews' || app.overlay === 'results') app.setOverlay(null)
-          else if (app.overlay === 'settings' || app.overlay === 'howto') app.setOverlay('pause')
+          else if (app.overlay === 'settings' || app.overlay === 'howto' || app.overlay === 'feedback') app.setOverlay('pause')
         }
         if (action === 'respawn' && app.overlay === null) app.session?.respawn()
         if (action === 'ready' && app.overlay === null && app.session) pressPrimary(app.session)
@@ -137,6 +138,7 @@ export function App() {
       {overlay === 'results' && <Results />}
       {overlay === 'levels' && <LevelSelect />}
       {overlay === 'crews' && <CrewsPanel />}
+      {overlay === 'feedback' && <FeedbackPanel />}
       <div id="flash" className="pointer-events-none fixed inset-0 bg-white opacity-0" />
       <Connecting />
       <Notice />

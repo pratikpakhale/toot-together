@@ -6,7 +6,7 @@ import type { FinishOutcome } from './progress'
 
 type Screen = 'menu' | 'local-lobby' | 'game' | 'hippocam'
 /** `crews`: the host's crew tools in a race room. */
-type Overlay = null | 'pause' | 'settings' | 'howto' | 'results' | 'levels' | 'crews'
+type Overlay = null | 'pause' | 'settings' | 'howto' | 'results' | 'levels' | 'crews' | 'feedback'
 type LevelMode = 'solo' | 'online'
 /**
  * `aim`: the wheel while Q or the chat button is held (moving from where the press began picks a line, letting

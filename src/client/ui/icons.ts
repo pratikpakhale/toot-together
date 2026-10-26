@@ -22,7 +22,7 @@ function starPoints(cx: number, cy: number, outer: number, inner: number, points
 const shine = (cx: number, cy: number, rx: number, ry: number, rot = -30, opacity = 0.6) =>
   `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" transform="rotate(${rot} ${cx} ${cy})" fill="#fff" opacity="${opacity}"/>`
 
-type Mood = 'happy' | 'devil' | 'oops' | 'tired'
+type Mood = 'happy' | 'devil' | 'oops' | 'tired' | 'grumpy' | 'meh' | 'love'
 
 function hippo(mood: Mood, color = '#4aa8ff') {
   const skin = `style="fill:var(--hippo,${color})"`
@@ -39,6 +39,8 @@ function hippo(mood: Mood, color = '#4aa8ff') {
   s += `<ellipse cx="24" cy="40" rx="2.4" ry="3.4" fill="${INK}"/><ellipse cx="40" cy="40" rx="2.4" ry="3.4" fill="${INK}"/>`
   s += `<ellipse cx="13" cy="47" rx="3.6" ry="2.2" fill="#ff8fa3" opacity=".9"/><ellipse cx="51" cy="47" rx="3.6" ry="2.2" fill="#ff8fa3" opacity=".9"/>`
 
+  const heart = (x: number, y: number) =>
+    `<path d="M${x} ${y + 6}c-6-4-8-7-8-10a4 4 0 0 1 8-1.5 4 4 0 0 1 8 1.5c0 3-2 6-8 10z" fill="#ff5b8a" ${O3}/>`
   const eye = (x: number, px: number, py: number) =>
     `<circle cx="${x}" cy="25" r="5.5" fill="#fff" ${O3}/><circle cx="${px}" cy="${py}" r="2.8" fill="${INK}"/><circle cx="${px + 1}" cy="${py - 1.2}" r="1" fill="#fff"/>`
   switch (mood) {
@@ -60,6 +62,19 @@ function hippo(mood: Mood, color = '#4aa8ff') {
     case 'tired':
       s += `<path d="M20 26q5 4 10 0M34 26q5 4 10 0" fill="none" ${O3}/>`
       s += `<ellipse cx="32" cy="51" rx="5" ry="3.6" fill="${INK}"/><ellipse cx="33.5" cy="53" rx="2.6" ry="1.6" fill="#ff8fa3"/>`
+      break
+    case 'grumpy':
+      s += eye(25, 26, 27) + eye(39, 38, 27)
+      s += `<path d="M18 19l11 4M46 19l-11 4" ${O}/>`
+      s += `<path d="M23 53q9-6 18 0" fill="none" ${O3}/>`
+      break
+    case 'meh':
+      s += eye(25, 25, 26) + eye(39, 39, 26)
+      s += `<path d="M24 51h16" ${O3}/>`
+      break
+    case 'love':
+      s += heart(25, 25) + heart(39, 25)
+      s += `<path d="M21 48q11 10 22 0z" fill="${INK}" ${O3}/>`
       break
   }
   return s
@@ -149,6 +164,9 @@ export const ICONS = {
   hippoDevil: hippo('devil', '#ff6b6b'),
   hippoOops: hippo('oops'),
   hippoTired: hippo('tired', '#b8c4d6'),
+  hippoGrumpy: hippo('grumpy', '#ff8a5c'),
+  hippoMeh: hippo('meh', '#ffcf3f'),
+  hippoLove: hippo('love', '#ff7eb6'),
   toot,
   stink,
   sneaky,

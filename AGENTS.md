@@ -17,7 +17,7 @@ Production is one game server per region plus the page on Vercel. `regions.json`
 - **Changes under `deploy/`** (service, Caddyfile, setup) take effect only after re-running the setup on the box: copy `deploy/` over and run `sudo bash setup-server.sh <region> <domain> [redirect domains…]` with the same region and domains as before (`AGENTS.local.md` has the exact line). It is safe to re-run.
 - **Redirect domains** (www, domains the game moved from) 301 to the main one, keeping path and query, and still proxy `/ws` for pages opened before a move.
 - **Logs:** `ssh $DEPLOY_HOST_<ID> journalctl -u toot-together -f`
-- **Analytics:** production builds send PostHog events only when `VITE_POSTHOG_KEY` is set in `.env.local`.
+- **Analytics:** production builds send PostHog events only when `VITE_POSTHOG_KEY` is set in `.env.local`. Player feedback goes through two PostHog API surveys the game draws itself (`VITE_POSTHOG_RUN_SURVEY`, `VITE_POSTHOG_FEEDBACK_SURVEY`; see `.env.example`); without them the results row and Feedback buttons stay hidden.
 
 ## Testing
 

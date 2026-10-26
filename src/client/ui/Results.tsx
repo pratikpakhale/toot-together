@@ -10,6 +10,7 @@ import { medalFor, recordOf, useProgress } from '../state/progress'
 import { useApp } from '../state/store'
 import { formatMedalTime, formatTime, ordinal } from './format'
 import type { IconName } from './icons'
+import { RunSurvey } from './Feedback'
 import { MEDAL_ICON } from './LevelSelect'
 import { Modal } from './Modal'
 import { Icon } from './Icon'
@@ -140,6 +141,7 @@ export function Results() {
               {MEDAL_NAME[target.medal]} medal: finish in under {formatMedalTime(target.time)}
             </p>
           )}
+          <RunSurvey results={results} />
         </div>
         <div className="contents short:flex short:flex-col">
           {list.length > 0 && <AwardList list={list} short={short} />}
@@ -347,6 +349,7 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
         <div className="contents short:block">
           {head}
           {standings}
+          <RunSurvey results={results} />
         </div>
         <div className="contents short:flex short:flex-col">
           {list.length > 0 && <AwardList list={list} short={short} />}

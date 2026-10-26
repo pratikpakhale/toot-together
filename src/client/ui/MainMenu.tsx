@@ -5,6 +5,7 @@ import { joinRoom } from '../game/controller'
 import { useShortScreen } from '../platform'
 import { measureRegions } from '../regions'
 import { useApp } from '../state/store'
+import { FeedbackButton } from './Feedback'
 import { FullscreenButton } from './FullscreenButton'
 import { Logo } from './Logo'
 import { Icon } from './Icon'
@@ -80,13 +81,14 @@ export function MainMenu() {
     </div>
   )
   const extras = (
-    <div className="flex gap-3 short:gap-2 short:[&_.btn]:px-3 short:[&_.btn]:py-2 short:[&_.btn]:text-sm">
+    <div className="flex gap-2.5 [&_.btn]:px-3 short:gap-2 short:[&_.btn]:py-2 short:[&_.btn]:text-sm">
       <button className="btn btn-cream flex-1" onClick={click(() => setOverlay('howto'))}>
         How to play
       </button>
       <button className="btn btn-cream flex-1" onClick={click(() => setOverlay('settings'))}>
         Settings
       </button>
+      <FeedbackButton className="flex-1" />
     </div>
   )
 

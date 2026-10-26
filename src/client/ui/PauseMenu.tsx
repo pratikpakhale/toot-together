@@ -2,6 +2,7 @@ import { audio } from '../audio/audio'
 import { leaveGame } from '../game/controller'
 import { TEAMS } from '../game/frame'
 import { useApp } from '../state/store'
+import { FeedbackButton } from './Feedback'
 import { FullscreenButton } from './FullscreenButton'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
@@ -105,9 +106,12 @@ export function PauseMenu() {
           </button>
           <FullscreenButton className="w-14 shrink-0 text-base" />
         </div>
-        <button className="btn btn-pink" onClick={act(leaveGame)}>
-          {online ? `Leave room ${info?.roomCode ?? ''}` : 'Quit to menu'}
-        </button>
+        <div className="flex gap-3">
+          <button className="btn btn-pink flex-1" onClick={act(leaveGame)}>
+            {online ? `Leave room ${info?.roomCode ?? ''}` : 'Quit to menu'}
+          </button>
+          <FeedbackButton className="w-14 shrink-0 p-0" label={false} />
+        </div>
       </div>
     </Modal>
   )

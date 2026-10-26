@@ -1,10 +1,17 @@
-import type { PostHog } from 'posthog-js'
+import type { PostHog, Survey, SurveyResponseValue } from 'posthog-js'
 
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY
+/** API surveys made in PostHog: we draw them, PostHog picks who sees them and keeps the answers. */
+export const SURVEY_IDS = {
+  run: import.meta.env.VITE_POSTHOG_RUN_SURVEY as string | undefined,
+  feedback: import.meta.env.VITE_POSTHOG_FEEDBACK_SURVEY as string | undefined,
+}
 
 let enabled = false
 let client: PostHog | null = null
 let playerName: string | null = null
+let surveys: Survey[] = []
+const surveyListeners = new Set<() => void>()
 const queue: [string, Record<string, unknown> | undefined][] = []
 
 export function initAnalytics() {
@@ -21,6 +28,10 @@ export function initAnalytics() {
         })
         client = posthog
         if (playerName) posthog.setPersonProperties({ name: playerName })
+        posthog.onActiveMatchingSurveysChanged((active) => {
+          surveys = active.filter((s) => s.type === 'api')
+          for (const fn of surveyListeners) fn()
+        })
         for (const [event, properties] of queue.splice(0)) posthog.capture(event, properties)
       })
       .catch(() => {
@@ -41,4 +52,47 @@ export function track(event: string, properties?: Record<string, unknown>) {
   if (!enabled) return
   if (client) client.capture(event, properties)
   else queue.push([event, properties])
+}
+
+export function subscribeSurveys(fn: () => void) {
+  surveyListeners.add(fn)
+  return () => void surveyListeners.delete(fn)
+}
+
+/** The survey if it's running and this player matches its targeting (and wait period) right now. */
+export function activeSurvey(id: string | undefined) {
+  return (id && surveys.find((s) => s.id === id)) || null
+}
+
+const surveyProps = (survey: Survey) => ({
+  $survey_id: survey.id,
+  $survey_name: survey.name,
+  $survey_iteration: survey.current_iteration,
+  $survey_iteration_start_date: survey.current_iteration_start_date,
+})
+
+export function surveyShown(survey: Survey) {
+  track('survey shown', surveyProps(survey))
+  // Starts the survey's wait period, as PostHog's own renderer would.
+  client?.surveys.markSurveyAsSeen(survey.id, { iteration: survey.current_iteration ?? undefined })
+}
+
+/** Answers keyed by question id. Sending again with the same submission id updates the answer. */
+export function surveySent(survey: Survey, submissionId: string, answers: Record<string, SurveyResponseValue>, completed: boolean, properties?: Record<string, unknown>) {
+  const responses: Record<string, unknown> = {}
+  survey.questions.forEach((q, i) => {
+    if (!q.id || answers[q.id] === undefined) return
+    responses[`$survey_response_${q.id}`] = answers[q.id]
+    // The old index keys, which some of PostHog's survey views still read.
+    responses[i === 0 ? '$survey_response' : `$survey_response_${i}`] = answers[q.id]
+  })
+  track('survey sent', {
+    ...surveyProps(survey),
+    $survey_submission_id: submissionId,
+    $survey_completed: completed,
+    $survey_questions: survey.questions.map((q) => ({ id: q.id, question: q.question, response: q.id ? answers[q.id] : undefined })),
+    ...responses,
+    ...properties,
+    $set: { [`$survey_responded/${survey.id}${survey.current_iteration ? `/${survey.current_iteration}` : ''}`]: true },
+  })
 }
