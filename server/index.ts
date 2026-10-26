@@ -106,6 +106,7 @@ class Room {
   createdAt = Date.now()
   private nextId = 1
   private rosterSent = -1
+  private pingsSent = ''
   emptySince: number | null = null
 
   constructor(
@@ -235,10 +236,7 @@ class Room {
       age: Math.round((now - this.createdAt) / 1000),
       idle: this.connectedCount() === 0 && this.emptySince !== null ? Math.round((now - this.emptySince) / 1000) : null,
       spectators: this.spectators.size,
-      players: this.roster().map((p) => {
-        const ws = this.clients.get(p.id)?.ws
-        return { ...p, ping: ws ? (rtt.get(ws) ?? null) : null }
-      }),
+      players: this.roster(),
     }
   }
 
@@ -389,12 +387,25 @@ class Room {
 
   private roster(): RosterEntry[] {
     const host = this.hostId()
-    return this.sim.roster().map((p) => ({ ...p, host: p.id === host, away: !this.clients.get(p.id)?.ws }))
+    return this.sim.roster().map((p) => {
+      const ws = this.clients.get(p.id)?.ws
+      return { ...p, host: p.id === host, away: !ws, ping: ws ? (rtt.get(ws) ?? null) : null }
+    })
+  }
+
+  /** Sends the roster again if anyone's ping changed since it last went out. */
+  sendPings() {
+    const pings = this.roster()
+      .map((p) => p.ping)
+      .join()
+    if (pings !== this.pingsSent) this.broadcastRoster()
   }
 
   private broadcastRoster() {
+    const players = this.roster()
     this.rosterSent = this.sim.rosterVersion
-    this.broadcast({ type: 'roster', players: this.roster() })
+    this.pingsSent = players.map((p) => p.ping).join()
+    this.broadcast({ type: 'roster', players })
   }
 
   private broadcast(msg: ServerMsg) {
@@ -680,6 +691,8 @@ wss.on('connection', (ws, req) => {
 // Browsers answer protocol-level pings even from hidden tabs, so only truly dead
 // connections (lost Wi-Fi, crashed device) get dropped here.
 setInterval(() => {
+  // Round trips measured on the last beat.
+  for (const room of rooms.values()) room.sendPings()
   for (const ws of wss.clients) {
     if (!alive.get(ws)) {
       ws.terminate()

@@ -249,7 +249,13 @@ export function Hud() {
                 <Icon name="hippo" size={20} style={{ ['--hippo' as string]: seatColor(p.seat) }} />
                 <span className={p.away ? 'text-ink/40' : undefined}>{p.name}</span>
                 {online && p.host && <Icon name="crown" size={18} label="Host" />}
-                {p.away ? <span className="text-ink/50">(reconnecting)</span> : localIds.includes(p.id) && <span className="text-ink/50">(you)</span>}
+                {p.away ? (
+                  <span className="text-ink/50">(reconnecting)</span>
+                ) : localIds.includes(p.id) ? (
+                  <span className="text-ink/50">(you)</span>
+                ) : (
+                  p.ping != null && <span className="text-[13px] tabular-nums text-ink/50">{p.ping}ms</span>
+                )}
               </div>
             ))}
         </div>

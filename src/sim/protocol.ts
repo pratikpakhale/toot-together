@@ -92,8 +92,7 @@ export interface RoomSummary {
   /** Seconds since the last player left (the room closes after a minute), or null while anyone's in. */
   idle: number | null
   spectators: number
-  /** `ping` is the server's own round trip to that player, in ms. */
-  players: (RosterEntry & { ping: number | null })[]
+  players: RosterEntry[]
 }
 
 export interface ServerStats {

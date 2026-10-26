@@ -734,6 +734,7 @@ function PlayerList({ roster, myId }: { roster: RosterEntry[]; myId: number | un
       >
         {hippo}
         <span className={`min-w-0 flex-1 truncate text-left ${off ? 'text-ink/45 line-through decoration-2' : ''}`}>{p.name}</span>
+        {p.ping != null && <span className="shrink-0 text-[13px] tabular-nums text-ink/50">{p.ping}ms</span>}
         <Icon name={off ? 'speakerOff' : 'speaker'} size={22} />
       </button>
     )

@@ -111,6 +111,8 @@ export interface RosterEntry {
   host?: boolean
   /** Online only: connection dropped, seat held while they reconnect. */
   away?: boolean
+  /** Online only: the server's own round trip to that player, in ms; null until measured or while away. */
+  ping?: number | null
 }
 
 export interface PlayerStats {

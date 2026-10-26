@@ -220,7 +220,7 @@ function RoomCard({ room }: { room: RoomSummary }) {
                 {p.name}
               </span>
               {p.host && <Icon name="crown" size={18} label="Host" />}
-              <span className="ml-auto text-xs font-extrabold tabular-nums text-ink/55">{p.away ? 'away' : p.ping === null ? '…' : `${p.ping} ms`}</span>
+              <span className="ml-auto text-xs font-extrabold tabular-nums text-ink/55">{p.away ? 'away' : p.ping == null ? '…' : `${p.ping}ms`}</span>
             </div>
           ))}
       </div>
