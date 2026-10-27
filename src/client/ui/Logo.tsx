@@ -3,7 +3,8 @@ import { Icon } from './Icon'
 export function Logo({ size = 'lg' }: { size?: 'lg' | 'md' }) {
   const big = size === 'lg'
   return (
-    <div className="relative inline-block select-none -rotate-3 anim-float" aria-label="Toot Together">
+    // The tilt and the thick outline paint past the text's box; the padding keeps them inside it, so a scrolling menu column doesn't clip the left edge.
+    <div className="relative inline-block select-none px-2 -rotate-3 anim-float" aria-label="Toot Together">
       <div className="flex items-center gap-[0.12em]" style={{ fontSize: big ? 'clamp(44px, min(9vw, 13vh), 124px)' : '56px' }}>
         <div
           className="font-display stroke-text leading-[0.85]"
