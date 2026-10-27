@@ -21,7 +21,9 @@ export function initAnalytics() {
     import('posthog-js')
       .then(({ default: posthog }) => {
         posthog.init(POSTHOG_KEY, {
-          api_host: 'https://us.i.posthog.com',
+          // Proxied through the page's own origin (vercel.json) so ad blockers don't drop events.
+          api_host: '/splash',
+          ui_host: 'https://us.posthog.com',
           defaults: '2026-08-30',
           person_profiles: 'always',
           disable_session_recording: true,

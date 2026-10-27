@@ -5,6 +5,11 @@
   "buildCommand": "pnpm typecheck && pnpm exec vite build --mode deploy && pnpm exec tsx scripts/pages.ts",
   "outputDirectory": "dist",
   "git": { "deploymentEnabled": false },
-  "rewrites": [{ "source": "/(hippocam|lab)", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/(hippocam|lab)", "destination": "/index.html" },
+    { "source": "/splash/static/:path(.*)", "destination": "https://us-assets.i.posthog.com/static/:path" },
+    { "source": "/splash/array/:path(.*)", "destination": "https://us-assets.i.posthog.com/array/:path" },
+    { "source": "/splash/:path(.*)", "destination": "https://us.i.posthog.com/:path" }
+  ],
   "headers": [{ "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] }]
 }
