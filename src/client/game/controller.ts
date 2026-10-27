@@ -274,9 +274,9 @@ export function roomFromUrl(): string | null {
   return isRoomCode(code) ? code : null
 }
 
+/** Always the game's own page, so a link copied while watching on /hippocam joins instead of watching. */
 export function inviteLink(code: string) {
-  const url = new URL(location.href)
-  url.search = ''
+  const url = new URL('/', location.href)
   url.searchParams.set('room', code)
   return url.toString()
 }
