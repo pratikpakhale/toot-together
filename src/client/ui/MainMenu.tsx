@@ -88,7 +88,8 @@ export function MainMenu() {
       <button className="btn btn-cream flex-1" onClick={click(() => setOverlay('settings'))}>
         Settings
       </button>
-      <FeedbackButton className="flex-1" />
+      {/* Three labels don't fit the phone's right-hand column; the icon alone does, as on the pause menu. */}
+      <FeedbackButton className={short ? 'w-14 shrink-0' : 'flex-1'} label={!short} />
     </div>
   )
 
