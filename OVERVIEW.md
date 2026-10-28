@@ -4,14 +4,14 @@
 
 - **Eight rivers that ramp up**, each with its own look, and each harder towards its end:
   1. **Lazy River** (meadow): introduces each hazard on its own, with room to recover.
-  2. **Canyon Run** (desert canyon): spike alley, spinner plaza, the drop, the first rapids, the ice shelf, crusher canyon and the sky-ribbon finale.
+  2. **Bayou Bends** (swamp at dusk): introduces sideways currents, kelp beds, whirlpools and spike fences.
   3. **Volcano Peak** (lava): spinner gauntlet, lava chute with the first geyser, obsidian ice, the crusher corridor and the caldera rim.
-  4. **Bayou Bends** (swamp at dusk): introduces sideways currents, kelp beds, whirlpools and spike fences.
-  5. **Frostbite Falls** (glacier): ice runs, sweeper booms, ice geysers, fences over open edges and two frozen falls.
-  6. **Sunken Temple** (jungle ruins): introduces fire jets and sluice gates (one straight after a drop, so you have to brake), mixed with crushers, sweepers and pistons.
+  4. **Frostbite Falls** (glacier): ice runs, sweeper booms, ice geysers, fences over open edges and two frozen falls.
+  5. **Sunken Temple** (jungle ruins): introduces fire jets and sluice gates (one straight after a drop, so you have to brake), mixed with crushers, sweepers and pistons.
+  6. **Canyon Run** (desert canyon), the longest river: spike alley, spinner plaza, the drop, the rapids, the ice shelf, crusher canyon and the sky-ribbon finale.
   7. **Dragon's Gullet** (lava): fire-jet waves, geysers by open edges, whirlpool pairs, a climb up rapids through fire and a double sweeper.
   8. **Thunder Run** (storm): introduces lightning, then every hazard in the game stacked back to back, finishing with a lightning climb up the rapids.
-  Each river is harder than the one before: hazards get quicker and tighter and stack up more, and the balance script's sloppy crews die roughly 0, 8, 13, 9, 12, 9, 23 and 32 times down rivers 1–8.
+  Hazards get quicker and tighter and stack up more river by river, and the balance script's sloppy crews die roughly 0, 9, 13, 12, 9, 8, 23 and 32 times down rivers 1–8. Canyon Run sits sixth for its length: players die on it more than on any river before it, and online crews take over 15 minutes.
 - **Progression**: finishing a river unlocks the next. Best times and bronze/silver/gold medals are saved per river, and the results screen has *Next river*, *Again* and *Share*.
 - **Hippo school**: first-time players get a hands-on checklist in the practice pond (walk, toot, burst, then START).
 - **Hazards**: spiked walls, spinning spike crosses, swinging maces, sliding spike logs, crusher doors, slamming pistons, floating mines, sweeper booms hinged on a bank, wall-mounted fire jets, spike fences with a sliding gap, spiked sluice gates that slam shut across the whole river, lightning that marches across the river strike by strike, geysers that blast the raft away, whirlpools that drag the raft in, sideways currents, kelp beds that hold the raft back, rapids running back upstream, bouncy mushrooms, rocks, boost pads, and open edges you can fall off. Hit shapes cover the spikes you can see, so a raft that looks like it touched them did.

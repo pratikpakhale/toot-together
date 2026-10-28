@@ -44,7 +44,7 @@ const CANYON_RUN: CourseDef = {
   name: 'Canyon Run',
   blurb: 'Spikes, spinners, a big drop, the rapids and the crushers.',
   theme: 'canyon',
-  difficulty: 2,
+  difficulty: 4,
   medals: [300, 410, 625],
   startHeading: 0,
   pieces: [
@@ -501,7 +501,7 @@ const THUNDER_RUN: CourseDef = {
 }
 
 /** Levels in play order; each unlocks the next. */
-export const COURSE_LIST: CourseDef[] = [LAZY_RIVER, CANYON_RUN, VOLCANO_PEAK, BAYOU_BENDS, FROSTBITE_FALLS, SUNKEN_TEMPLE, DRAGONS_GULLET, THUNDER_RUN]
+export const COURSE_LIST: CourseDef[] = [LAZY_RIVER, BAYOU_BENDS, VOLCANO_PEAK, FROSTBITE_FALLS, SUNKEN_TEMPLE, CANYON_RUN, DRAGONS_GULLET, THUNDER_RUN]
 /** Null-prototype so untrusted ids like "constructor" or "__proto__" never match. */
 export const COURSES: Readonly<Record<string, CourseDef>> = Object.assign(Object.create(null) as Record<string, CourseDef>, Object.fromEntries(COURSE_LIST.map((c) => [c.id, c])))
 export const DEFAULT_COURSE = LAZY_RIVER.id
