@@ -362,6 +362,9 @@ export const ICONS = {
     `<circle cx="32" cy="32" r="5.5" fill="${INK}"/>` +
     shine(27, 27, 3, 2, -40, 0.9),
 
+  /** The "more" button in an app's own browser bar. */
+  more: [12, 32, 52].map((x) => `<circle cx="${x}" cy="32" r="7" fill="${INK}"/>`).join(''),
+
   next:
     `<path d="M8 25h24V12l24 20-24 20V39H8z" fill="#9be23a" ${O}/>` +
     `<path d="M12 29h22" stroke="#fff" stroke-width="3" opacity=".6"/>`,

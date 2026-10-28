@@ -5,6 +5,25 @@ export const isTouch = matchMedia('(pointer: coarse)').matches
 /** iPhone, iPod, or an iPad (which reports itself as a Mac). */
 export const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
 
+const IN_APP_BROWSERS = [
+  ['Instagram', /Instagram/],
+  ['Facebook', /FBAN|FBAV|FB_IAB/],
+  ['Snapchat', /Snapchat/],
+  ['TikTok', /musical_ly|BytedanceWebview/],
+] as const
+
+/** The app whose own browser this is, if any. On iPhone, Instagram's never turns sideways. */
+export const inAppBrowser = IN_APP_BROWSERS.find(([, ua]) => ua.test(navigator.userAgent))?.[0] ?? null
+
+/** This page in Android's default browser. */
+export function systemBrowserUrl() {
+  const url = new URL(location.href)
+  return `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=https;S.browser_fallback_url=${encodeURIComponent(url.href)};end`
+}
+
+/** This page in Chrome on iPhone, if it's installed. iPhone apps block links into Safari. */
+export const chromeUrl = () => location.href.replace(/^https:/, 'googlechromes:')
+
 const FULLSCREEN_DISPLAY = '(display-mode: fullscreen)'
 
 export function isStandalone() {
@@ -113,7 +132,8 @@ const emitInstall = () => installListeners.forEach((fn) => fn())
 export type InstallOffer = 'prompt' | 'ios' | null
 
 function installOffer(): InstallOffer {
-  if (!isTouch || installDismissed || isStandalone()) return null
+  // An app's own browser can't add to the home screen.
+  if (!isTouch || installDismissed || inAppBrowser || isStandalone()) return null
   if (installEvent) return 'prompt'
   return isIOS ? 'ios' : null
 }
