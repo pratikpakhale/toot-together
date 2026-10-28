@@ -386,7 +386,7 @@ export class NetSession extends BaseSession implements GameSession {
 
   private forgetStoredSeat() {
     this.resumingStored = false
-    this.token = null
+    this.setToken(null)
     saveSeat(null)
   }
 
@@ -405,7 +405,7 @@ export class NetSession extends BaseSession implements GameSession {
       const v = PROTOCOL_VERSION
       if (this.spectating) this.send({ type: 'watch', v, room: this.room ?? undefined })
       else if (this.token && this.info.roomCode) this.send({ type: 'join', v, name, room: this.info.roomCode, resume: this.token })
-      else if (this.room) this.send({ type: 'join', v, name, room: this.room })
+      else if (code) this.send({ type: 'join', v, name, room: code })
       else this.send({ type: 'join', v, name, course: this.info.courseId, rafts: this.rafts })
     }
     ws.onmessage = (e) => {
@@ -529,7 +529,8 @@ export class NetSession extends BaseSession implements GameSession {
         if (this.pending.length > EVENT_BACKLOG_MAX) this.pending = this.pending.filter((e) => STATEFUL_EVENTS.has(e.type)).concat(this.pending.slice(-EVENT_BACKLOG_KEEP))
         break
       case 'error':
-        if (msg.code === 'expired' && this.resumingStored) {
+        // The seat went to someone else while we were away, but the room may still be going: join it as a new hippo.
+        if (msg.code === 'expired' && (this.resumingStored || this.info.status === 'reconnecting')) {
           this.forgetStoredSeat()
           this.ws?.close()
           this.connect()
