@@ -53,7 +53,8 @@ printf '[Service]\nEnvironment=REGION=%s\n' "$REGION" >/etc/systemd/system/toot-
   cat "$HERE/Caddyfile"
   if [ -n "$REDIRECT_FROM" ]; then cat "$HERE/Caddyfile.redirect"; fi
 } | sed -e "s|{\$DOMAIN}|$DOMAIN|g" -e "s|{\$REDIRECT_FROM}|$REDIRECT_FROM|g" >/etc/caddy/Caddyfile
-caddy validate --config /etc/caddy/Caddyfile
+# As Caddy's own user: validating opens the log files, and ones it created as root Caddy couldn't write to.
+runuser -u caddy -- caddy validate --config /etc/caddy/Caddyfile
 systemctl daemon-reload
 systemctl enable toot-together caddy
 systemctl reload-or-restart caddy

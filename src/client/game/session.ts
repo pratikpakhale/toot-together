@@ -10,12 +10,12 @@ import {
   LEAVE_CLOSE_CODE,
   mayRestart,
   PROTOCOL_VERSION,
-  sanitizeChat,
-  sanitizeName,
   SEAT_HOLD_MS,
   type ServerMsg,
+  sanitizeChat,
+  sanitizeName,
 } from '../../sim/protocol'
-import { type Region, REGIONS, regionOfCode } from '../../sim/regions'
+import { REGIONS, type Region, regionOfCode } from '../../sim/regions'
 import { rimSector, walkRim } from '../../sim/sectors'
 import { Sim } from '../../sim/sim'
 import type { BakedCourse } from '../../sim/track'
@@ -32,8 +32,8 @@ import {
 } from '../../sim/types'
 import { socketUrl } from '../regions'
 import { SnapshotClock } from './clock'
-import { cloneSnapshot, extrapolate, interpolate } from './interp'
 import type { DeviceId } from './input'
+import { cloneSnapshot, extrapolate, interpolate } from './interp'
 
 export interface LocalPlayer {
   id: number
@@ -55,7 +55,12 @@ export interface SessionInfo {
   roomCode: string | null
   roster: RosterEntry[]
   chat: ChatEntry[]
-  error: { code: JoinError | 'disconnected' | 'unreachable'; message: string } | null
+  error: {
+    code: JoinError | 'disconnected' | 'unreachable'
+    message: string
+    /** Why the socket went away, for analytics: its close code, and whether it ever opened. */
+    close?: { code: number; opened: boolean; region: string }
+  } | null
   /** The server's latest "no" to something this player tried; `key` changes with each one. */
   refused: { key: number; reason: string } | null
 }
@@ -239,7 +244,8 @@ const SNAPSHOT_BUFFER = 40
 const EVENT_BACKLOG_MAX = 200
 const EVENT_BACKLOG_KEEP = 50
 const AIM_RESEND_DELTA = 0.03
-const aimMoved = (a: number | null, b: number | null) => (a === null) !== (b === null) || (a !== null && b !== null && Math.abs(a - b) > AIM_RESEND_DELTA)
+const aimMoved = (a: number | null, b: number | null) =>
+  (a === null) !== (b === null) || (a !== null && b !== null && Math.abs(a - b) > AIM_RESEND_DELTA)
 const PING_EVERY_MS = 1000
 const PING_SAMPLES = 5
 const LATE_AVERAGE_TIME = 3
@@ -398,9 +404,12 @@ export class NetSession extends BaseSession implements GameSession {
 
   private connect() {
     const code = this.info.roomCode ?? this.room
-    const ws = new WebSocket(socketUrl((code && regionOfCode(code)) || this.region))
+    const region = (code && regionOfCode(code)) || this.region
+    const ws = new WebSocket(socketUrl(region))
     this.ws = ws
+    let opened = false
     ws.onopen = () => {
+      opened = true
       const name = sanitizeName(this.name)
       const v = PROTOCOL_VERSION
       if (this.spectating) this.send({ type: 'watch', v, room: this.room ?? undefined })
@@ -411,16 +420,19 @@ export class NetSession extends BaseSession implements GameSession {
     ws.onmessage = (e) => {
       if (ws === this.ws) this.onMessage(JSON.parse(String(e.data)) as ServerMsg)
     }
-    ws.onclose = () => {
-      if (ws === this.ws) this.onClose()
+    ws.onclose = (e) => {
+      if (ws === this.ws) this.onClose({ code: e.code, opened, region: region.id })
     }
   }
 
-  private onClose() {
+  private onClose(close: NonNullable<SessionInfo['error']>['close']) {
     window.clearInterval(this.pingTimer)
     if (this.disposed || this.info.status === 'error' || this.info.status === 'closed') return
     if (!this.token) {
-      this.setInfo({ status: 'closed', error: { code: 'unreachable', message: "Couldn't reach the game server. Check your connection and try again." } })
+      this.setInfo({
+        status: 'closed',
+        error: { code: 'unreachable', message: "Couldn't reach the game server. Check your connection and try again.", close },
+      })
       return
     }
     if (this.info.status !== 'reconnecting') {
@@ -430,7 +442,7 @@ export class NetSession extends BaseSession implements GameSession {
       this.setInfo({ status: 'reconnecting' })
     }
     if (Date.now() > this.reconnectUntil) {
-      this.setInfo({ status: 'closed', error: { code: 'disconnected', message: 'Lost connection to the server.' } })
+      this.setInfo({ status: 'closed', error: { code: 'disconnected', message: 'Lost connection to the server.', close } })
       return
     }
     this.retryTimer = window.setTimeout(() => this.connect(), RECONNECT_DELAY_MS)
@@ -526,7 +538,8 @@ export class NetSession extends BaseSession implements GameSession {
       }
       case 'events':
         this.pending.push(...msg.events.filter((e) => !this.confirmsPrediction(e)))
-        if (this.pending.length > EVENT_BACKLOG_MAX) this.pending = this.pending.filter((e) => STATEFUL_EVENTS.has(e.type)).concat(this.pending.slice(-EVENT_BACKLOG_KEEP))
+        if (this.pending.length > EVENT_BACKLOG_MAX)
+          this.pending = this.pending.filter((e) => STATEFUL_EVENTS.has(e.type)).concat(this.pending.slice(-EVENT_BACKLOG_KEEP))
         break
       case 'error':
         // The seat went to someone else while we were away, but the room may still be going: join it as a new hippo.

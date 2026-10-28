@@ -5,7 +5,7 @@ import './index.css'
 import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { initAnalytics } from './analytics'
+import { initAnalytics, track } from './analytics'
 import { isHippocamRoute, isLabRoute } from './game/controller'
 import { installPlatformGuards } from './platform'
 import { ErrorBoundary, FatalScreen, hasWebGL } from './ui/Fatal'
@@ -18,10 +18,13 @@ installPlatformGuards()
 if (!isHippocamRoute()) initAnalytics()
 keepUpToDate()
 
+const webgl = hasWebGL()
+if (!webgl) track('webgl_missing')
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      {hasWebGL() ? (
+      {webgl ? (
         isLabRoute() ? (
           <Suspense fallback={null}>
             <LabPage />
@@ -30,7 +33,10 @@ createRoot(document.getElementById('root')!).render(
           <App />
         )
       ) : (
-        <FatalScreen title="No 3D here" message="Your browser has WebGL turned off or doesn't support it. Try a recent Chrome, Safari, Firefox or Edge." />
+        <FatalScreen
+          title="No 3D here"
+          message="Your browser has WebGL turned off or doesn't support it. Try a recent Chrome, Safari, Firefox or Edge."
+        />
       )}
     </ErrorBoundary>
   </StrictMode>,

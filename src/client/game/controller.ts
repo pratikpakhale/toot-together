@@ -1,6 +1,6 @@
 import { normalizeRoomCode, ROOM_CODE_LENGTH } from '../../sim/protocol'
-import { RAFT_RESULT } from '../../sim/types'
 import { type Region, regionOfCode } from '../../sim/regions'
+import { RAFT_RESULT } from '../../sim/types'
 import { setPlayerName, track } from '../analytics'
 import { audio } from '../audio/audio'
 import { fx } from '../scene/Fx'
@@ -62,7 +62,7 @@ function onInfo(session: GameSession) {
       showHippocam()
       return
     }
-    track('online_error', { code: err.code })
+    track('online_error', { code: err.code, ...(err.close && { close: err.close.code, opened: err.close.opened, server: err.close.region }) })
     app.setNotice({ title: ERROR_TITLES[err.code] ?? 'Disconnected', message: err.message })
     setRoomInUrl(null)
     showMenu()
@@ -281,6 +281,7 @@ function trackQuit(how: 'menu' | 'closed') {
       mode: modeOf(s),
       race: isRace(v),
       course: course.def.id,
+      room_code: s.info.roomCode ?? undefined,
       progress: Math.round(Math.min(1, Math.max(0, (raft.s - course.startS) / (course.finishS - course.startS))) * 100) / 100,
       deaths: raft.d,
       time: Math.round(v.raceTime),

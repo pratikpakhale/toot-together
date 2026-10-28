@@ -4,14 +4,7 @@ import { createServer, type IncomingMessage } from 'node:http'
 import { freemem, loadavg } from 'node:os'
 import { basename, extname, join, normalize, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  asteriskCensorStrategy,
-  englishDataset,
-  englishRecommendedTransformers,
-  keepStartCensorStrategy,
-  RegExpMatcher,
-  TextCensor,
-} from 'obscenity'
+import { asteriskCensorStrategy, englishDataset, englishRecommendedTransformers, keepStartCensorStrategy, RegExpMatcher, TextCensor } from 'obscenity'
 import { WebSocket, WebSocketServer } from 'ws'
 import { DT, MAX_RAFTS, SNAPSHOT_EVERY } from '../src/sim/constants'
 import { DEFAULT_COURSE, getCourse, isCourseId } from '../src/sim/courses'
@@ -22,22 +15,22 @@ import {
   type ClientMsg,
   type JoinError,
   LEAVE_CLOSE_CODE,
+  mayRestart,
   normalizeRoomCode,
   PROTOCOL_VERSION,
+  quantizeSnapshot,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_RANDOM,
-  quantizeSnapshot,
   type RoomSummary,
-  mayRestart,
-  sanitizeChat,
-  sanitizeName,
   SEAT_HOLD_MS,
   type ServerMsg,
   type ServerStats,
+  sanitizeChat,
+  sanitizeName,
 } from '../src/sim/protocol'
 import { REGIONS, regionById } from '../src/sim/regions'
 import { type Refusal, Sim } from '../src/sim/sim'
-import type { Results, RosterEntry } from '../src/sim/types'
+import type { Results, RosterEntry, SimEvent } from '../src/sim/types'
 
 const PORT = Number(process.env.PORT ?? 2567)
 const HOST = process.env.HOST
@@ -73,6 +66,14 @@ const censor = new TextCensor().setStrategy(keepStartCensorStrategy(asteriskCens
 
 const randomSeed = () => Math.floor(Math.random() * 2 ** 31)
 
+/**
+ * One JSON line per event on stdout, which journald keeps on the box (`scripts/logs.sh` pulls them). Lines start with
+ * `{`, so they're easy to tell from the human ones.
+ */
+function log(ev: string, fields: Record<string, unknown> = {}) {
+  process.stdout.write(`${JSON.stringify({ t: new Date().toISOString(), ev, region: REGION, ...fields })}\n`)
+}
+
 function cleanChat(raw: unknown) {
   const text = sanitizeChat(raw)
   return censor.applyTo(text, profanity.getAllMatches(text, true))
@@ -104,6 +105,9 @@ class Room {
   /** What everyone saw when the last run finished, so late joiners get the same. */
   results: Results | null = null
   createdAt = Date.now()
+  /** For the room's closing log line. */
+  peakPlayers = 0
+  runsFinished = 0
   private nextId = 1
   private rosterSent = -1
   private pingsSent = ''
@@ -139,6 +143,7 @@ class Room {
       chatTimes: [],
     }
     this.clients.set(client.id, client)
+    this.peakPlayers = Math.max(this.peakPlayers, this.clients.size)
     this.sim.addNewcomer(client.id, name)
     this.emptySince = null
     this.welcome(client)
@@ -201,6 +206,7 @@ class Room {
       sim.setAway(id, true)
     }
     room.emptySince = now
+    room.peakPlayers = room.clients.size
     return room
   }
 
@@ -213,7 +219,7 @@ class Room {
   }
 
   close() {
-    for (const ws of this.spectators) reject(ws, 'not_found', `Room ${this.code} closed.`)
+    for (const ws of this.spectators) reject(ws, 'not_found', `Room ${this.code} closed.`, { room: this.code })
     this.spectators.clear()
   }
 
@@ -311,7 +317,9 @@ class Room {
         hostOnly(() => this.sim.setRaftCount(Number(msg.count)))
         break
       case 'move':
-        hostOnly(() => (this.clients.has(Number(msg.id)) ? this.sim.move(Number(msg.id), msg.raft === null ? null : Number(msg.raft)) : 'That hippo left.'))
+        hostOnly(() =>
+          this.clients.has(Number(msg.id)) ? this.sim.move(Number(msg.id), msg.raft === null ? null : Number(msg.raft)) : 'That hippo left.',
+        )
         break
       case 'shuffle':
         hostOnly(() => this.sim.shuffle())
@@ -348,6 +356,7 @@ class Room {
   }
 
   private switchCourse(courseId: string) {
+    log('course', { room: this.code, from: this.courseId, to: courseId })
     this.sim = Sim.carryOver(this.sim, getCourse(courseId), randomSeed())
     this.broadcast({ type: 'course', course: courseId })
     this.broadcastRoster()
@@ -379,10 +388,52 @@ class Room {
     this.sim.host = this.hostId()
     this.sim.step()
     const events = this.sim.drainEvents()
-    for (const e of events) if (e.type === 'finish') this.results = e.results
+    for (const e of events) this.logEvent(e)
     if (this.sim.rosterVersion !== this.rosterSent) this.broadcastRoster()
     if (events.length) this.broadcast({ type: 'events', events })
     if (this.sim.tick % SNAPSHOT_EVERY === 0) this.broadcast(this.snapMsg())
+  }
+
+  private logEvent(e: SimEvent) {
+    const sim = this.sim
+    const at = { room: this.code, course: this.courseId, race: sim.race }
+    switch (e.type) {
+      case 'start':
+      case 'go':
+        log('run_start', { ...at, players: sim.players.size, rafts: sim.rafts.length })
+        break
+      case 'death': {
+        const { course } = sim
+        const s = sim.rafts[e.raft].s
+        log('death', {
+          ...at,
+          raft: e.raft,
+          crew: sim.crew(e.raft).length,
+          cause: e.cause,
+          s: Math.round(s),
+          progress: round2(Math.min(1, Math.max(0, (s - course.startS) / (course.finishS - course.startS)))),
+          deaths: e.deaths,
+          time: Math.round(sim.raceTime),
+          blamed: e.blame !== null,
+          rival: e.rival,
+        })
+        break
+      }
+      case 'finish':
+        this.results = e.results
+        this.runsFinished++
+        log('run_finish', {
+          ...at,
+          time: Math.round(e.results.time),
+          deaths: e.results.deaths,
+          players: e.results.players.filter((p) => p.raft !== null).length,
+          rafts: e.results.standings.length,
+        })
+        break
+      case 'restart':
+        log('run_restart', at)
+        break
+    }
   }
 
   private roster(): RosterEntry[] {
@@ -543,13 +594,21 @@ const server = createServer((req, res) => {
 
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 })
 
-function reject(ws: WebSocket, code: JoinError, message: string) {
+function reject(ws: WebSocket, code: JoinError, message: string, fields: Record<string, unknown> = {}) {
+  log('reject', { ...fields, code, why: message })
   send(ws, { type: 'error', code, message })
   ws.close()
 }
 
+// Socket ids stay unique across restarts: this process's start time, then a count.
+const SOCKET_ID_PREFIX = Date.now().toString(36)
+let socketCount = 0
+
 wss.on('connection', (ws, req) => {
   const ip = clientIp(req)
+  const sid = `${SOCKET_ID_PREFIX}-${++socketCount}`
+  const openedAt = Date.now()
+  log('conn', { sid, ip, ua: req.headers['user-agent'], origin: req.headers.origin })
   const count = (socketsPerIp.get(ip) ?? 0) + 1
   socketsPerIp.set(ip, count)
   ws.once('close', () => {
@@ -558,7 +617,7 @@ wss.on('connection', (ws, req) => {
     else socketsPerIp.set(ip, left)
   })
   if (count > MAX_SOCKETS_PER_IP || wss.clients.size > MAX_SOCKETS) {
-    reject(ws, 'busy', 'Too many connections from your network. Close a few tabs and try again.')
+    reject(ws, 'busy', 'Too many connections from your network. Close a few tabs and try again.', { sid, ip, sockets: count })
     return
   }
   alive.set(ws, true)
@@ -570,12 +629,15 @@ wss.on('connection', (ws, req) => {
   let watchWindow = Date.now()
   let joins = 0
   const deadline = setTimeout(() => {
-    if (!client && !watching) ws.terminate()
+    if (client || watching) return
+    log('join_timeout', { sid })
+    ws.terminate()
   }, JOIN_DEADLINE_MS)
 
-  const failJoin = (code: JoinError, message: string) => {
+  const refuse = (code: JoinError, message: string, fields: Record<string, unknown> = {}) => reject(ws, code, message, { sid, ...fields })
+  const failJoin = (code: JoinError, message: string, room: string) => {
     failedJoins.hit(ip)
-    reject(ws, code, message)
+    refuse(code, message, { room })
   }
 
   ws.on('message', (raw) => {
@@ -601,27 +663,29 @@ wss.on('connection', (ws, req) => {
     if (!client) {
       if (msg.type !== 'join' && msg.type !== 'watch') return
       if (++joins > MAX_JOINS_PER_SOCKET || failedJoins.blocked(ip)) {
-        reject(ws, 'rate_limited', 'Too many attempts. Wait a minute and try again.')
+        refuse('rate_limited', 'Too many attempts. Wait a minute and try again.', { joins })
         return
       }
       if (msg.v !== PROTOCOL_VERSION) {
-        reject(ws, 'outdated', 'Toot Together just got an update. Reload the page to keep playing.')
+        refuse('outdated', 'Toot Together just got an update. Reload the page to keep playing.', { v: msg.v })
         return
       }
       if (msg.type === 'watch') {
         const code = normalizeRoomCode(msg.room)
         if (!code) {
           watching = true
+          log('watch', { sid })
           roomListWatchers.add(ws)
           send(ws, roomListMsg())
           return
         }
         room = rooms.get(code) ?? null
         if (!room) {
-          reject(ws, 'not_found', `Room ${code} closed.`)
+          refuse('not_found', `Room ${code} closed.`, { room: code })
           return
         }
         watching = true
+        log('watch', { sid, room: code })
         room.watch(ws)
         return
       }
@@ -630,34 +694,37 @@ wss.on('connection', (ws, req) => {
       if (code) {
         room = rooms.get(code) ?? null
         if (!room) {
-          failJoin('not_found', `Room ${code} doesn't exist (or everyone left).`)
+          failJoin('not_found', `Room ${code} doesn't exist (or everyone left).`, code)
           return
         }
         if (resume !== null) {
           client = room.resume(ws, resume)
-          if (!client) failJoin('expired', 'Your seat was given away after the connection dropped.')
+          if (!client) failJoin('expired', 'Your seat was given away after the connection dropped.', code)
+          else log('join', { sid, how: 'resume', room: code, course: room.courseId, player: client.id, players: room.clients.size })
           return
         }
         if (room.full) {
-          failJoin('full', `Room ${code} already has ${room.sim.capacity} hippos.`)
+          failJoin('full', `Room ${code} already has ${room.sim.capacity} hippos.`, code)
           return
         }
       } else {
         if (rooms.size >= MAX_ROOMS) {
-          reject(ws, 'busy', 'The server is packed right now. Try again in a few minutes.')
+          refuse('busy', 'The server is packed right now. Try again in a few minutes.', { rooms: rooms.size })
           return
         }
         if (!roomCreates.hit(ip)) {
-          reject(ws, 'rate_limited', 'Slow down! Too many rooms created. Try again in a minute.')
+          refuse('rate_limited', 'Slow down! Too many rooms created. Try again in a minute.', { creates: true })
           return
         }
         const course = isCourseId(msg.course) ? msg.course : DEFAULT_COURSE
         const rafts = Number.isInteger(msg.rafts) ? Math.min(MAX_RAFTS, Math.max(1, Number(msg.rafts))) : 1
         room = new Room(newRoomCode(), course, rafts)
         rooms.set(room.code, room)
+        log('room_open', { room: room.code, course, rafts })
       }
       client = room.join(ws, cleanName(msg.name))
-      if (!client) failJoin('full', 'That raft is full.')
+      if (!client) failJoin('full', 'That raft is full.', room.code)
+      else log('join', { sid, how: code ? 'join' : 'create', room: room.code, course: room.courseId, player: client.id, players: room.clients.size })
       return
     }
 
@@ -677,15 +744,27 @@ wss.on('connection', (ws, req) => {
     const sent = pingSentAt.get(ws)
     if (sent !== undefined) rtt.set(ws, Math.round(performance.now() - sent))
   })
-  ws.on('close', (code) => {
+  ws.on('close', (code, reason) => {
     clearTimeout(deadline)
+    log('close', {
+      sid,
+      code,
+      reason: reason.toString() || undefined,
+      secs: Math.round((Date.now() - openedAt) / 1000),
+      room: room?.code,
+      player: client?.id,
+      watching: watching || undefined,
+    })
     roomListWatchers.delete(ws)
     room?.spectators.delete(ws)
     if (!room || !client || client.ws !== ws) return
     if (code === LEAVE_CLOSE_CODE) room.leave(client.id)
     else room.disconnect(client)
   })
-  ws.on('error', () => ws.close())
+  ws.on('error', (err) => {
+    log('socket_error', { sid, error: err.message })
+    ws.close()
+  })
 })
 
 // Browsers answer protocol-level pings even from hidden tabs, so only truly dead
@@ -719,6 +798,13 @@ function gameLoop() {
       if (room.emptySince !== null && Date.now() - room.emptySince > EMPTY_ROOM_TTL_MS) {
         room.close()
         rooms.delete(code)
+        log('room_close', {
+          room: code,
+          course: room.courseId,
+          mins: Math.round((Date.now() - room.createdAt) / 60_000),
+          peak: room.peakPlayers,
+          runs: room.runsFinished,
+        })
       }
     }
     nextTick += TICK_MS
@@ -731,7 +817,19 @@ gameLoop()
 
 const RELEASE = basename(process.cwd())
 const round2 = (v: number) => Math.round(v * 100) / 100
-let stats: ServerStats = { release: RELEASE, uptime: 0, sockets: 0, rssMb: 0, heapMb: 0, cpu: 0, load: 0, stealPct: null, memAvailableMb: 0, tickLateAvg: 0, tickLateMax: 0 }
+let stats: ServerStats = {
+  release: RELEASE,
+  uptime: 0,
+  sockets: 0,
+  rssMb: 0,
+  heapMb: 0,
+  cpu: 0,
+  load: 0,
+  stealPct: null,
+  memAvailableMb: 0,
+  tickLateAvg: 0,
+  tickLateMax: 0,
+}
 let lastCpu = process.cpuUsage()
 let lastStatsAt = performance.now()
 
@@ -775,19 +873,27 @@ setInterval(() => {
   }
   lastStatsAt = now
   lastMachineCpu = machineCpu
+  minuteLateMax = Math.max(minuteLateMax, lateness.max)
   lateness.sum = lateness.max = lateness.count = 0
   if (!roomListWatchers.size) return
   const data = JSON.stringify(roomListMsg())
   for (const ws of roomListWatchers) if (ws.readyState === WebSocket.OPEN) ws.send(data)
 }, STATS_EVERY_MS)
 
+let minuteLateMax = 0
 setInterval(() => {
+  let players = 0
+  for (const room of rooms.values()) players += room.clients.size
+  const { sockets, rssMb, cpu, load, stealPct } = stats
+  log('stats', { sockets, rooms: rooms.size, players, rssMb, cpu, load, stealPct, tickLateMax: round2(minuteLateMax) })
+  minuteLateMax = 0
   roomCreates.prune()
   failedJoins.prune()
 }, RATE_WINDOW_MS)
 
 server.listen(PORT, HOST, () => {
   console.log(`Toot Together server on http://localhost:${PORT} (ws path /ws, region ${REGION})`)
+  log('start', { release: RELEASE, protocol: PROTOCOL_VERSION, rooms: rooms.size })
 })
 
 function parkRooms() {
@@ -805,7 +911,10 @@ function unparkRooms() {
     for (const saved of parked.rooms) {
       const room = Room.restore(saved, parked.savedAt)
       if (room) rooms.set(room.code, room)
-      else console.warn(`Room ${saved.code} not restored: this release changed the simulation.`)
+      else {
+        console.warn(`Room ${saved.code} not restored: this release changed the simulation.`)
+        log('room_lost', { room: saved.code, course: saved.course, players: saved.seats.length })
+      }
     }
     console.log(`Restored ${rooms.size} of ${parked.rooms.length} rooms.`)
   } catch (err) {
@@ -820,6 +929,7 @@ unparkRooms()
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
     clearTimeout(loopTimer)
+    log('stop', { signal, rooms: rooms.size, sockets: wss.clients.size })
     try {
       parkRooms()
     } catch (err) {

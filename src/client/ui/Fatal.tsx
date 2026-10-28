@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { reportError } from '../analytics'
 import { Icon } from './Icon'
 
 export function FatalScreen({ title, message }: { title: string; message: string }) {
@@ -34,6 +35,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
 
   componentDidCatch(error: Error) {
     console.error(error)
+    reportError(error)
   }
 
   render() {

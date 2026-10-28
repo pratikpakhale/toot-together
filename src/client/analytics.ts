@@ -12,7 +12,8 @@ let client: PostHog | null = null
 let playerName: string | null = null
 let surveys: Survey[] = []
 const surveyListeners = new Set<() => void>()
-const queue: [string, Record<string, unknown> | undefined, CaptureOptions | undefined][] = []
+/** What happened before PostHog finished loading, sent once it has. */
+const queue: ((posthog: PostHog) => void)[] = []
 
 export function initAnalytics() {
   if (!import.meta.env.PROD || !POSTHOG_KEY) return
@@ -27,6 +28,8 @@ export function initAnalytics() {
           defaults: '2026-08-30',
           person_profiles: 'always',
           disable_session_recording: true,
+          // Uncaught errors and rejected promises, into PostHog's error tracking.
+          capture_exceptions: true,
         })
         client = posthog
         if (playerName) posthog.setPersonProperties({ name: playerName })
@@ -34,7 +37,7 @@ export function initAnalytics() {
           surveys = active.filter((s) => s.type === 'api')
           for (const fn of surveyListeners) fn()
         })
-        for (const [event, properties, options] of queue.splice(0)) posthog.capture(event, properties, options)
+        for (const send of queue.splice(0)) send(posthog)
       })
       .catch(() => {
         enabled = false
@@ -53,7 +56,14 @@ export function setPlayerName(name: string) {
 export function track(event: string, properties?: Record<string, unknown>, options?: CaptureOptions) {
   if (!enabled) return
   if (client) client.capture(event, properties, options)
-  else queue.push([event, properties, options])
+  else queue.push((posthog) => posthog.capture(event, properties, options))
+}
+
+/** An error the game caught itself (the crash screen), which PostHog's own capture never sees. */
+export function reportError(error: unknown) {
+  if (!enabled) return
+  if (client) client.captureException(error)
+  else queue.push((posthog) => posthog.captureException(error))
 }
 
 export function subscribeSurveys(fn: () => void) {
@@ -80,7 +90,13 @@ export function surveyShown(survey: Survey) {
 }
 
 /** Answers keyed by question id. Sending again with the same submission id updates the answer. */
-export function surveySent(survey: Survey, submissionId: string, answers: Record<string, SurveyResponseValue>, completed: boolean, properties?: Record<string, unknown>) {
+export function surveySent(
+  survey: Survey,
+  submissionId: string,
+  answers: Record<string, SurveyResponseValue>,
+  completed: boolean,
+  properties?: Record<string, unknown>,
+) {
   const responses: Record<string, unknown> = {}
   survey.questions.forEach((q, i) => {
     if (!q.id || answers[q.id] === undefined) return

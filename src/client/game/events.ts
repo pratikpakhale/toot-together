@@ -122,7 +122,17 @@ export function handleEvent(e: SimEvent, menu: boolean) {
         shake(0.9)
         const [title, quip] = DEATH_LINES[e.cause]
         const by = blamed && sniper !== undefined ? `${blamed} (${team(sniper)})` : blamed
-        toast({ text: title, sub: by ? `${by.toUpperCase()} DID THIS` : quip, icon: 'skull', subIcon: blamed ? 'toot' : undefined, tone: 'bad', big: true }, 1700)
+        toast(
+          {
+            text: title,
+            sub: by ? `${by.toUpperCase()} DID THIS` : quip,
+            icon: 'skull',
+            subIcon: blamed ? 'toot' : undefined,
+            tone: 'bad',
+            big: true,
+          },
+          1700,
+        )
       } else if (sniper !== undefined && sniper === mine) {
         toast({ text: 'SNIPED!', sub: `${blamed} gassed ${team(e.raft)} into it`, icon: 'target', tone: 'good' }, 1800)
       } else if (onCamera(e.raft)) {
@@ -167,7 +177,16 @@ export function handleEvent(e: SimEvent, menu: boolean) {
     case 'go':
       audio.countdown(true)
       audio.start()
-      toast({ text: 'GO GO GO!', sub: mine === null ? 'Hop on a raft to join in' : 'First raft to the finish wins!', icon: 'toot', tone: 'good', big: true }, 1400)
+      toast(
+        {
+          text: 'GO GO GO!',
+          sub: mine === null ? 'Hop on a raft to join in' : 'First raft to the finish wins!',
+          icon: 'toot',
+          tone: 'good',
+          big: true,
+        },
+        1400,
+      )
       break
     case 'raftFinish': {
       const c = frame.session?.course
@@ -214,6 +233,8 @@ export function handleEvent(e: SimEvent, menu: boolean) {
           players: e.results.players.length,
           medal: outcome?.medal ?? null,
           ping: s.net?.pingMs ?? null,
+          // Matches the room in the server's event log.
+          room_code: s.info.roomCode ?? undefined,
         })
       } else if (playing) {
         const me = s.localPlayers[0]?.id
@@ -224,6 +245,7 @@ export function handleEvent(e: SimEvent, menu: boolean) {
           players: e.results.players.filter((p) => p.raft !== null).length,
           place: standing?.place ?? null,
           ping: s.net?.pingMs ?? null,
+          room_code: s.info.roomCode ?? undefined,
         })
       }
       cancelResults()
@@ -238,7 +260,10 @@ export function handleEvent(e: SimEvent, menu: boolean) {
       fx.clear()
       app.setResults(null)
       if (app.overlay === 'results') app.setOverlay(null)
-      toast({ text: 'BACK TO THE POND', sub: race ? 'Pick a raft and get ready' : 'Cross START when ready', icon: 'hippo', tone: 'info', big: true }, 1600)
+      toast(
+        { text: 'BACK TO THE POND', sub: race ? 'Pick a raft and get ready' : 'Cross START when ready', icon: 'hippo', tone: 'info', big: true },
+        1600,
+      )
       break
     case 'seat':
       if (isLocal(e.id)) {
@@ -301,7 +326,15 @@ export function handleEvent(e: SimEvent, menu: boolean) {
       // Announced to the whole room; only your own raft's gets the fanfare.
       const ours = own(p.raft)
       if (ours) audio.legendary()
-      toast({ text: 'LEGENDARY TOOT', sub: ours ? `by ${nameOf(e.id)}` : `by ${nameOf(e.id)} (${team(p.raft)})`, icon: ours ? 'sparkle' : TEAMS[p.raft].icon, tone: 'gold' }, 2200)
+      toast(
+        {
+          text: 'LEGENDARY TOOT',
+          sub: ours ? `by ${nameOf(e.id)}` : `by ${nameOf(e.id)} (${team(p.raft)})`,
+          icon: ours ? 'sparkle' : TEAMS[p.raft].icon,
+          tone: 'gold',
+        },
+        2200,
+      )
       break
     }
     case 'exhausted': {
