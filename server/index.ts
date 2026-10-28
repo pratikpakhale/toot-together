@@ -883,9 +883,31 @@ setInterval(() => {
 let minuteLateMax = 0
 setInterval(() => {
   let players = 0
-  for (const room of rooms.values()) players += room.clients.size
+  // Each connected player's latest heartbeat round trip, to see how far this region is from the people on it.
+  const pings: number[] = []
+  for (const room of rooms.values()) {
+    players += room.clients.size
+    for (const c of room.clients.values()) {
+      const ms = c.ws ? rtt.get(c.ws) : undefined
+      if (ms !== undefined) pings.push(ms)
+    }
+  }
+  pings.sort((a, b) => a - b)
+  const ping = (q: number) => (pings.length ? pings[Math.floor(q * (pings.length - 1))] : null)
   const { sockets, rssMb, cpu, load, stealPct } = stats
-  log('stats', { sockets, rooms: rooms.size, players, rssMb, cpu, load, stealPct, tickLateMax: round2(minuteLateMax) })
+  log('stats', {
+    sockets,
+    rooms: rooms.size,
+    players,
+    pingMedian: ping(0.5),
+    pingP90: ping(0.9),
+    pingMax: ping(1),
+    rssMb,
+    cpu,
+    load,
+    stealPct,
+    tickLateMax: round2(minuteLateMax),
+  })
   minuteLateMax = 0
   roomCreates.prune()
   failedJoins.prune()

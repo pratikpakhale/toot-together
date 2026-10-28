@@ -73,6 +73,28 @@ from events where {game} and event = 'online_error' and timestamp > now() - inte
 group by d, code, close, opened, server order by d, n desc
 ```
 
+**Which region serves which players.** From the menu probe: the ping every country gets from each region, and how many are far from both. Add a column per region as regions are added.
+
+```sql
+select properties.$geoip_country_code cc, count(distinct person_id) people,
+  round(quantile(0.5)(toFloat(properties.ping_IN))) in_median, round(quantile(0.5)(toFloat(properties.ping_US))) us_median,
+  round(quantile(0.9)(least(toFloat(coalesce(properties.ping_IN, 9999)), toFloat(coalesce(properties.ping_US, 9999))))) best_p90,
+  countIf(least(toFloat(coalesce(properties.ping_IN, 9999)), toFloat(coalesce(properties.ping_US, 9999))) > 150) over_150ms
+from events where {game} and event = 'region_pings' and timestamp > now() - interval 30 day
+group by cc order by people desc limit 30
+```
+
+**Lag in real runs, by server and outcome.** Do laggy runs end in quits?
+
+```sql
+select substring(properties.room_code, 1, 2) server, event, count() runs,
+  round(quantile(0.5)(toFloat(properties.ping))) ping, round(quantile(0.5)(toFloat(properties.ping_p90))) p90,
+  round(avg(toFloat(properties.late)), 3) late
+from events where {game} and event in ('run_finished', 'run_quit', 'race_finished') and properties.ping_p90 is not null
+  and timestamp > now() - interval 30 day
+group by server, event order by server, event
+```
+
 **Survey answers.**
 
 ```sql
@@ -110,6 +132,13 @@ create view ev as select * from read_json_auto('/tmp/server.jsonl', union_by_nam
 ```sql
 select region, date_trunc('hour', t::timestamptz) h, max(players) peak_players, max(rooms) peak_rooms, max(sockets) peak_sockets
 from ev where ev = 'stats' group by all order by h, region;
+```
+
+**Ping on each server, minute by minute.** Spikes line up with crowded minutes or one far-away player.
+
+```sql
+select region, date_trunc('hour', t::timestamptz) h, max(players) players, median(pingMedian) ping, max(pingP90) p90, max(pingMax) worst
+from ev where ev = 'stats' and pingMedian is not null group by all order by h, region;
 ```
 
 **Where online crews die.** Deaths per tenth of each river, by cause. A spike at one `progress` bucket is one hazard.

@@ -9,7 +9,7 @@ import { useApp } from '../state/store'
 import { reloadForUpdate, reloadingForUpdate } from '../updates'
 import { frame, isRace, modeOf, myRaft } from './frame'
 import type { DeviceId } from './input'
-import { type GameSession, LocalSession, NetSession, type SessionInfo } from './session'
+import { type GameSession, LocalSession, NetSession, netSummary, type SessionInfo } from './session'
 
 let unsubscribe: (() => void) | null = null
 let courseShown: string | null = null
@@ -282,6 +282,7 @@ function trackQuit(how: 'menu' | 'closed') {
       race: isRace(v),
       course: course.def.id,
       room_code: s.info.roomCode ?? undefined,
+      ...netSummary(s.net),
       progress: Math.round(Math.min(1, Math.max(0, (raft.s - course.startS) / (course.finishS - course.startS))) * 100) / 100,
       deaths: raft.d,
       time: Math.round(v.raceTime),

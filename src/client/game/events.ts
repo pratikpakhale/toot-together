@@ -9,6 +9,7 @@ import { useProgress } from '../state/progress'
 import { useApp } from '../state/store'
 import { formatTime, ordinal } from '../ui/format'
 import { EARSHOT, frame, isRace, modeOf, myRaft, seatColor, TEAMS } from './frame'
+import { netSummary } from './session'
 
 const DEATH_LINES: Record<KillCause, [string, string]> = {
   spikes: ['POPPED!', 'Spikes are pointy. Who knew?'],
@@ -232,7 +233,7 @@ export function handleEvent(e: SimEvent, menu: boolean) {
           deaths: e.results.deaths,
           players: e.results.players.length,
           medal: outcome?.medal ?? null,
-          ping: s.net?.pingMs ?? null,
+          ...netSummary(s.net),
           // Matches the room in the server's event log.
           room_code: s.info.roomCode ?? undefined,
         })
@@ -244,7 +245,7 @@ export function handleEvent(e: SimEvent, menu: boolean) {
           rafts: e.results.standings.length,
           players: e.results.players.filter((p) => p.raft !== null).length,
           place: standing?.place ?? null,
-          ping: s.net?.pingMs ?? null,
+          ...netSummary(s.net),
           room_code: s.info.roomCode ?? undefined,
         })
       }

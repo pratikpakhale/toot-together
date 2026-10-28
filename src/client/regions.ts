@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { REGIONS, type Region } from '../sim/regions'
+import { track } from './analytics'
 
 /**
  * Deploy builds (`vite build --mode deploy`) reach each region at its URL in regions.json. Any other build, and
@@ -34,11 +35,24 @@ async function pingRegion(region: Region) {
 
 let measured = false
 
-/** Times every region once per page; with a single region there's nothing to choose, so nothing is sent. */
+/**
+ * Times every region once per page; with a single region there's nothing to choose, so nothing is sent. Analytics gets
+ * the results as `ping_<id>` (null: no answer), to see which players each region serves well.
+ */
 export function measureRegions() {
   if (measured || REGIONS.length < 2) return
   measured = true
-  for (const r of REGIONS) void pingRegion(r).then((ms) => useRegionPings.setState({ [r.id]: ms }))
+  void Promise.all(
+    REGIONS.map((r) =>
+      pingRegion(r).then((ms) => {
+        useRegionPings.setState({ [r.id]: ms })
+        return [`ping_${r.id}`, ms] as const
+      }),
+    ),
+  ).then((pings) => {
+    const answered = pings.some(([, ms]) => ms !== null)
+    track('region_pings', { ...Object.fromEntries(pings), fastest: answered ? fastestRegion(useRegionPings.getState()).id : null })
+  })
 }
 
 /** The region with the shortest round trip; the first one while nothing has answered. */

@@ -72,6 +72,24 @@ export interface NetStats {
   pingMs: number | null
   bufferMs: number
   lateFraction: number
+  /** Since the run began (or the room was joined), for analytics: every round trip, and frames drawn past the latest snapshot. */
+  run: { rtts: number[]; frames: number; lateFrames: number }
+}
+
+/** An hour of pings at one a second; a longer run keeps its first hour. */
+const MAX_RUN_RTTS = 3600
+
+/** How the connection held up over the run so far, as event properties; nothing for a local game. */
+export function netSummary(net: NetStats | null) {
+  if (!net?.run.rtts.length) return {}
+  const sorted = [...net.run.rtts].sort((a, b) => a - b)
+  const at = (q: number) => Math.round(sorted[Math.floor(q * (sorted.length - 1))])
+  return {
+    ping: at(0.5),
+    ping_p90: at(0.9),
+    ping_max: at(1),
+    late: net.run.frames ? Math.round((net.run.lateFrames / net.run.frames) * 1000) / 1000 : null,
+  }
 }
 
 export interface GameSession {
@@ -319,7 +337,7 @@ interface CatchUp {
 
 export class NetSession extends BaseSession implements GameSession {
   readonly kind = 'online' as const
-  readonly net: NetStats = { pingMs: null, bufferMs: 0, lateFraction: 0 }
+  readonly net: NetStats = { pingMs: null, bufferMs: 0, lateFraction: 0, run: { rtts: [], frames: 0, lateFrames: 0 } }
   readonly canChat: boolean
   localPlayers: LocalPlayer[] = []
   private ws: WebSocket | null = null
@@ -556,7 +574,9 @@ export class NetSession extends BaseSession implements GameSession {
         this.setInfo({ refused: { key: ++this.refusals, reason: msg.reason } })
         break
       case 'pong': {
-        this.pings.push(performance.now() - msg.t)
+        const rtt = performance.now() - msg.t
+        if (this.net.run.rtts.length < MAX_RUN_RTTS) this.net.run.rtts.push(rtt)
+        this.pings.push(rtt)
         if (this.pings.length > PING_SAMPLES) this.pings.shift()
         const sorted = [...this.pings].sort((a, b) => a - b)
         this.net.pingMs = Math.round(sorted[sorted.length >> 1])
@@ -586,6 +606,8 @@ export class NetSession extends BaseSession implements GameSession {
     this.extrapolatedFrom = t > latest.t ? latest : null
     this.net.bufferMs = this.clock.delay * 1000
     this.net.lateFraction += ((this.extrapolatedFrom ? 1 : 0) - this.net.lateFraction) * (1 - Math.exp(-dt / LATE_AVERAGE_TIME))
+    this.net.run.frames++
+    if (this.extrapolatedFrom) this.net.run.lateFrames++
     this.applyCorrections(rafts, t, dt)
     this.predictOwnHippo(this.view, Math.min(dt, MAX_FRAME_DT), nowMs)
 
@@ -680,6 +702,8 @@ export class NetSession extends BaseSession implements GameSession {
   drainEvents() {
     const out = this.ready
     this.ready = []
+    // A run's connection summary starts when it does.
+    if (out.some((e) => e.type === 'start' || e.type === 'go' || e.type === 'restart')) this.net.run = { rtts: [], frames: 0, lateFrames: 0 }
     return out
   }
 
