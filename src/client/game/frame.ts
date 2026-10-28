@@ -48,6 +48,9 @@ export const tagSlot = (raft: number, seat: number) => raft * CREW_SIZE + seat
 export const EARSHOT = 40
 
 export const isRace = (v: Snapshot) => v.rafts.length > 1
+
+/** How a session is played, for analytics. */
+export const modeOf = (s: GameSession) => (s.kind === 'online' ? 'online' : s.localPlayers.length > 1 ? 'couch' : 'solo')
 export const crewed = (v: Snapshot, raft: number) => v.players.some((p) => p.raft === raft)
 
 /** The raft the first local player is on, or null on the bench, spectating or before the first snapshot. */

@@ -8,7 +8,7 @@ import { fx } from '../scene/Fx'
 import { useProgress } from '../state/progress'
 import { useApp } from '../state/store'
 import { formatTime, ordinal } from '../ui/format'
-import { EARSHOT, frame, isRace, myRaft, seatColor, TEAMS } from './frame'
+import { EARSHOT, frame, isRace, modeOf, myRaft, seatColor, TEAMS } from './frame'
 
 const DEATH_LINES: Record<KillCause, [string, string]> = {
   spikes: ['POPPED!', 'Spikes are pointy. Who knew?'],
@@ -207,7 +207,7 @@ export function handleEvent(e: SimEvent, menu: boolean) {
       app.setResults(e.results, outcome)
       if (playing && !race) {
         track('run_finished', {
-          mode: s.kind === 'online' ? 'online' : s.localPlayers.length > 1 ? 'couch' : 'solo',
+          mode: modeOf(s),
           course: courseId,
           time: Math.round(e.results.time * 100) / 100,
           deaths: e.results.deaths,

@@ -64,7 +64,7 @@ export function TouchControls() {
   }
 
   return (
-    <div className="safe-area pointer-events-none z-10 touch-none [--stick:clamp(96px,28vmin,136px)] [--toot:clamp(84px,24vmin,128px)]">
+    <div className="ph-no-capture safe-area pointer-events-none z-10 touch-none [--stick:clamp(96px,28vmin,136px)] [--toot:clamp(84px,24vmin,128px)]">
       <div
         className="pointer-events-auto absolute bottom-0 left-0 top-24 w-1/2"
         onPointerDown={(e) => {

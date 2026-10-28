@@ -1,4 +1,4 @@
-import type { PostHog, Survey, SurveyResponseValue } from 'posthog-js'
+import type { CaptureOptions, PostHog, Survey, SurveyResponseValue } from 'posthog-js'
 
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY
 /** API surveys made in PostHog: we draw them, PostHog picks who sees them and keeps the answers. */
@@ -12,7 +12,7 @@ let client: PostHog | null = null
 let playerName: string | null = null
 let surveys: Survey[] = []
 const surveyListeners = new Set<() => void>()
-const queue: [string, Record<string, unknown> | undefined][] = []
+const queue: [string, Record<string, unknown> | undefined, CaptureOptions | undefined][] = []
 
 export function initAnalytics() {
   if (!import.meta.env.PROD || !POSTHOG_KEY) return
@@ -34,7 +34,7 @@ export function initAnalytics() {
           surveys = active.filter((s) => s.type === 'api')
           for (const fn of surveyListeners) fn()
         })
-        for (const [event, properties] of queue.splice(0)) posthog.capture(event, properties)
+        for (const [event, properties, options] of queue.splice(0)) posthog.capture(event, properties, options)
       })
       .catch(() => {
         enabled = false
@@ -50,10 +50,10 @@ export function setPlayerName(name: string) {
   client?.setPersonProperties({ name })
 }
 
-export function track(event: string, properties?: Record<string, unknown>) {
+export function track(event: string, properties?: Record<string, unknown>, options?: CaptureOptions) {
   if (!enabled) return
-  if (client) client.capture(event, properties)
-  else queue.push([event, properties])
+  if (client) client.capture(event, properties, options)
+  else queue.push([event, properties, options])
 }
 
 export function subscribeSurveys(fn: () => void) {

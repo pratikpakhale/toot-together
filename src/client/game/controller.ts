@@ -1,12 +1,13 @@
 import { normalizeRoomCode, ROOM_CODE_LENGTH } from '../../sim/protocol'
+import { RAFT_RESULT } from '../../sim/types'
 import { type Region, regionOfCode } from '../../sim/regions'
 import { setPlayerName, track } from '../analytics'
 import { audio } from '../audio/audio'
 import { fx } from '../scene/Fx'
 import { useProgress } from '../state/progress'
 import { useApp } from '../state/store'
-import { reloadForUpdate } from '../updates'
-import { frame } from './frame'
+import { reloadForUpdate, reloadingForUpdate } from '../updates'
+import { frame, isRace, modeOf, myRaft } from './frame'
 import type { DeviceId } from './input'
 import { type GameSession, LocalSession, NetSession, type SessionInfo } from './session'
 
@@ -170,6 +171,7 @@ export function playLevel(courseId: string) {
   useProgress.getState().select(courseId)
   session.restart(courseId)
   useApp.getState().setOverlay(null)
+  track('river_started', { mode: modeOf(session), course: courseId })
 }
 
 export function joinRoom(code: string) {
@@ -258,9 +260,38 @@ export function leaveGame() {
     showHippocam()
     return
   }
+  trackQuit('menu')
   setRoomInUrl(null)
   showMenu()
 }
+
+/** A run left before the finish line (or before the start one): through the menu, or by closing the page. */
+function trackQuit(how: 'menu' | 'closed') {
+  const s = frame.session
+  const v = frame.view
+  if (useApp.getState().screen !== 'game' || !s || s.spectating || !v || v.phase === 'finished' || reloadingForUpdate) return
+  const raft = v.rafts[myRaft(v, s) ?? -1]
+  if (!raft || raft.res !== RAFT_RESULT.none) return
+  const { course } = s
+  track(
+    'run_quit',
+    {
+      how,
+      phase: v.phase,
+      mode: modeOf(s),
+      race: isRace(v),
+      course: course.def.id,
+      progress: Math.round(Math.min(1, Math.max(0, (raft.s - course.startS) / (course.finishS - course.startS))) * 100) / 100,
+      deaths: raft.d,
+      time: Math.round(v.raceTime),
+    },
+    // The page is going away, so the usual batched request wouldn't make it.
+    how === 'closed' ? { transport: 'sendBeacon' } : undefined,
+  )
+}
+
+// A page put in the back/forward cache may come back, so it hasn't been left yet.
+window.addEventListener('pagehide', (e) => !e.persisted && trackQuit('closed'))
 
 function setRoomInUrl(code: string | null) {
   const url = new URL(location.href)

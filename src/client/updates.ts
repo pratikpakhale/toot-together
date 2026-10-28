@@ -9,6 +9,13 @@ const MIN_GAP_MS = 60_000
 
 let registration: ServiceWorkerRegistration | undefined
 let updateWanted = false
+/** The page is about to reload onto a new release, which isn't the player leaving. */
+export let reloadingForUpdate = false
+
+function reload() {
+  reloadingForUpdate = true
+  window.location.reload()
+}
 
 /**
  * The server already runs a newer release than this page. A plain reload would be answered from the service
@@ -17,11 +24,11 @@ let updateWanted = false
 export function reloadForUpdate() {
   updateWanted = true
   const reg = registration
-  if (!reg) return window.location.reload()
+  if (!reg) return reload()
   reg.update().then(
     // Nothing new to install: the cache was never the problem, so a reload is enough.
-    () => !reg.installing && !reg.waiting && window.location.reload(),
-    () => window.location.reload(),
+    () => !reg.installing && !reg.waiting && reload(),
+    reload,
   )
 }
 
@@ -33,7 +40,6 @@ export function keepUpToDate() {
   registerSW({
     immediate: true,
     onNeedReload() {
-      const reload = () => window.location.reload()
       if (updateWanted || useApp.getState().screen !== 'game' || performance.now() < STARTUP_MS) return reload()
       const stop = useApp.subscribe((s) => {
         if (s.screen === 'game') return
