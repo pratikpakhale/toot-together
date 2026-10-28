@@ -35,7 +35,9 @@ function cached(key: string, build: () => THREE.BufferGeometry) {
 function spike() {
   return cached('spike', () => {
     const spikeCol = new THREE.Color(PALETTE.spike)
-    const cone = paint(new THREE.ConeGeometry(0.13, 0.42, 10, 1), (p, _n, out) => out.copy(spikeCol).multiplyScalar(0.8 + 0.28 * smoothstep(-0.21, 0.15, p.y)))
+    const cone = paint(new THREE.ConeGeometry(0.13, 0.42, 10, 1), (p, _n, out) =>
+      out.copy(spikeCol).multiplyScalar(0.8 + 0.28 * smoothstep(-0.21, 0.15, p.y)),
+    )
     const collar = tint(new THREE.TorusGeometry(0.12, 0.028, 4, 10).rotateX(Math.PI / 2).translate(0, -0.15, 0), '#d8cfc4')
     return merge([cone, collar])
   })
@@ -89,7 +91,9 @@ export function spikeBall(radius: number, color: string) {
   return cached(`ball|${radius}|${color}`, () => {
     const body = new THREE.Color(color)
     const parts = [
-      paint(blob(32, 22).scale(radius, radius, radius), (p, _n, out) => out.copy(body).multiplyScalar(0.82 + 0.25 * smoothstep(-radius, radius, p.y))),
+      paint(blob(32, 22).scale(radius, radius, radius), (p, _n, out) =>
+        out.copy(body).multiplyScalar(0.82 + 0.25 * smoothstep(-radius, radius, p.y)),
+      ),
       tint(new THREE.TorusGeometry(radius * 1.0, radius * 0.07, 8, 40).rotateX(Math.PI / 2), METAL),
       rivets(radius * 1.06, 12, 0, radius * 0.045),
     ]
@@ -159,7 +163,7 @@ export function woodTexture() {
   ctx.fillStyle = '#e8e8e8'
   ctx.fillRect(0, 0, 128, 256)
   let seed = 7
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
   for (let k = 0; k < 26; k++) {
     const x = rnd() * 128
     const shade = 150 + rnd() * 70
@@ -222,7 +226,12 @@ export function bracket(size: number) {
       [-1, 1],
       [1, -1],
       [1, 1],
-    ].map(([x, y]) => tint(new THREE.SphereGeometry(0.05, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2).translate(x * size * 0.32, y * size * 0.32, 0.03), RIVET))
+    ].map(([x, y]) =>
+      tint(
+        new THREE.SphereGeometry(0.05, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2).translate(x * size * 0.32, y * size * 0.32, 0.03),
+        RIVET,
+      ),
+    )
     return merge([plate, ...bolts])
   })
 }
@@ -278,7 +287,12 @@ export function dome(r: number, color = GOLD) {
     return merge([
       paint(blob(24, 16).scale(r, r, r), (p, _n, out) => out.copy(c).multiplyScalar(0.85 + 0.25 * smoothstep(-r, r, p.y))),
       tint(new THREE.TorusGeometry(r * 0.92, r * 0.1, 6, 24).rotateX(Math.PI / 2).translate(0, -r * 0.3, 0), METAL),
-      tint(blob(10, 8).scale(r * 0.18, r * 0.18, r * 0.18).translate(0, r * 1.02, 0), '#fff2c4'),
+      tint(
+        blob(10, 8)
+          .scale(r * 0.18, r * 0.18, r * 0.18)
+          .translate(0, r * 1.02, 0),
+        '#fff2c4',
+      ),
     ])
   })
 }
@@ -386,7 +400,7 @@ function foamTexture() {
   }
   // Bubbles round the edge, drawn on both sides of the seam so the ring wraps cleanly.
   let seed = 11
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
   for (let k = 0; k < 70; k++) {
     const y = rnd() * h
     const x = reach(y) * (0.55 + rnd() * 0.5)
@@ -433,4 +447,5 @@ export function foamRing(inner: number, outer: number) {
 
 let foamMaterial: THREE.MeshBasicMaterial | null = null
 /** White water where something stands in the river. */
-export const foamMat = () => (foamMaterial ??= new THREE.MeshBasicMaterial({ map: foamTexture(), transparent: true, opacity: 0.85, depthWrite: false }))
+export const foamMat = () =>
+  (foamMaterial ??= new THREE.MeshBasicMaterial({ map: foamTexture(), transparent: true, opacity: 0.85, depthWrite: false }))

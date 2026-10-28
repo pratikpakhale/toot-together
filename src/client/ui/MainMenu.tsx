@@ -7,8 +7,8 @@ import { measureRegions } from '../regions'
 import { useApp } from '../state/store'
 import { FeedbackButton } from './Feedback'
 import { FullscreenButton } from './FullscreenButton'
-import { Logo } from './Logo'
 import { Icon } from './Icon'
+import { Logo } from './Logo'
 import { NameInput } from './Settings'
 
 export function MainMenu() {
@@ -35,20 +35,30 @@ export function MainMenu() {
     </label>
   )
   const solo = (
-    <button className="btn btn-green py-4 text-3xl [@media(max-height:800px)]:py-2 [@media(max-height:800px)]:text-2xl" onClick={click(() => openLevels('solo'))} onMouseEnter={() => audio.hover()}>
+    <button
+      className="btn btn-green py-4 text-3xl [@media(max-height:800px)]:py-2 [@media(max-height:800px)]:text-2xl"
+      onClick={click(() => openLevels('solo'))}
+      onMouseEnter={() => audio.hover()}
+    >
       <Icon name="hippo" size="1.15em" className="mr-2" />
       Play solo
     </button>
   )
   const couch = (
-    <button className="btn btn-orange text-2xl short:py-2 short:text-xl" onClick={click(() => setScreen('local-lobby'))} onMouseEnter={() => audio.hover()}>
+    <button
+      className="btn btn-orange text-2xl short:py-2 short:text-xl"
+      onClick={click(() => setScreen('local-lobby'))}
+      onMouseEnter={() => audio.hover()}
+    >
       <Icon name="couch" size="1.2em" className="mr-2" />
       Couch party (1–4)
     </button>
   )
   const online = (
     <div className="panel flex flex-col gap-3 p-4 short:gap-2 short:p-3">
-      <div className="font-display flex items-center gap-2 text-xl short:text-base"><Icon name="globe" size="1.3em" /> PLAY ONLINE WITH FRIENDS</div>
+      <div className="font-display flex items-center gap-2 text-xl short:text-base">
+        <Icon name="globe" size="1.3em" /> PLAY ONLINE WITH FRIENDS
+      </div>
       <button className="btn btn-blue text-xl short:py-2" onClick={click(pickRiverForRoom)} onMouseEnter={() => audio.hover()}>
         Create room
       </button>

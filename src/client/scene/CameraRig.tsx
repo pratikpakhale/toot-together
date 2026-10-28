@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useState } from 'react'
 import * as THREE from 'three'
 import { angleDiff } from '../../sim/math'
-import { pointAt, type BakedCourse } from '../../sim/track'
+import { type BakedCourse, pointAt } from '../../sim/track'
 import { RAFT_STATE } from '../../sim/types'
 import { frame } from '../game/frame'
 

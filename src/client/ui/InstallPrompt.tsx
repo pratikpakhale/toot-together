@@ -1,8 +1,8 @@
 import { audio } from '../audio/audio'
 import { dismissInstall, promptInstall, useInstallOffer } from '../platform'
 import { useApp } from '../state/store'
-import { Modal } from './Modal'
 import { Icon } from './Icon'
+import { Modal } from './Modal'
 
 export function InstallPrompt() {
   const offer = useInstallOffer()
@@ -20,7 +20,11 @@ export function InstallPrompt() {
             : 'Add Toot Together to your home screen. It opens full screen, with no browser bars, and solo games work offline.'}
         </p>
         <div className="mt-5 flex gap-3">
-          <button autoFocus={ios} className={`btn ${ios ? 'btn-green' : 'btn-cream'} flex-1 text-xl`} onClick={() => (audio.click(), dismissInstall())}>
+          <button
+            autoFocus={ios}
+            className={`btn ${ios ? 'btn-green' : 'btn-cream'} flex-1 text-xl`}
+            onClick={() => (audio.click(), dismissInstall())}
+          >
             {ios ? 'OK' : 'Not now'}
           </button>
           {!ios && (
@@ -29,7 +33,10 @@ export function InstallPrompt() {
             </button>
           )}
         </div>
-        <button className="mt-2 min-h-11 w-full text-sm font-extrabold text-ink/55 underline decoration-2 underline-offset-2" onClick={() => (audio.click(), dismissInstall(true))}>
+        <button
+          className="mt-2 min-h-11 w-full text-sm font-extrabold text-ink/55 underline decoration-2 underline-offset-2"
+          onClick={() => (audio.click(), dismissInstall(true))}
+        >
           Don't ask again
         </button>
       </div>

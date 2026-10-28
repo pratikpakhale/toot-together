@@ -22,7 +22,16 @@ async function withRoomsFile(run: (roomsFile: string) => Promise<void>) {
 }
 
 function parkRoom(roomsFile: string, code: string, sim: SimState, savedAt = Date.now(), extra: object = {}) {
-  const room = { code, course: course.def.id, createdAt: Date.now(), nextId: 2, seats: [{ id: 1, token: 'x', awaySince: null }], chat: [], sim, ...extra }
+  const room = {
+    code,
+    course: course.def.id,
+    createdAt: Date.now(),
+    nextId: 2,
+    seats: [{ id: 1, token: 'x', awaySince: null }],
+    chat: [],
+    sim,
+    ...extra,
+  }
   writeFileSync(roomsFile, JSON.stringify({ savedAt, rooms: [room] }))
 }
 

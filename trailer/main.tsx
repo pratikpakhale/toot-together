@@ -6,9 +6,6 @@ import { advance, Canvas } from '@react-three/fiber'
 import { Suspense, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
-import { DT } from '../src/sim/constants'
-import { getCourse } from '../src/sim/courses'
-import type { Sim } from '../src/sim/sim'
 import { audio } from '../src/client/audio/audio'
 import { adopt as adoptSession } from '../src/client/game/controller'
 import { cloneSnapshot } from '../src/client/game/interp'
@@ -26,9 +23,12 @@ import { useApp } from '../src/client/state/store'
 import { ChatDock } from '../src/client/ui/Chat'
 import { NameTags } from '../src/client/ui/NameTags'
 import { Toasts } from '../src/client/ui/Toasts'
+import { DT } from '../src/sim/constants'
+import { getCourse } from '../src/sim/courses'
+import type { Sim } from '../src/sim/sim'
 import { CUT } from './cuts'
 import { crewOf, prime, type Shot, steer } from './director'
-import { Overlay, type Beat } from './Overlay'
+import { type Beat, Overlay } from './Overlay'
 
 const FPS = 60
 const SAMPLE_RATE = 48000
@@ -72,7 +72,14 @@ class ShotSession extends LocalSession {
     if (due.length === this.fired) return
     const fresh: ChatEntry[] = due.slice(this.fired).map((c) => {
       const id = c.seat + 1
-      return { key: ++this.chatKey, liveAt: performance.now(), id, seat: c.seat, name: sim.players.get(id)?.name ?? crewOf(this.shot)[c.seat], text: c.text }
+      return {
+        key: ++this.chatKey,
+        liveAt: performance.now(),
+        id,
+        seat: c.seat,
+        name: sim.players.get(id)?.name ?? crewOf(this.shot)[c.seat],
+        text: c.text,
+      }
     })
     this.fired = due.length
     this.setInfo({ chat: [...this.info.chat, ...fresh].slice(-30) })
@@ -117,7 +124,13 @@ function limitTootVoices(max: number) {
 let shown = -2
 
 function direct(t: number): Beat {
-  const n = t < INTRO ? -1 : Math.min(SHOTS.length - 1, starts.findLastIndex((s) => t >= s))
+  const n =
+    t < INTRO
+      ? -1
+      : Math.min(
+          SHOTS.length - 1,
+          starts.findLastIndex((s) => t >= s),
+        )
   if (n !== shown) {
     shown = n
     if (n === -1) {
@@ -214,11 +227,12 @@ function pinAnimations(now: number) {
 
 /** Lets React's scheduler (MessageChannel tasks, not faked) finish committing. */
 async function settle() {
-  for (let i = 0; i < 4; i++) await new Promise((r) => {
-    const ch = new MessageChannel()
-    ch.port1.onmessage = r
-    ch.port2.postMessage(0)
-  })
+  for (let i = 0; i < 4; i++)
+    await new Promise((r) => {
+      const ch = new MessageChannel()
+      ch.port1.onmessage = r
+      ch.port2.postMessage(0)
+    })
 }
 
 let offline: OfflineAudioContext | null = null
@@ -229,6 +243,7 @@ function startAudio() {
   offline = new OfflineAudioContext({ numberOfChannels: 2, length: Math.ceil(SAMPLE_RATE * (DURATION + 0.5)), sampleRate: SAMPLE_RATE })
   for (let k = 1; k < FRAMES; k++) suspends[k] = offline.suspend(k / FPS)
   const ctx = offline
+  // biome-ignore lint/complexity/useArrowFunction: the page calls it with `new`, which an arrow function can't take.
   ;(window as unknown as { AudioContext: unknown }).AudioContext = function () {
     return ctx
   }
@@ -255,8 +270,7 @@ function wav(buffer: AudioBuffer) {
   out.setUint16(34, 16, true)
   str(36, 'data')
   out.setUint32(40, frames * 4, true)
-  for (let i = 0; i < frames; i++)
-    for (let c = 0; c < 2; c++) out.setInt16(44 + i * 4 + c * 2, Math.max(-1, Math.min(1, ch[c][i])) * 0x7fff, true)
+  for (let i = 0; i < frames; i++) for (let c = 0; c < 2; c++) out.setInt16(44 + i * 4 + c * 2, Math.max(-1, Math.min(1, ch[c][i])) * 0x7fff, true)
   let bin = ''
   const bytes = new Uint8Array(out.buffer)
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))

@@ -1,9 +1,9 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { Survey, SurveyQuestion, SurveyResponseValue } from 'posthog-js'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { create } from 'zustand'
 import { PROTOCOL_VERSION } from '../../sim/protocol'
 import type { Results as RunResults } from '../../sim/types'
-import { activeSurvey, subscribeSurveys, SURVEY_IDS, surveySent, surveyShown } from '../analytics'
+import { activeSurvey, SURVEY_IDS, subscribeSurveys, surveySent, surveyShown } from '../analytics'
 import { audio } from '../audio/audio'
 import { isTouch } from '../platform'
 import { useProgress } from '../state/progress'
@@ -26,19 +26,32 @@ const FACES: Record<number, IconName[]> = {
   5: ['hippoGrumpy', 'hippoTired', 'hippoMeh', 'hippo', 'hippoLove'],
 }
 
-function Rating({ question, value, onPick }: { question: Extract<SurveyQuestion, { type: 'rating' }>; value: SurveyResponseValue | undefined; onPick: (n: number) => void }) {
+function Rating({
+  question,
+  value,
+  onPick,
+}: {
+  question: Extract<SurveyQuestion, { type: 'rating' }>
+  value: SurveyResponseValue | undefined
+  onPick: (n: number) => void
+}) {
   // PostHog's 0–10 scale is an NPS one; every other scale starts at 1.
   const from = question.scale === 10 ? 0 : 1
   const steps = Array.from({ length: question.scale - from + 1 }, (_, i) => from + i)
   const faces = question.display === 'emoji' ? FACES[question.scale] : undefined
-  const label = (n: number) => `${n} of ${question.scale}${n === from && question.lowerBoundLabel ? `: ${question.lowerBoundLabel}` : ''}${n === question.scale && question.upperBoundLabel ? `: ${question.upperBoundLabel}` : ''}`
+  const label = (n: number) =>
+    `${n} of ${question.scale}${n === from && question.lowerBoundLabel ? `: ${question.lowerBoundLabel}` : ''}${n === question.scale && question.upperBoundLabel ? `: ${question.upperBoundLabel}` : ''}`
   return (
     <div className="flex flex-wrap justify-center gap-1">
       {steps.map((n, i) => (
         <button
           key={n}
           className={`flex size-11 items-center justify-center rounded-full border-[3px] transition-transform hover:scale-110 motion-reduce:transition-none ${
-            faces ? (value === n ? 'border-ink bg-sun' : 'border-transparent') : `font-display border-ink text-lg ${value === n ? 'bg-sun' : 'bg-white'}`
+            faces
+              ? value === n
+                ? 'border-ink bg-sun'
+                : 'border-transparent'
+              : `font-display border-ink text-lg ${value === n ? 'bg-sun' : 'bg-white'}`
           }`}
           aria-label={label(n)}
           title={label(n)}
@@ -52,7 +65,15 @@ function Rating({ question, value, onPick }: { question: Extract<SurveyQuestion,
   )
 }
 
-function Choices({ question, value, onChange }: { question: Extract<SurveyQuestion, { type: 'single_choice' | 'multiple_choice' }>; value: SurveyResponseValue | undefined; onChange: (v: string | string[]) => void }) {
+function Choices({
+  question,
+  value,
+  onChange,
+}: {
+  question: Extract<SurveyQuestion, { type: 'single_choice' | 'multiple_choice' }>
+  value: SurveyResponseValue | undefined
+  onChange: (v: string | string[]) => void
+}) {
   const many = question.type === 'multiple_choice'
   const picked = Array.isArray(value) ? value : typeof value === 'string' ? [value] : []
   return (
@@ -129,7 +150,12 @@ export function RunSurvey({ results }: { results: RunResults }) {
     if (!q) return
     const { answers: before, submissionId } = useRunAsk.getState()
     const answers = { ...before, [q.id]: value }
-    surveySent(survey, submissionId, answers, step + 1 >= questions.length, { ...context(), deaths: results.deaths, time: Math.round(results.time * 100) / 100, race: results.standings.length > 1 })
+    surveySent(survey, submissionId, answers, step + 1 >= questions.length, {
+      ...context(),
+      deaths: results.deaths,
+      time: Math.round(results.time * 100) / 100,
+      race: results.standings.length > 1,
+    })
     useRunAsk.setState({ answers, step: step + 1 })
     setText('')
   }
@@ -158,7 +184,13 @@ export function RunSurvey({ results }: { results: RunResults }) {
             onChange={(e) => setText(e.target.value)}
             enterKeyHint="send"
           />
-          <button className="btn btn-green flex min-h-11 w-12 shrink-0 items-center justify-center p-0" type="submit" aria-label="Send" title="Send" disabled={!text.trim()}>
+          <button
+            className="btn btn-green flex min-h-11 w-12 shrink-0 items-center justify-center p-0"
+            type="submit"
+            aria-label="Send"
+            title="Send"
+            disabled={!text.trim()}
+          >
             <Icon name="next" size={26} />
           </button>
         </form>

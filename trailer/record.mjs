@@ -6,14 +6,34 @@ import { parseArgs } from 'node:util'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
 
-const { values: opts } = parseArgs({ options: { cut: { type: 'string', default: 'trailer' }, from: { type: 'string' }, to: { type: 'string' }, step: { type: 'string' } } })
+const { values: opts } = parseArgs({
+  options: { cut: { type: 'string', default: 'trailer' }, from: { type: 'string' }, to: { type: 'string' }, step: { type: 'string' } },
+})
 const stills = opts.from !== undefined
 
 /** The reel renders at a phone-sized viewport so the game's labels come out phone-sized. */
 const CUTS = {
-  trailer: { master: 'trailer/out/toot-together-trailer.mp4', social: 'trailer/out/toot-together-trailer-1080p.mp4', preview: 'trailer/preview.webp', viewport: { width: 1280, height: 720 }, scale: 1.5 },
-  reel: { master: 'trailer/out/toot-together-reel-master.mp4', social: 'trailer/out/toot-together-reel.mp4', preview: null, viewport: { width: 360, height: 640 }, scale: 3 },
-  stream: { master: 'trailer/out/toot-together-stream-master.mp4', social: 'trailer/out/toot-together-stream.mp4', preview: null, viewport: { width: 360, height: 384 }, scale: 3 },
+  trailer: {
+    master: 'trailer/out/toot-together-trailer.mp4',
+    social: 'trailer/out/toot-together-trailer-1080p.mp4',
+    preview: 'trailer/preview.webp',
+    viewport: { width: 1280, height: 720 },
+    scale: 1.5,
+  },
+  reel: {
+    master: 'trailer/out/toot-together-reel-master.mp4',
+    social: 'trailer/out/toot-together-reel.mp4',
+    preview: null,
+    viewport: { width: 360, height: 640 },
+    scale: 3,
+  },
+  stream: {
+    master: 'trailer/out/toot-together-stream-master.mp4',
+    social: 'trailer/out/toot-together-stream.mp4',
+    preview: null,
+    viewport: { width: 360, height: 384 },
+    scale: 3,
+  },
 }
 const cut = CUTS[opts.cut]
 if (!cut) throw new Error(`unknown cut "${opts.cut}", expected ${Object.keys(CUTS).join(' or ')}`)
@@ -54,7 +74,11 @@ try {
   await page.goto(url)
   await page.waitForFunction(() => window.__trailer && document.fonts.status === 'loaded')
   await page.evaluate(() => document.fonts.ready)
-  const { fps, frames, highlights } = await page.evaluate(() => ({ fps: window.__trailer.fps, frames: window.__trailer.frames, highlights: window.__trailer.highlights }))
+  const { fps, frames, highlights } = await page.evaluate(() => ({
+    fps: window.__trailer.fps,
+    frames: window.__trailer.frames,
+    highlights: window.__trailer.highlights,
+  }))
   await page.clock.pauseAt(60_000)
   await page.clock.runFor(WARM_UP_MS)
   const renderer = await page.evaluate(() => {
@@ -72,7 +96,36 @@ try {
   mkdirSync(join(WORK, 'stills'), { recursive: true })
   if (!stills) {
     mkdirSync('trailer/out', { recursive: true })
-    ffmpeg = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-', '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-vf', 'scale=out_range=tv', '-pix_fmt', 'yuv420p', '-color_range', 'tv', join(WORK, 'video.mp4')], { stdio: ['pipe', 'inherit', 'inherit'] })
+    ffmpeg = spawn(
+      'ffmpeg',
+      [
+        '-y',
+        '-loglevel',
+        'error',
+        '-f',
+        'image2pipe',
+        '-framerate',
+        String(fps),
+        '-c:v',
+        'mjpeg',
+        '-i',
+        '-',
+        '-c:v',
+        'libx264',
+        '-preset',
+        'slow',
+        '-crf',
+        '17',
+        '-vf',
+        'scale=out_range=tv',
+        '-pix_fmt',
+        'yuv420p',
+        '-color_range',
+        'tv',
+        join(WORK, 'video.mp4'),
+      ],
+      { stdio: ['pipe', 'inherit', 'inherit'] },
+    )
     await page.evaluate(() => window.__trailer.startAudio())
   }
 
@@ -101,13 +154,77 @@ try {
     const wav = await page.evaluate(() => window.__trailer.audioWav())
     writeFileSync(join(WORK, 'audio.wav'), Buffer.from(wav, 'base64'))
     const q = ['-y', '-loglevel', 'error']
-    await run('ffmpeg', [...q, '-i', join(WORK, 'video.mp4'), '-i', join(WORK, 'audio.wav'), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '256k', '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11', '-ar', '48000', '-shortest', '-movflags', '+faststart', MASTER])
-    await run('ffmpeg', [...q, '-i', MASTER, '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-maxrate', '12M', '-bufsize', '24M', '-vf', 'scale=out_range=tv', '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-c:a', 'copy', '-movflags', '+faststart', SOCIAL])
+    await run('ffmpeg', [
+      ...q,
+      '-i',
+      join(WORK, 'video.mp4'),
+      '-i',
+      join(WORK, 'audio.wav'),
+      '-c:v',
+      'copy',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '256k',
+      '-af',
+      'loudnorm=I=-14:TP=-1.5:LRA=11',
+      '-ar',
+      '48000',
+      '-shortest',
+      '-movflags',
+      '+faststart',
+      MASTER,
+    ])
+    await run('ffmpeg', [
+      ...q,
+      '-i',
+      MASTER,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'slow',
+      '-crf',
+      '18',
+      '-maxrate',
+      '12M',
+      '-bufsize',
+      '24M',
+      '-vf',
+      'scale=out_range=tv',
+      '-pix_fmt',
+      'yuv420p',
+      '-color_range',
+      'tv',
+      '-c:a',
+      'copy',
+      '-movflags',
+      '+faststart',
+      SOCIAL,
+    ])
     if (!PREVIEW) console.log(`wrote ${MASTER} and ${SOCIAL}`)
     else {
       const cuts = highlights.map(([a, b], n) => `[0:v]trim=${a.toFixed(3)}:${b.toFixed(3)},setpts=PTS-STARTPTS[h${n}]`)
       const chain = highlights.map((_, n) => `[h${n}]`).join('')
-      await run('ffmpeg', [...q, '-i', MASTER, '-filter_complex', `${cuts.join(';')};${chain}concat=n=${highlights.length}:v=1:a=0,fps=15,scale=800:-1:flags=lanczos[v]`, '-map', '[v]', '-c:v', 'libwebp_anim', '-lossless', '0', '-quality', '60', '-compression_level', '5', '-loop', '0', PREVIEW])
+      await run('ffmpeg', [
+        ...q,
+        '-i',
+        MASTER,
+        '-filter_complex',
+        `${cuts.join(';')};${chain}concat=n=${highlights.length}:v=1:a=0,fps=15,scale=800:-1:flags=lanczos[v]`,
+        '-map',
+        '[v]',
+        '-c:v',
+        'libwebp_anim',
+        '-lossless',
+        '0',
+        '-quality',
+        '60',
+        '-compression_level',
+        '5',
+        '-loop',
+        '0',
+        PREVIEW,
+      ])
       console.log(`wrote ${MASTER}, ${SOCIAL} and ${PREVIEW}`)
     }
   }

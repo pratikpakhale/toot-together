@@ -8,7 +8,13 @@ export function RotatePrompt() {
   return (
     <div className="safe-pad fixed inset-0 z-40 flex items-center justify-center bg-ink/60 anim-fade backdrop-blur-[2px]">
       {stuck && <MenuArrow />}
-      <div role="dialog" aria-modal="true" aria-labelledby="rotate-title" aria-describedby="rotate-why" className="panel w-full max-w-[340px] px-5 py-5 text-center anim-pop">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rotate-title"
+        aria-describedby="rotate-why"
+        className="panel w-full max-w-[340px] px-5 py-5 text-center anim-pop"
+      >
         {stuck ? <OpenInSafari app={stuck} /> : <TurnSideways app={inAppBrowser} />}
       </div>
     </div>
@@ -27,7 +33,11 @@ function TurnSideways({ app }: { app: typeof inAppBrowser }) {
         The river needs a wide screen. Rotate your phone to keep floating.
       </p>
       {app && (
-        <a className="btn btn-cream mt-4 flex w-full items-center justify-center gap-2 text-lg" href={systemBrowserUrl()} onClick={() => track('open_in_browser', { via: 'intent', app })}>
+        <a
+          className="btn btn-cream mt-4 flex w-full items-center justify-center gap-2 text-lg"
+          href={systemBrowserUrl()}
+          onClick={() => track('open_in_browser', { via: 'intent', app })}
+        >
           <Icon name="next" size="1.2em" />
           Open in browser
         </a>
@@ -66,7 +76,12 @@ function OpenInSafari({ app }: { app: NonNullable<typeof inAppBrowser> }) {
         <Step n={2}>Tap “{app === 'Instagram' || app === 'Facebook' ? 'Open in external browser' : 'Open in browser'}”</Step>
       </ol>
       <div className="mt-4 flex gap-2">
-        <a className="btn btn-cream flex flex-1 items-center justify-center gap-1.5 px-2 text-base" href={chromeUrl()} aria-label="Open in Chrome" onClick={() => track('open_in_browser', { via: 'chrome', app })}>
+        <a
+          className="btn btn-cream flex flex-1 items-center justify-center gap-1.5 px-2 text-base"
+          href={chromeUrl()}
+          aria-label="Open in Chrome"
+          onClick={() => track('open_in_browser', { via: 'chrome', app })}
+        >
           <Icon name="next" size="1.2em" />
           Chrome
         </a>
@@ -79,7 +94,10 @@ function OpenInSafari({ app }: { app: NonNullable<typeof inAppBrowser> }) {
 function Step({ n, children }: { n: number; children: ReactNode }) {
   return (
     <li className="flex items-center gap-3">
-      <span aria-hidden className="font-display flex size-8 shrink-0 items-center justify-center rounded-full border-[3px] border-ink bg-gold text-lg">
+      <span
+        aria-hidden
+        className="font-display flex size-8 shrink-0 items-center justify-center rounded-full border-[3px] border-ink bg-gold text-lg"
+      >
         {n}
       </span>
       <span>{children}</span>

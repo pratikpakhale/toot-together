@@ -4,19 +4,19 @@ import * as THREE from 'three'
 import { CREW_SIZE, MAX_RAFTS } from '../../sim/constants'
 import { ITEM_SIZES, whirlpoolSwirl } from '../../sim/obstacles'
 import { rimSector } from '../../sim/sectors'
-import { pointAt, type BakedCourse, type BakedItem } from '../../sim/track'
-import { BUFF_CODE, RAFT_RESULT, RAFT_STATE, type PlayerSnap, type RaftStateCode } from '../../sim/types'
+import { type BakedCourse, type BakedItem, pointAt } from '../../sim/track'
+import { BUFF_CODE, type PlayerSnap, RAFT_RESULT, RAFT_STATE, type RaftStateCode } from '../../sim/types'
 import { audio } from '../audio/audio'
-import { EARSHOT, frame, isRace, myRaft, SEAT_COLORS, standings, tagSlot, TEAMS } from '../game/frame'
+import { EARSHOT, frame, isRace, myRaft, SEAT_COLORS, standings, TEAMS, tagSlot } from '../game/frame'
 import { useApp } from '../state/store'
+import { crewLabel, ordinal } from '../ui/format'
 import type { IconName } from '../ui/icons'
 import { setTagContent } from '../ui/NameTags'
-import { crewLabel, ordinal } from '../ui/format'
 import { fx } from './Fx'
 import { Hippo, type HippoHandle } from './Hippo'
 import { PALETTE } from './materials'
-import { HIPPO_SCALE, hullKit, SEAT_R, SEAT_Y, SLICE_GAP, vinyl } from './raftKit'
 import { RaftHull } from './RaftHull'
+import { HIPPO_SCALE, hullKit, SEAT_R, SEAT_Y, SLICE_GAP, vinyl } from './raftKit'
 import { BlobShadow } from './shadow'
 
 const BUTT_R = SEAT_R + 0.66 * HIPPO_SCALE
@@ -112,9 +112,22 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
   const menu = useApp((s) => s.screen !== 'game')
   const arrows = useRef<(THREE.Group | null)[]>([])
   const slices = useRef<(THREE.Mesh | null)[]>([])
-  const arrowMats = useMemo(() => SEAT_COLORS.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.6, depthWrite: false })), [])
+  const arrowMats = useMemo(
+    () => SEAT_COLORS.map((c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.6, depthWrite: false })),
+    [],
+  )
   const fartKeys = useMemo(() => SEAT_COLORS.map((_, seat) => `p${index}-${seat}`), [index])
-  const state = useRef({ emit: [0, 0, 0, 0], tooting: [false, false, false, false], wake: 0, tiltX: 0, tiltZ: 0, team: false, gurgle: 0, slurped: false, burped: false })
+  const state = useRef({
+    emit: [0, 0, 0, 0],
+    tooting: [false, false, false, false],
+    wake: 0,
+    tiltX: 0,
+    tiltZ: 0,
+    team: false,
+    gurgle: 0,
+    slurped: false,
+    burped: false,
+  })
   const drains = useMemo(() => course.items.flatMap((item) => drainOf(item) ?? []), [course])
 
   useEffect(() => () => arrowMats.forEach((m) => m.dispose()), [arrowMats])
@@ -218,7 +231,11 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
     }
     st.tiltX = THREE.MathUtils.damp(st.tiltX, tz * 0.05, 6, dt)
     st.tiltZ = THREE.MathUtils.damp(st.tiltZ, -tx * 0.05, 6, dt)
-    tilt.current.rotation.set(st.tiltX + Math.sin(t * 1.7) * 0.02 + Math.sin(t * 8) * 0.08 * pull, 0, st.tiltZ + Math.cos(t * 1.3) * 0.02 + Math.cos(t * 8) * 0.08 * pull)
+    tilt.current.rotation.set(
+      st.tiltX + Math.sin(t * 1.7) * 0.02 + Math.sin(t * 8) * 0.08 * pull,
+      0,
+      st.tiltZ + Math.cos(t * 1.3) * 0.02 + Math.cos(t * 8) * 0.08 * pull,
+    )
     tilt.current.position.y = Math.sin(t * 2.1) * 0.04
     // A raft respawning through others flickers; one that's done racing just drifts through.
     tilt.current.visible = !(r.gh && r.res === RAFT_RESULT.none && Math.floor(t * 12) % 2)
@@ -349,7 +366,8 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
       const oz = Math.sin(alpha)
       const fartKey = fartKeys[seat]
       if (!farting || loudness < 0.08) audio.fartStop(fartKey)
-      else if (!audio.isFarting(fartKey)) audio.fartStart(fartKey, seat, { pan: seat % 2 ? 0.3 : -0.3, kind: p.buff === BUFF_CODE.chili ? 'chili' : 'normal', gain: loudness })
+      else if (!audio.isFarting(fartKey))
+        audio.fartStart(fartKey, seat, { pan: seat % 2 ? 0.3 : -0.3, kind: p.buff === BUFF_CODE.chili ? 'chili' : 'normal', gain: loudness })
 
       const started = farting && !st.tooting[seat]
       st.tooting[seat] = farting
@@ -365,8 +383,7 @@ function RaftView({ course, index }: { course: BakedCourse; index: number }) {
           else if (p.buff === BUFF_CODE.chili) {
             fx.flame(bx, by, bz, ox, oz, r.vx, r.vz)
             if (Math.random() < 0.25) fx.fart(bx, by, bz, ox, oz, SMOKE, 1, r.vx, r.vz)
-          }
-          else fx.fart(bx, by, bz, ox, oz, FART_COLORS[seat], p.buff === BUFF_CODE.beans ? 1.35 : 1, r.vx, r.vz)
+          } else fx.fart(bx, by, bz, ox, oz, FART_COLORS[seat], p.buff === BUFF_CODE.beans ? 1.35 : 1, r.vx, r.vz)
         }
       }
 
@@ -453,9 +470,7 @@ function crewNames(crew: PlayerSnap[]) {
 /** Nudges crewmates' name tags apart sideways where they would overlap, as two hippos side by side at the back do. */
 function spreadTags(spots: TagSpot[]) {
   // Measured together, after every tag's text is set: one layout per frame rather than one per hippo.
-  const tags = spots
-    .flatMap((s) => (s.tag ? [{ s, w: s.tag.offsetWidth, h: s.tag.offsetHeight }] : []))
-    .sort((a, b) => a.s.x - b.s.x)
+  const tags = spots.flatMap((s) => (s.tag ? [{ s, w: s.tag.offsetWidth, h: s.tag.offsetHeight }] : [])).sort((a, b) => a.s.x - b.s.x)
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 1; i < tags.length; i++) {
       const a = tags[i - 1]

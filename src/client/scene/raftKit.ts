@@ -1,7 +1,7 @@
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { CREW_SIZE } from '../../sim/constants'
 import { SEAT_COLORS } from '../game/frame'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { PALETTE, soft, softGradient } from './materials'
 import { merge, paint, smoothstep, tint } from './sculpt'
 
@@ -104,9 +104,7 @@ export const hullKit = (() => {
   const seams = merge(
     Array.from({ length: ANCHORS }, (_, k) => {
       const a = (k / ANCHORS) * Math.PI * 2
-      return new THREE.TorusGeometry(TUBE_THICK + 0.006, 0.014, 4, 28)
-        .rotateY(-a)
-        .translate(Math.cos(a) * TUBE_R, TUBE_Y, Math.sin(a) * TUBE_R)
+      return new THREE.TorusGeometry(TUBE_THICK + 0.006, 0.014, 4, 28).rotateY(-a).translate(Math.cos(a) * TUBE_R, TUBE_Y, Math.sin(a) * TUBE_R)
     }),
   )
 

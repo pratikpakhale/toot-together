@@ -27,10 +27,19 @@ const CONTROLS: [string, string, string, string][] = [
 const FAQ: { q: string; a: ReactNode }[] = [
   { q: 'Is Toot Together free?', a: 'Yes. It is free to play, with no ads, accounts or downloads.' },
   { q: 'Do I need to download anything?', a: 'No. It runs in any recent browser: Chrome, Safari, Firefox or Edge, on a phone, tablet or computer.' },
-  { q: 'Can I play on my phone?', a: 'Yes. Turn your phone sideways: drag on the left to move, and hold TOOT on the right. You can also add it to your home screen.' },
+  {
+    q: 'Can I play on my phone?',
+    a: 'Yes. Turn your phone sideways: drag on the left to move, and hold TOOT on the right. You can also add it to your home screen.',
+  },
   { q: 'How many people can play?', a: 'One to four hippos per raft. Online races take up to four rafts, so 16 friends can play in one room.' },
-  { q: 'How do I play with friends online?', a: 'Pick Create room, choose a river, and share the room code or invite link. Friends open the link or type the code under Join.' },
-  { q: 'Is it like Fart Together?', a: 'It is inspired by it: a crew shares one raft and moves it by tooting, so everyone has to agree on where to go.' },
+  {
+    q: 'How do I play with friends online?',
+    a: 'Pick Create room, choose a river, and share the room code or invite link. Friends open the link or type the code under Join.',
+  },
+  {
+    q: 'Is it like Fart Together?',
+    a: 'It is inspired by it: a crew shares one raft and moves it by tooting, so everyone has to agree on where to go.',
+  },
 ]
 
 export function GuidePage() {
@@ -40,7 +49,8 @@ export function GuidePage() {
         <Logo />
         <h1 className="font-display text-3xl sm:text-4xl">How to play Toot Together</h1>
         <p className="max-w-[640px] text-lg font-semibold">
-          Toot Together is a free co-op party game for your browser. Up to four hippos share one inflatable raft, and the only way to move it is to toot. Each hippo pushes the raft away from its own butt, so everyone's toots add up, and one bad toot ruins it for everyone.
+          Toot Together is a free co-op party game for your browser. Up to four hippos share one inflatable raft, and the only way to move it is to
+          toot. Each hippo pushes the raft away from its own butt, so everyone's toots add up, and one bad toot ruins it for everyone.
         </p>
         <a className="btn btn-green px-8 py-4 text-3xl" href="/">
           <Icon name="hippo" size="1.15em" className="mr-2" />
@@ -100,11 +110,18 @@ export function GuidePage() {
         <div className="grid gap-3 sm:grid-cols-2">
           {COURSE_LIST.map((def, i) => (
             <div key={def.id} className="overflow-hidden rounded-2xl border-[3px] border-ink bg-white">
-              <img src={`/levels/${def.id}.webp`} alt={`${def.name}, river ${i + 1} of Toot Together`} loading="lazy" className="aspect-[16/9] w-full object-cover object-[50%_62%]" />
+              <img
+                src={`/levels/${def.id}.webp`}
+                alt={`${def.name}, river ${i + 1} of Toot Together`}
+                loading="lazy"
+                className="aspect-[16/9] w-full object-cover object-[50%_62%]"
+              />
               <div className="p-3">
                 <h3 className="font-display text-xl">{def.name}</h3>
                 <p className="mt-1 text-[15px] font-semibold">{def.blurb}</p>
-                <p className="mt-1 text-[13px] font-semibold text-ink/70">Difficulty {def.difficulty} of {MAX_DIFFICULTY}</p>
+                <p className="mt-1 text-[13px] font-semibold text-ink/70">
+                  Difficulty {def.difficulty} of {MAX_DIFFICULTY}
+                </p>
               </div>
             </div>
           ))}
@@ -135,7 +152,11 @@ export function GuidePage() {
           <a className="underline" href="https://store.steampowered.com/app/5117550/">
             Fart Together
           </a>
-          . Open source on <a className="underline" href="https://github.com/pratikpakhale/toot-together">GitHub</a>.
+          . Open source on{' '}
+          <a className="underline" href="https://github.com/pratikpakhale/toot-together">
+            GitHub
+          </a>
+          .
         </p>
       </footer>
     </div>

@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": { "includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs"] },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 150 },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "semicolons": "asNeeded",
+      "trailingCommas": "all",
+      "arrowParentheses": "always"
+    }
+  },
+  "linter": {
+    "rules": {
+      "a11y": { "preset": "none" },
+      "complexity": { "noCommaOperator": "off", "useMathMinMax": "off" },
+      "correctness": { "useExhaustiveDependencies": "off" },
+      "style": { "noNonNullAssertion": "off", "useTemplate": "off" },
+      "suspicious": { "noArrayIndexKey": "off", "noAssignInExpressions": "off", "useIterableCallbackReturn": "off" }
+    }
+  },
+  "overrides": [{ "includes": ["src/sim/courses.ts"], "formatter": { "enabled": false } }]
+}

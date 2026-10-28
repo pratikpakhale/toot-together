@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { MAX_RAFTS } from '../../sim/constants'
 import { COURSES } from '../../sim/courses'
 import { PROTOCOL_VERSION, type RoomSummary, type ServerMsg, type ServerStats } from '../../sim/protocol'
-import { type Region, REGIONS } from '../../sim/regions'
+import { REGIONS, type Region } from '../../sim/regions'
 import { audio } from '../audio/audio'
 import { showMenu, watchRoom } from '../game/controller'
 import { seatColor, TEAMS } from '../game/frame'
@@ -189,7 +189,14 @@ function RoomCard({ room }: { room: RoomSummary }) {
         {race ? (
           room.progress.map((p, r) =>
             p === null ? null : (
-              <Icon key={r} name={TEAMS[r].icon} size={18} label={`${TEAMS[r].name} raft`} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ left: `${p * 100}%` }} />
+              <Icon
+                key={r}
+                name={TEAMS[r].icon}
+                size={18}
+                label={`${TEAMS[r].name} raft`}
+                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${p * 100}%` }}
+              />
             ),
           )
         ) : (
@@ -215,12 +222,19 @@ function RoomCard({ room }: { room: RoomSummary }) {
           .sort((a, b) => (a.raft ?? MAX_RAFTS) - (b.raft ?? MAX_RAFTS) || a.ord - b.ord)
           .map((p) => (
             <div key={p.id} className={`flex items-center gap-2 ${p.away ? 'opacity-45' : ''}`}>
-              {race && (p.raft === null ? <span className="w-[18px] text-center text-xs font-extrabold text-ink/40">–</span> : <TeamBadge raft={p.raft} size={18} />)}
+              {race &&
+                (p.raft === null ? (
+                  <span className="w-[18px] text-center text-xs font-extrabold text-ink/40">–</span>
+                ) : (
+                  <TeamBadge raft={p.raft} size={18} />
+                ))}
               <span className="name-tag max-w-[60%] truncate !text-sm" style={{ ['--tag' as string]: seatColor(p.seat) }}>
                 {p.name}
               </span>
               {p.host && <Icon name="crown" size={18} label="Host" />}
-              <span className="ml-auto text-xs font-extrabold tabular-nums text-ink/55">{p.away ? 'away' : p.ping == null ? '…' : `${p.ping}ms`}</span>
+              <span className="ml-auto text-xs font-extrabold tabular-nums text-ink/55">
+                {p.away ? 'away' : p.ping == null ? '…' : `${p.ping}ms`}
+              </span>
             </div>
           ))}
       </div>

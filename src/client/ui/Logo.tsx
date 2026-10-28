@@ -23,7 +23,11 @@ export function Logo({ size = 'lg' }: { size?: 'lg' | 'md' }) {
       </div>
       <div
         className="font-display stroke-text leading-[0.9] text-white"
-        style={{ fontSize: big ? 'clamp(28px, min(5.6vw, 8vh), 76px)' : '34px', filter: 'drop-shadow(0 5px 0 var(--color-ink))', marginTop: big ? -6 : -2 }}
+        style={{
+          fontSize: big ? 'clamp(28px, min(5.6vw, 8vh), 76px)' : '34px',
+          filter: 'drop-shadow(0 5px 0 var(--color-ink))',
+          marginTop: big ? -6 : -2,
+        }}
       >
         TOGETHER
       </div>

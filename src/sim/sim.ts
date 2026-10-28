@@ -1339,8 +1339,7 @@ export class Sim {
   }
 
   save() {
-    const self: Sim = this
-    const { course: _course, rng, players, ...state } = self
+    const { course: _course, rng, players, ...state } = this
     return { ...state, rng: rng.state(), players: [...players.values()] }
   }
 

@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { CREW_SIZE } from '../../sim/constants'
 import { audio } from '../audio/audio'
 import { selectLevel, startLocal } from '../game/controller'
-import { playable, useProgress } from '../state/progress'
 import { SEAT_COLORS, SEAT_NAMES } from '../game/frame'
 import { type DeviceId, input } from '../game/input'
 import { isTouch } from '../platform'
+import { playable, useProgress } from '../state/progress'
 import { useApp } from '../state/store'
 import { Icon } from './Icon'
 import { LevelCards } from './LevelSelect'
@@ -70,11 +70,13 @@ export function LocalLobby() {
         <p className="mt-1 text-center font-extrabold text-ink/70">
           {isTouch ? (
             <>
-              Everyone needs a controller: press <b>A</b> on a gamepad (or <span className="kbd">Space</span> / <span className="kbd">Enter</span> on a keyboard) to hop on the raft.
+              Everyone needs a controller: press <b>A</b> on a gamepad (or <span className="kbd">Space</span> / <span className="kbd">Enter</span> on
+              a keyboard) to hop on the raft.
             </>
           ) : (
             <>
-              Press <span className="kbd">Space</span> (WASD player), <span className="kbd">Enter</span> (arrows player) or <b>A</b> on a gamepad to hop on the raft.
+              Press <span className="kbd">Space</span> (WASD player), <span className="kbd">Enter</span> (arrows player) or <b>A</b> on a gamepad to
+              hop on the raft.
             </>
           )}
         </p>
@@ -111,11 +113,7 @@ export function LocalLobby() {
           <button className="btn btn-cream" onClick={() => (audio.click(), setScreen('menu'))}>
             Back
           </button>
-          <button
-            className="btn btn-green flex-1 text-2xl"
-            disabled={devices.length === 0}
-            onClick={() => begin(devices)}
-          >
+          <button className="btn btn-green flex-1 text-2xl" disabled={devices.length === 0} onClick={() => begin(devices)}>
             {devices.length === 0 ? 'Waiting for hippos…' : `Start with ${devices.length} hippo${devices.length > 1 ? 's' : ''}!`}
           </button>
         </div>

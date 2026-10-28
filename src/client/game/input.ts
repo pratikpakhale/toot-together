@@ -29,7 +29,21 @@ const GAMEPAD_DEADZONE = 0.22
 const TRIGGER_THRESHOLD = 0.25
 const MAX_PADS = 4
 
-const STANDARD_PAD = { a: 0, b: 1, x: 2, y: 3, rb: 5, lt: 6, rt: 7, back: 8, start: 9, dpadUp: 12, dpadDown: 13, dpadLeft: 14, dpadRight: 15 } as const
+const STANDARD_PAD = {
+  a: 0,
+  b: 1,
+  x: 2,
+  y: 3,
+  rb: 5,
+  lt: 6,
+  rt: 7,
+  back: 8,
+  start: 9,
+  dpadUp: 12,
+  dpadDown: 13,
+  dpadLeft: 14,
+  dpadRight: 15,
+} as const
 const STICK_X = 0
 const STICK_Y = 1
 
@@ -192,7 +206,7 @@ class InputManager {
 
   private connectedPads(): number[] {
     const pads = navigator.getGamepads?.() ?? []
-    return [...pads].flatMap((p) => (p && p.connected && p.index < MAX_PADS ? [p.index] : []))
+    return [...pads].flatMap((p) => (p?.connected && p.index < MAX_PADS ? [p.index] : []))
   }
 
   read(device: DeviceId): RawInput {

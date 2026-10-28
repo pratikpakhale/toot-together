@@ -3,17 +3,17 @@ import { COURSES, nextCourseId } from '../../sim/courses'
 import type { PlayerStats, Results as RunResults } from '../../sim/types'
 import { audio } from '../audio/audio'
 import { leaveGame, playLevel } from '../game/controller'
-import { useShortScreen } from '../platform'
 import { seatColor, TEAMS } from '../game/frame'
 import type { GameSession, SessionInfo } from '../game/session'
+import { useShortScreen } from '../platform'
 import { medalFor, recordOf, useProgress } from '../state/progress'
 import { useApp } from '../state/store'
-import { formatMedalTime, formatTime, ordinal } from './format'
-import type { IconName } from './icons'
 import { RunSurvey } from './Feedback'
+import { formatMedalTime, formatTime, ordinal } from './format'
+import { Icon } from './Icon'
+import type { IconName } from './icons'
 import { MEDAL_ICON } from './LevelSelect'
 import { Modal } from './Modal'
-import { Icon } from './Icon'
 import { Refusal, roomiestRaft, startBlocker, TeamBadge, useRace, useRaftCount } from './Race'
 
 function rank(deaths: number) {
@@ -41,11 +41,13 @@ function awards(players: PlayerStats[]): Award[] {
   if (toxic.fartTime > 0) list.push({ icon: 'stink', title: 'Most Toxic', who: toxic, detail: `${toxic.fartTime.toFixed(1)}s of tooting` })
   if (players.length > 1) {
     const sab = top('blamed')
-    if (sab.blamed > 0) list.push({ icon: 'hippoDevil', title: 'Saboteur', who: sab, detail: `caused ${sab.blamed} crash${sab.blamed === 1 ? '' : 'es'}` })
+    if (sab.blamed > 0)
+      list.push({ icon: 'hippoDevil', title: 'Saboteur', who: sab, detail: `caused ${sab.blamed} crash${sab.blamed === 1 ? '' : 'es'}` })
     const sync = top('syncs')
     if (sync.syncs > 0) list.push({ icon: 'note', title: 'Harmony Hippo', who: sync, detail: plural(sync.syncs, 'toot sync') })
     const quiet = [...players].sort((a, b) => a.fartTime - b.fartTime)[0]
-    if (quiet !== toxic && toxic.fartTime > 0) list.push({ icon: 'sneaky', title: 'Silent But Deadly', who: quiet, detail: `only ${quiet.fartTime.toFixed(1)}s` })
+    if (quiet !== toxic && toxic.fartTime > 0)
+      list.push({ icon: 'sneaky', title: 'Silent But Deadly', who: quiet, detail: `only ${quiet.fartTime.toFixed(1)}s` })
   }
   const sniper = top('snipes')
   if (sniper.snipes > 0) list.unshift({ icon: 'target', title: 'Gas Assassin', who: sniper, detail: `sniped ${plural(sniper.snipes, 'raft')}` })
@@ -95,7 +97,11 @@ export function Results() {
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
-      setNotice({ icon: 'share', title: "Couldn't share", message: 'Your browser blocked sharing and copying. Send your friends the address from the address bar instead.' })
+      setNotice({
+        icon: 'share',
+        title: "Couldn't share",
+        message: 'Your browser blocked sharing and copying. Send your friends the address from the address bar instead.',
+      })
     }
   }
 
@@ -123,7 +129,9 @@ export function Results() {
                 {formatTime(results.time)}
               </span>
               {finish?.newBest && finish.previousBest !== null ? (
-                <span className="absolute -right-2 -top-3 rotate-6 rounded-full border-[3px] border-ink bg-berry px-2 font-display text-sm text-white anim-pop short:static short:rotate-0 short:border-2 short:text-xs">NEW BEST!</span>
+                <span className="absolute -right-2 -top-3 rotate-6 rounded-full border-[3px] border-ink bg-berry px-2 font-display text-sm text-white anim-pop short:static short:rotate-0 short:border-2 short:text-xs">
+                  NEW BEST!
+                </span>
               ) : best !== null && best < results.time ? (
                 <span className="text-xs font-extrabold text-ink/50">best {formatTime(best)}</span>
               ) : null}
@@ -150,7 +158,10 @@ export function Results() {
           ) : (
             <div className="mt-5 flex flex-col gap-3 short:mt-3 short:gap-2.5 short:[&_.btn]:py-2">
               {next && (
-                <button className="btn btn-green flex items-center justify-center gap-2 text-2xl short:text-xl" onClick={() => (audio.click(), playLevel(next))}>
+                <button
+                  className="btn btn-green flex items-center justify-center gap-2 text-2xl short:text-xl"
+                  onClick={() => (audio.click(), playLevel(next))}
+                >
                   Next river: {COURSES[next].name}
                   <Icon name="next" size="1.1em" />
                 </button>
@@ -214,7 +225,11 @@ function AwardList({ list, short }: { list: Award[]; short: boolean }) {
   return (
     <div className="mt-4 grid gap-2 sm:grid-cols-2 short:mt-0 short:grid-cols-1 short:gap-1">
       {list.map((a, i) => (
-        <div key={a.title} className="flex items-center gap-2.5 rounded-2xl border-[3px] border-ink bg-white px-3 py-1.5 anim-rise short:py-1 short:pl-2" style={{ animationDelay: `${i * 90}ms` }}>
+        <div
+          key={a.title}
+          className="flex items-center gap-2.5 rounded-2xl border-[3px] border-ink bg-white px-3 py-1.5 anim-rise short:py-1 short:pl-2"
+          style={{ animationDelay: `${i * 90}ms` }}
+        >
           <Icon name={a.icon} size={short ? 28 : 34} />
           <div className="min-w-0 flex-1 short:flex short:items-baseline short:gap-2">
             <div className="font-display truncate text-base leading-tight short:shrink-0">{a.title}</div>
@@ -253,7 +268,13 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
   const click = (fn: () => void) => () => (audio.click(), fn())
 
   const title = winner?.place ? `${TEAMS[winner.raft].name.toUpperCase()} WINS!` : 'NOBODY MADE IT!'
-  const sub = session.spectating ? null : mine ? (mine.place ? `your crew came ${ordinal(mine.place)}` : 'your crew ran out of time') : 'you sat this one out'
+  const sub = session.spectating
+    ? null
+    : mine
+      ? mine.place
+        ? `your crew came ${ordinal(mine.place)}`
+        : 'your crew ran out of time'
+      : 'you sat this one out'
 
   const head = (
     <div className="text-center">
@@ -276,8 +297,12 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
         >
           <span className="font-display w-7 text-center text-3xl short:w-5 short:text-xl">{st.place ?? '–'}</span>
           <TeamBadge raft={st.raft} size={short ? 18 : 24} />
-          <span className="min-w-0 flex-1 truncate text-[15px] font-extrabold short:text-xs">{st.ids.map(nameOf).join(', ') || TEAMS[st.raft].name}</span>
-          <span className={`font-display text-xl tabular-nums short:text-[15px] ${st.time === null ? 'text-berry' : ''}`}>{st.time === null ? 'DNF' : formatTime(st.time)}</span>
+          <span className="min-w-0 flex-1 truncate text-[15px] font-extrabold short:text-xs">
+            {st.ids.map(nameOf).join(', ') || TEAMS[st.raft].name}
+          </span>
+          <span className={`font-display text-xl tabular-nums short:text-[15px] ${st.time === null ? 'text-berry' : ''}`}>
+            {st.time === null ? 'DNF' : formatTime(st.time)}
+          </span>
           <span className="flex items-center gap-0.5 text-sm font-extrabold text-ink/50 short:text-xs">
             <Icon name="skull" size="1.1em" />
             {st.deaths}
@@ -291,7 +316,12 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
     <WatchingButtons />
   ) : host ? (
     <div className="mt-5 flex flex-col gap-3 short:mt-3 short:gap-2 short:[&_.btn]:py-1.5">
-      <button className="btn btn-green flex items-center justify-center gap-2 text-2xl short:text-lg" disabled={!!blocker} title={blocker ?? undefined} onClick={click(() => session.act({ type: 'start' }))}>
+      <button
+        className="btn btn-green flex items-center justify-center gap-2 text-2xl short:text-lg"
+        disabled={!!blocker}
+        title={blocker ?? undefined}
+        onClick={click(() => session.act({ type: 'start' }))}
+      >
         <Icon name="replay" size="1.1em" /> Rematch
       </button>
       {blocker && <p className="-mt-1.5 text-center text-xs font-extrabold text-ink/55">{blocker}</p>}
@@ -323,7 +353,10 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
       </p>
       <div className="flex gap-3 short:gap-2 short:[&_.btn]:py-1.5">
         {me && me.raft !== null ? (
-          <button className={`btn ${me.ready ? 'btn-cream' : 'btn-green'} flex flex-1 items-center justify-center gap-2 text-xl short:text-base`} onClick={click(() => session.act({ type: 'ready', on: !me.ready }))}>
+          <button
+            className={`btn ${me.ready ? 'btn-cream' : 'btn-green'} flex flex-1 items-center justify-center gap-2 text-xl short:text-base`}
+            onClick={click(() => session.act({ type: 'ready', on: !me.ready }))}
+          >
             {me.ready && <Icon name="check" size="1em" />}
             {me.ready ? 'Ready!' : 'Ready for rematch'}
             <span className="text-sm opacity-80">
@@ -331,7 +364,10 @@ function RaceResults({ results, info, session, short }: { results: RunResults; i
             </span>
           </button>
         ) : (
-          <button className="btn btn-blue flex flex-1 items-center justify-center gap-2 text-xl short:text-base" onClick={click(() => session.act({ type: 'pick', raft: hopTo }))}>
+          <button
+            className="btn btn-blue flex flex-1 items-center justify-center gap-2 text-xl short:text-base"
+            onClick={click(() => session.act({ type: 'pick', raft: hopTo }))}
+          >
             <TeamBadge raft={hopTo} size="1em" /> Hop on {TEAMS[hopTo].name}
           </button>
         )}

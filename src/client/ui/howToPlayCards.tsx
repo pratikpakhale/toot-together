@@ -9,7 +9,9 @@ export const HOW_TO_PLAY: { icon: IconName; title: string; body: ReactNode }[] =
     title: 'Move your hippo',
     body: (
       <>
-        Hold <span className="kbd">A</span>/<span className="kbd">D</span> to walk around the rim, <span className="kbd">W</span>/<span className="kbd">S</span> to hop to the front or back, or point the stick where you want to stand. In a crew, each hippo owns its own coloured slice of the rim. Its butt points outward, so a toot pushes the raft the <b>opposite</b> way.
+        Hold <span className="kbd">A</span>/<span className="kbd">D</span> to walk around the rim, <span className="kbd">W</span>/
+        <span className="kbd">S</span> to hop to the front or back, or point the stick where you want to stand. In a crew, each hippo owns its own
+        coloured slice of the rim. Its butt points outward, so a toot pushes the raft the <b>opposite</b> way.
       </>
     ),
   },
@@ -18,7 +20,8 @@ export const HOW_TO_PLAY: { icon: IconName; title: string; body: ReactNode }[] =
     title: 'Toot to move',
     body: (
       <>
-        Hold <span className="kbd">Space</span> / <b>A</b> / <b>RT</b> to toot. Every hippo's toot pushes the <b>same</b> raft, so one wrong toot ruins it for everyone.
+        Hold <span className="kbd">Space</span> / <b>A</b> / <b>RT</b> to toot. Every hippo's toot pushes the <b>same</b> raft, so one wrong toot
+        ruins it for everyone.
       </>
     ),
   },
@@ -56,7 +59,8 @@ export const HOW_TO_PLAY: { icon: IconName; title: string; body: ReactNode }[] =
     title: 'Racing',
     body: (
       <>
-        Online, a room can race 2–4 rafts. You land on a raft (one tap switches), press <span className="kbd">Y</span> when you're ready, and the start gate drops on GO. Bump rivals, toot them into trouble, and get there first.
+        Online, a room can race 2–4 rafts. You land on a raft (one tap switches), press <span className="kbd">Y</span> when you're ready, and the
+        start gate drops on GO. Bump rivals, toot them into trouble, and get there first.
       </>
     ),
   },
@@ -68,7 +72,21 @@ export const HOW_TO_PLAY: { icon: IconName; title: string; body: ReactNode }[] =
 ]
 
 /** One rule card, in the HOW TO TOOT panel and on the /how-to-play page. */
-export function RuleCard({ icon, title, children, compact, className = '', style }: { icon: IconName; title: string; children: ReactNode; compact?: boolean; className?: string; style?: CSSProperties }) {
+export function RuleCard({
+  icon,
+  title,
+  children,
+  compact,
+  className = '',
+  style,
+}: {
+  icon: IconName
+  title: string
+  children: ReactNode
+  compact?: boolean
+  className?: string
+  style?: CSSProperties
+}) {
   return (
     <div className={`flex gap-3 rounded-2xl border-[3px] border-ink bg-white p-3 short:gap-2 short:p-2 ${className}`} style={style}>
       <Icon name={icon} size={compact ? 32 : 44} />

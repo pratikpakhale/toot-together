@@ -11,8 +11,8 @@ import { useProgress } from '../state/progress'
 import { useApp } from '../state/store'
 import { ChatButton } from './Chat'
 import { formatTime } from './format'
-import { setTagContent } from './NameTags'
 import { Icon } from './Icon'
+import { setTagContent } from './NameTags'
 import { ClosingChip, Countdown, MiniStandings, PlaceChip, RaceLobby, TeamBadge, usePhase, useRace, useSeatToast, WatchBar } from './Race'
 
 export function Hud() {
@@ -56,14 +56,15 @@ export function Hud() {
       if (!v || !course) return
       const mine = myRaft(v, session)
       const shown = v.rafts[mine ?? frame.follow] ?? v.rafts[0]
-      if (timerRef.current) timerRef.current.textContent = formatTime(v.phase === 'pond' || v.phase === 'countdown' ? 0 : v.raceTime, isShort() ? 1 : 2)
+      if (timerRef.current)
+        timerRef.current.textContent = formatTime(v.phase === 'pond' || v.phase === 'countdown' ? 0 : v.raceTime, isShort() ? 1 : 2)
       if (deathRef.current && shown.d !== lastDeaths.current) {
         lastDeaths.current = shown.d
         deathRef.current.textContent = String(shown.d)
-        deathRef.current.parentElement?.animate(
-          [{ transform: 'scale(1.5) rotate(-8deg)' }, { transform: 'scale(1) rotate(0)' }],
-          { duration: 420, easing: 'cubic-bezier(.2,.9,.3,1.3)' },
-        )
+        deathRef.current.parentElement?.animate([{ transform: 'scale(1.5) rotate(-8deg)' }, { transform: 'scale(1) rotate(0)' }], {
+          duration: 420,
+          easing: 'cubic-bezier(.2,.9,.3,1.3)',
+        })
       }
       const span = course.finishS - course.startS
       const progressOf = (s: number) => Math.min(1, Math.max(0, (s - course.startS) / span))
@@ -87,7 +88,12 @@ export function Hud() {
         const meter = meterRefs.current.get(p.id)
         if (meter) {
           meter.style.width = `${Math.max(0, Math.min(1, p.stam)) * 100}%`
-          meter.style.background = p.buff === BUFF_CODE.chili || p.buff === BUFF_CODE.prune ? 'linear-gradient(90deg,#ff7a2f,var(--color-gold))' : p.exh ? '#ff6b6b' : seatColor(p.seat)
+          meter.style.background =
+            p.buff === BUFF_CODE.chili || p.buff === BUFF_CODE.prune
+              ? 'linear-gradient(90deg,#ff7a2f,var(--color-gold))'
+              : p.exh
+                ? '#ff6b6b'
+                : seatColor(p.seat)
         }
         const wrap = meterWrapRefs.current.get(p.id)
         if (wrap) wrap.style.transform = p.fart ? `translateX(${Math.sin(performance.now() / 30) * 1.5}px)` : ''
@@ -97,8 +103,14 @@ export function Hud() {
           const empty = emptyRefs.current.get(p.id)
           if (empty) empty.style.display = exh ? 'flex' : 'none'
           if (exh && wrap) {
-            wrap.animate([{ translate: '0' }, { translate: '-6px' }, { translate: '6px' }, { translate: '-4px' }, { translate: '3px' }, { translate: '0' }], { duration: 380, easing: 'ease-out' })
-            wrap.animate([{ boxShadow: '0 0 0 0 #ff6b6b' }, { boxShadow: '0 0 0 6px #ff6b6b' }, { boxShadow: '0 4px 0 rgb(28 53 87 / 0.3)' }], { duration: 650, easing: 'ease-out' })
+            wrap.animate(
+              [{ translate: '0' }, { translate: '-6px' }, { translate: '6px' }, { translate: '-4px' }, { translate: '3px' }, { translate: '0' }],
+              { duration: 380, easing: 'ease-out' },
+            )
+            wrap.animate([{ boxShadow: '0 0 0 0 #ff6b6b' }, { boxShadow: '0 0 0 6px #ff6b6b' }, { boxShadow: '0 4px 0 rgb(28 53 87 / 0.3)' }], {
+              duration: 650,
+              easing: 'ease-out',
+            })
           }
         }
         const buff = buffRefs.current.get(p.id)
@@ -107,7 +119,10 @@ export function Hud() {
           if (name === 'none') buff.style.display = 'none'
           else {
             if (buff.style.display !== 'flex') {
-              buff.animate([{ transform: 'scale(0.3)' }, { transform: 'scale(1.15)' }, { transform: 'scale(1)' }], { duration: 380, easing: 'cubic-bezier(.2,.9,.3,1.2)' })
+              buff.animate([{ transform: 'scale(0.3)' }, { transform: 'scale(1.15)' }, { transform: 'scale(1)' }], {
+                duration: 380,
+                easing: 'cubic-bezier(.2,.9,.3,1.2)',
+              })
             }
             buff.style.display = 'flex'
             setTagContent(buff, [name], ` ${Math.ceil(p.buffT)}`)
@@ -130,10 +145,12 @@ export function Hud() {
   const benched = race && !session.spectating && localPlayers.length === 0
   const span = course.finishS - course.startS
   const online = session.kind === 'online'
-  const setRef = <T,>(map: Map<number, T>, id: number) => (el: T | null) => {
-    if (el) map.set(id, el)
-    else map.delete(id)
-  }
+  const setRef =
+    <T,>(map: Map<number, T>, id: number) =>
+    (el: T | null) => {
+      if (el) map.set(id, el)
+      else map.delete(id)
+    }
   // After a race, the lobby comes back once the results have had their turn.
   const lobby = race && (phase === 'pond' || (phase === 'finished' && overlay === null && resultsSeen))
   // A phone's race lobby makes room for the raft strip: the race-only HUD (river progress, gas, respawn, clock) waits
@@ -143,11 +160,17 @@ export function Hud() {
   return (
     // Above the touch controls (z-10), so a HUD button over the walk area still gets the tap.
     <div className="safe-area pointer-events-none z-20 select-none">
-      <div className={`absolute left-1/2 top-3 w-[min(820px,calc(100%-440px))] -translate-x-1/2 max-[620px]:top-16 max-[620px]:w-[calc(100%-24px)] ${hideRaceHud}`}>
+      <div
+        className={`absolute left-1/2 top-3 w-[min(820px,calc(100%-440px))] -translate-x-1/2 max-[620px]:top-16 max-[620px]:w-[calc(100%-24px)] ${hideRaceHud}`}
+      >
         <div className="relative h-5 rounded-full border-[3px] border-ink bg-white/85 shadow-[0_3px_0_rgba(28,53,87,0.3)]">
           <div ref={fillRef} className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-toot to-grass" style={{ width: 0 }} />
           {course.checkpoints.map((s) => (
-            <div key={s} className="absolute top-1/2 h-3 w-1 -translate-x-1/2 -translate-y-1/2 rounded bg-ink/70" style={{ left: `${((s - course.startS) / span) * 100}%` }} />
+            <div
+              key={s}
+              className="absolute top-1/2 h-3 w-1 -translate-x-1/2 -translate-y-1/2 rounded bg-ink/70"
+              style={{ left: `${((s - course.startS) / span) * 100}%` }}
+            />
           ))}
           <Icon name="flag" size={26} className="absolute -left-3 top-1/2 -translate-y-[60%]" />
           <Icon name="finishFlag" size={26} className="absolute -right-4 top-1/2 -translate-y-[60%]" />
@@ -220,7 +243,11 @@ export function Hud() {
                 {localPlayers.length > 1 ? entry.name : 'GAS'}
               </span>
               <div className="relative h-4 w-36 overflow-hidden rounded-full border-2 border-ink bg-ink/10">
-                <div ref={setRef(meterRefs.current, id)} className="h-full rounded-full transition-[width] duration-75" style={{ width: '100%', background: seatColor(entry.seat) }} />
+                <div
+                  ref={setRef(meterRefs.current, id)}
+                  className="h-full rounded-full transition-[width] duration-75"
+                  style={{ width: '100%', background: seatColor(entry.seat) }}
+                />
                 <span
                   ref={setRef(emptyRefs.current, id)}
                   className="font-display absolute inset-0 hidden items-center justify-center text-[11px] leading-none tracking-[0.2em] text-ink"
@@ -245,7 +272,11 @@ export function Hud() {
             .sort((a, b) => a.seat - b.seat)
             .slice(0, CREW_SIZE)
             .map((p) => (
-              <div key={p.id} ref={setRef(crewRefs.current, p.id)} className="chip flex items-center gap-2 px-3 py-0.5 font-display text-sm transition-shadow">
+              <div
+                key={p.id}
+                ref={setRef(crewRefs.current, p.id)}
+                className="chip flex items-center gap-2 px-3 py-0.5 font-display text-sm transition-shadow"
+              >
                 <Icon name="hippo" size={20} style={{ ['--hippo' as string]: seatColor(p.seat) }} />
                 <span className={p.away ? 'text-ink/40' : undefined}>{p.name}</span>
                 {online && p.host && <Icon name="crown" size={18} label="Host" />}
@@ -272,7 +303,11 @@ export function Hud() {
           </button>
         )}
         {phase === 'finished' && hasResults && overlay === null && (
-          <button tabIndex={-1} className="btn btn-sun flex items-center gap-1 px-3 py-1 text-sm" onClick={() => (audio.click(), setOverlay('results'))}>
+          <button
+            tabIndex={-1}
+            className="btn btn-sun flex items-center gap-1 px-3 py-1 text-sm"
+            onClick={() => (audio.click(), setOverlay('results'))}
+          >
             <Icon name="trophy" size="1.5em" /> Results
           </button>
         )}
@@ -300,7 +335,11 @@ function RoomChip({ code, session }: { code: string; session: GameSession }) {
           setCopied(true)
           window.setTimeout(() => setCopied(false), 1400)
         } catch {
-          setNotice({ icon: 'link', title: "Couldn't copy the link", message: `Your browser blocked the clipboard. Tell your friends to join room ${code}.` })
+          setNotice({
+            icon: 'link',
+            title: "Couldn't copy the link",
+            message: `Your browser blocked the clipboard. Tell your friends to join room ${code}.`,
+          })
         }
       }}
       title="Copy invite link"
@@ -356,7 +395,12 @@ function NetStatus({ session }: { session: GameSession }) {
 }
 
 const TASKS = [
-  { key: 'move', icon: 'move', text: (touch: boolean) => (touch ? 'Drag left side to walk your hippo' : 'Hold A or D to walk around the rim'), couch: 'Walk around the rim' },
+  {
+    key: 'move',
+    icon: 'move',
+    text: (touch: boolean) => (touch ? 'Drag left side to walk your hippo' : 'Hold A or D to walk around the rim'),
+    couch: 'Walk around the rim',
+  },
   { key: 'toot', icon: 'toot', text: (touch: boolean) => (touch ? 'Hold TOOT to push the raft' : 'Hold Space to toot'), couch: 'Hold to toot' },
   { key: 'burst', icon: 'burst', text: (touch: boolean) => (touch ? 'Tap BURST for a big blast' : 'Tap Shift to burst'), couch: 'Tap to burst' },
 ] as const

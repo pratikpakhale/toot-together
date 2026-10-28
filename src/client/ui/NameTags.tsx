@@ -1,7 +1,7 @@
 import { CREW_SIZE, MAX_RAFTS } from '../../sim/constants'
-import { frame, SEAT_COLORS, tagSlot, TEAMS } from '../game/frame'
+import { frame, SEAT_COLORS, TEAMS, tagSlot } from '../game/frame'
 import { ChatBubble } from './Chat'
-import { iconElement, type IconName } from './icons'
+import { type IconName, iconElement } from './icons'
 
 export function setTagContent(el: HTMLElement, icons: IconName[], name: string) {
   const key = `${icons.join(',')}|${name}`

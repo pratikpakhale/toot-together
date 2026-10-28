@@ -1,8 +1,8 @@
 import { audio } from '../audio/audio'
 import { useShortScreen } from '../platform'
 import { useApp } from '../state/store'
-import { Modal } from './Modal'
 import { HOW_TO_PLAY, RuleCard } from './howToPlayCards'
+import { Modal } from './Modal'
 
 export function HowToPlay() {
   const screen = useApp((s) => s.screen)

@@ -85,7 +85,11 @@ async function shareInvite(code: string) {
     }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') return
-    app.setNotice({ icon: 'link', title: "Couldn't copy the link", message: `Your browser blocked the clipboard. Tell your friends to join room ${code}.` })
+    app.setNotice({
+      icon: 'link',
+      title: "Couldn't copy the link",
+      message: `Your browser blocked the clipboard. Tell your friends to join room ${code}.`,
+    })
   }
 }
 
@@ -115,7 +119,10 @@ export function pressPrimary(session: GameSession) {
 }
 
 /** The line under (desktop) or over (phone) the big button: what happens next. */
-function lobbyHint(action: LobbyAction, { twoCrews, others, hostName, unready }: { twoCrews: boolean; others: boolean; hostName: string; unready: string[] }) {
+function lobbyHint(
+  action: LobbyAction,
+  { twoCrews, others, hostName, unready }: { twoCrews: boolean; others: boolean; hostName: string; unready: string[] },
+) {
   if (action.kind === 'invite') return 'A race needs a second crew. Friends who open the link land on a raft.'
   if (action.kind === 'split') return "Everyone's on one raft. Split them up to race."
   if (action.kind === 'start') return others ? "Or it starts by itself once everyone's ready." : 'Start whenever you like.'
@@ -126,16 +133,48 @@ function lobbyHint(action: LobbyAction, { twoCrews, others, hostName, unready }:
   return `${hostName} can start any time.`
 }
 
-const ACTION_BUTTON: Record<LobbyAction['kind'], string> = { invite: 'btn-blue', split: 'btn-purple', start: 'btn-orange', ready: 'btn-green', hop: 'btn-blue' }
+const ACTION_BUTTON: Record<LobbyAction['kind'], string> = {
+  invite: 'btn-blue',
+  split: 'btn-purple',
+  start: 'btn-orange',
+  ready: 'btn-green',
+  hop: 'btn-blue',
+}
 // Once you're ready the button goes quiet; pressing it again takes it back.
 const buttonTone = (action: LobbyAction) => (action.kind === 'ready' && !action.on ? 'btn-cream' : ACTION_BUTTON[action.kind])
 
 function ActionLabel({ action }: { action: LobbyAction }) {
-  if (action.kind === 'invite') return <><Icon name={canShare() ? 'share' : 'link'} size="1.1em" /> Invite friends</>
-  if (action.kind === 'split') return <><Icon name="move" size="1.1em" /> Split crews</>
-  if (action.kind === 'start') return <><Icon name="flag" size="1.1em" /> Start race</>
-  if (action.kind === 'ready') return action.on ? <>Ready</> : <><Icon name="check" size="1.1em" /> Ready!</>
-  return <><TeamBadge raft={action.raft} size="1.1em" /> Hop on {TEAMS[action.raft].name}</>
+  if (action.kind === 'invite')
+    return (
+      <>
+        <Icon name={canShare() ? 'share' : 'link'} size="1.1em" /> Invite friends
+      </>
+    )
+  if (action.kind === 'split')
+    return (
+      <>
+        <Icon name="move" size="1.1em" /> Split crews
+      </>
+    )
+  if (action.kind === 'start')
+    return (
+      <>
+        <Icon name="flag" size="1.1em" /> Start race
+      </>
+    )
+  if (action.kind === 'ready')
+    return action.on ? (
+      <>Ready</>
+    ) : (
+      <>
+        <Icon name="check" size="1.1em" /> Ready!
+      </>
+    )
+  return (
+    <>
+      <TeamBadge raft={action.raft} size="1.1em" /> Hop on {TEAMS[action.raft].name}
+    </>
+  )
 }
 
 /** "You're on Teal" each time you land on a raft in a race room, and when you're moved to the bench. */
@@ -173,7 +212,13 @@ const STATUS = 'font-display shrink-0 rounded-full border-2 border-ink px-1.5 te
 function SwapButton({ dir, onSwap, className }: { dir: -1 | 1; onSwap: (dir: -1 | 1) => void; className: string }) {
   const label = `Swap spot ${dir < 0 ? 'left' : 'right'}`
   return (
-    <button tabIndex={-1} className={className} aria-label={label} title={isTouch ? undefined : `${label} (${dir < 0 ? '[' : ']'})`} onClick={() => onSwap(dir)}>
+    <button
+      tabIndex={-1}
+      className={className}
+      aria-label={label}
+      title={isTouch ? undefined : `${label} (${dir < 0 ? '[' : ']'})`}
+      onClick={() => onSwap(dir)}
+    >
       <Icon name="chevron" size={18} className={dir < 0 ? '-scale-x-100' : undefined} />
     </button>
   )
@@ -183,7 +228,19 @@ function SwapButton({ dir, onSwap, className }: { dir: -1 | 1; onSwap: (dir: -1 
  * Phone: a raft in the strip up top. It says who's on it and what a tap does: YOU on yours (with ‹ › to swap
  * spots round the rim), JOIN or HOP ON on one with room, FULL otherwise.
  */
-function RaftCard({ raft, crew, me, onPick, onSwap }: { raft: number; crew: RosterEntry[]; me: RosterEntry | undefined; onPick: () => void; onSwap: ((dir: -1 | 1) => void) | undefined }) {
+function RaftCard({
+  raft,
+  crew,
+  me,
+  onPick,
+  onSwap,
+}: {
+  raft: number
+  crew: RosterEntry[]
+  me: RosterEntry | undefined
+  onPick: () => void
+  onSwap: ((dir: -1 | 1) => void) | undefined
+}) {
   const mine = me?.raft === raft
   const full = crew.length >= CREW_SIZE
   const others = crew.filter((p) => !p.host && !p.away)
@@ -212,7 +269,10 @@ function RaftCard({ raft, crew, me, onPick, onSwap }: { raft: number; crew: Rost
     return (
       <div
         className={card}
-        style={{ background: `color-mix(in srgb, ${TEAMS[raft].color} 28%, white)`, boxShadow: '0 0 0 3px var(--color-sun), 0 4px 0 var(--color-ink)' }}
+        style={{
+          background: `color-mix(in srgb, ${TEAMS[raft].color} 28%, white)`,
+          boxShadow: '0 0 0 3px var(--color-sun), 0 4px 0 var(--color-ink)',
+        }}
         aria-label={`${TEAMS[raft].name} raft, yours`}
       >
         {onSwap && <SwapButton dir={-1} onSwap={onSwap} className={`${swap} border-r-[3px] border-ink/15`} />}
@@ -292,7 +352,14 @@ export function RaceLobby({ session, short }: { session: GameSession; short: boo
       <>
         <div className="pointer-events-auto absolute inset-x-3 top-2 flex justify-center gap-2">
           {Array.from({ length: rafts }, (_, r) => (
-            <RaftCard key={r} raft={r} crew={crewOf(roster, r)} me={pickable ? me : undefined} onPick={() => pick(r)} onSwap={canSwap ? swap : undefined} />
+            <RaftCard
+              key={r}
+              raft={r}
+              crew={crewOf(roster, r)}
+              me={pickable ? me : undefined}
+              onPick={() => pick(r)}
+              onSwap={canSwap ? swap : undefined}
+            />
           ))}
           {bench.length > 0 && (
             <span
@@ -310,7 +377,11 @@ export function RaceLobby({ session, short }: { session: GameSession; short: boo
             <div className="chip whitespace-nowrap px-2.5 py-0.5 text-[13px] font-extrabold">{action.kind === 'start' && tally ? tally : hint}</div>
             <div className="flex items-center gap-2">
               {crewsButton('btn btn-cream flex items-center gap-1.5 self-stretch rounded-[16px] px-3 text-sm')}
-              <button tabIndex={-1} className={`btn ${buttonTone(action)} flex items-center gap-2 whitespace-nowrap rounded-[16px] px-6 py-1.5 text-lg`} onClick={() => runLobbyAction(session, action)}>
+              <button
+                tabIndex={-1}
+                className={`btn ${buttonTone(action)} flex items-center gap-2 whitespace-nowrap rounded-[16px] px-6 py-1.5 text-lg`}
+                onClick={() => runLobbyAction(session, action)}
+              >
                 <ActionLabel action={action} />
               </button>
             </div>
@@ -341,7 +412,11 @@ export function RaceLobby({ session, short }: { session: GameSession; short: boo
               <div
                 key={r}
                 className="flex min-h-[40px] items-center gap-2 rounded-2xl px-2 py-1"
-                style={mine ? { background: `color-mix(in srgb, ${TEAMS[r].color} 22%, white)`, boxShadow: 'inset 0 0 0 3px var(--color-sun)' } : { background: 'rgb(255 255 255 / 0.6)' }}
+                style={
+                  mine
+                    ? { background: `color-mix(in srgb, ${TEAMS[r].color} 22%, white)`, boxShadow: 'inset 0 0 0 3px var(--color-sun)' }
+                    : { background: 'rgb(255 255 255 / 0.6)' }
+                }
               >
                 <TeamBadge raft={r} size={22} />
                 <span className="font-display w-14 shrink-0">{TEAMS[r].name}</span>
@@ -409,7 +484,10 @@ export function Countdown() {
   return (
     <div className="absolute left-1/2 top-[14%] -translate-x-1/2 text-center short:top-[22%]">
       <div key={left} className="anim-pop">
-        <div className="font-display stroke-text leading-none text-sun" style={{ fontSize: 'clamp(84px, 13vw, 160px)', filter: 'drop-shadow(0 6px 0 rgba(28,53,87,.45))' }}>
+        <div
+          className="font-display stroke-text leading-none text-sun"
+          style={{ fontSize: 'clamp(84px, 13vw, 160px)', filter: 'drop-shadow(0 6px 0 rgba(28,53,87,.45))' }}
+        >
           {left}
         </div>
       </div>
@@ -432,7 +510,8 @@ export function ClosingChip({ session }: { session: GameSession }) {
   if (left === null) return null
   return (
     <div className="chip font-display flex items-center gap-1.5 px-3 py-0.5 text-base anim-pop">
-      <TeamBadge raft={leader} size={18} /> {TEAMS[leader].name} finished! <span className="text-berry tabular-nums">{formatMedalTime(left)}</span> left
+      <TeamBadge raft={leader} size={18} /> {TEAMS[leader].name} finished! <span className="text-berry tabular-nums">{formatMedalTime(left)}</span>{' '}
+      left
     </div>
   )
 }
@@ -454,10 +533,19 @@ export function WatchBar({ session, short }: { session: GameSession; short: bool
   const phase = usePhase()
   const mine = useViewKey((v) => myRaft(v, session), null)
   const follow = useViewKey(() => frame.follow, 0)
-  const rank = useViewKey((v) => (v.phase === 'racing' && v.rafts[frame.follow]?.res !== RAFT_RESULT.dnf ? standings(v).indexOf(frame.follow) + 1 : 0), 0)
+  const rank = useViewKey(
+    (v) => (v.phase === 'racing' && v.rafts[frame.follow]?.res !== RAFT_RESULT.dnf ? standings(v).indexOf(frame.follow) + 1 : 0),
+    0,
+  )
   const open = useViewKey((v) => canHopOn(v, frame.follow), false)
   const left = useViewKey(secondsLeft, null)
-  const going = useViewKey((v) => standings(v).filter((r) => v.rafts[r].res === RAFT_RESULT.none).join(','), '')
+  const going = useViewKey(
+    (v) =>
+      standings(v)
+        .filter((r) => v.rafts[r].res === RAFT_RESULT.none)
+        .join(','),
+    '',
+  )
 
   useEffect(() => {
     if (!shown) return
@@ -475,7 +563,9 @@ export function WatchBar({ session, short }: { session: GameSession; short: bool
   const size = short ? 'px-2.5 py-0.5 text-sm' : 'px-3 py-1 text-sm'
 
   return (
-    <div className={`pointer-events-auto absolute left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5 ${isTouch && !bench ? 'bottom-[150px] short:bottom-3' : 'bottom-4 short:bottom-3'}`}>
+    <div
+      className={`pointer-events-auto absolute left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5 ${isTouch && !bench ? 'bottom-[150px] short:bottom-3' : 'bottom-4 short:bottom-3'}`}
+    >
       {left !== null && going !== '' ? (
         <div className="chip font-display flex items-center gap-1.5 px-3 py-0.5 text-base short:text-sm">
           <Icon name="clock" size="1.1em" /> Waiting for
@@ -492,14 +582,26 @@ export function WatchBar({ session, short }: { session: GameSession; short: bool
         )
       )}
       <div className="flex items-center gap-2">
-        <button tabIndex={-1} className={`btn btn-cream ${size}`} aria-label="Previous raft" title={isTouch ? undefined : 'Previous raft (←)'} onClick={() => (audio.click(), cycleWatch(-1))}>
+        <button
+          tabIndex={-1}
+          className={`btn btn-cream ${size}`}
+          aria-label="Previous raft"
+          title={isTouch ? undefined : 'Previous raft (←)'}
+          onClick={() => (audio.click(), cycleWatch(-1))}
+        >
           <Icon name="chevron" size="1.1em" className="-scale-x-100" />
         </button>
         <span className="chip font-display flex items-center gap-1.5 whitespace-nowrap px-3 py-0.5 text-[15px] short:text-sm">
           <Icon name="eye" size="1.15em" /> <TeamBadge raft={follow} size="1em" /> {TEAMS[follow].name}
           {rank > 0 && <span className="text-ink/55">· {ordinal(rank)}</span>}
         </span>
-        <button tabIndex={-1} className={`btn btn-cream ${size}`} aria-label="Next raft" title={isTouch ? undefined : 'Next raft (→)'} onClick={() => (audio.click(), cycleWatch(1))}>
+        <button
+          tabIndex={-1}
+          className={`btn btn-cream ${size}`}
+          aria-label="Next raft"
+          title={isTouch ? undefined : 'Next raft (→)'}
+          onClick={() => (audio.click(), cycleWatch(1))}
+        >
           <Icon name="chevron" size="1.1em" />
         </button>
         {mine !== null && (
@@ -508,7 +610,11 @@ export function WatchBar({ session, short }: { session: GameSession; short: bool
           </button>
         )}
         {bench && open && (
-          <button tabIndex={-1} className={`btn btn-blue flex items-center gap-1.5 whitespace-nowrap ${size}`} onClick={() => (audio.click(), session.act({ type: 'pick', raft: follow }))}>
+          <button
+            tabIndex={-1}
+            className={`btn btn-blue flex items-center gap-1.5 whitespace-nowrap ${size}`}
+            onClick={() => (audio.click(), session.act({ type: 'pick', raft: follow }))}
+          >
             {!isTouch && <span className="kbd">Y</span>} Hop on {TEAMS[follow].name}
           </button>
         )}
@@ -570,7 +676,14 @@ export function PlaceChip({ session, short }: { session: GameSession; short: boo
       className={`font-display anim-pop rounded-[10px] border-[3px] border-ink leading-tight ${short ? 'px-1.5 text-lg' : 'px-2 text-2xl'}`}
       style={{ background: team.color, color: team.text }}
     >
-      {place === 'DNF' ? 'DNF' : <>{place}<sup className="text-[0.5em]">{ordinal(place).slice(-2).toUpperCase()}</sup></>}
+      {place === 'DNF' ? (
+        'DNF'
+      ) : (
+        <>
+          {place}
+          <sup className="text-[0.5em]">{ordinal(place).slice(-2).toUpperCase()}</sup>
+        </>
+      )}
       <span className="text-[0.55em] opacity-85">/{of}</span>
     </span>
   )

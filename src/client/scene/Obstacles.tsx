@@ -24,9 +24,28 @@ import {
 import type { BakedCourse, BakedItem, ItemDef } from '../../sim/track'
 import { audio } from '../audio/audio'
 import { crewed, frame } from '../game/frame'
-import { fx } from './Fx'
 import { CHASE_CAM_HEIGHT } from './CameraRig'
-import { boulder, bracket, chain, dome, foamMat, foamRing, glowTexture, GOLD, hazardStripes, lumber, matte, METAL, painted, spikeBall, turnedPost, woodMat, woodTexture } from './hazardKit'
+import { fx } from './Fx'
+import { useFogCull } from './fogCull'
+import {
+  boulder,
+  bracket,
+  chain,
+  dome,
+  foamMat,
+  foamRing,
+  GOLD,
+  glowTexture,
+  hazardStripes,
+  lumber,
+  METAL,
+  matte,
+  painted,
+  spikeBall,
+  turnedPost,
+  woodMat,
+  woodTexture,
+} from './hazardKit'
 import {
   beansCan,
   boltGeo,
@@ -47,7 +66,6 @@ import {
   wheel,
 } from './hazardShapes'
 import { calmMotion, PALETTE, soft, softGradient, swaying, windTime } from './materials'
-import { useFogCull } from './fogCull'
 import { blob, lumps, merge as mergeParts, paint as paintGeo, smoothstep, tint } from './sculpt'
 import { BlobShadow } from './shadow'
 
@@ -147,7 +165,6 @@ function ItemView({ item, slot }: { item: BakedItem; slot: number }) {
   }
 }
 
-
 /** The one vertex-coloured material every merged hazard part uses. */
 const paint = painted()
 /** Its matte twin, for stone and weed. */
@@ -176,7 +193,21 @@ function Foam({ inner, outer, spin = 0.3 }: { inner: number; outer: number; spin
 const footingGeo = tint(new THREE.CylinderGeometry(0.55, 0.7, 0.5, 8), '#8d8994')
 
 /** A timber gantry over the river: two posts on stone footings, a beam, knee braces and bolted brackets. */
-function Gantry({ z = 0, half, post, beam, postTop, beamY }: { z?: number; half: number; post: number; beam: number; postTop: number; beamY: number }) {
+function Gantry({
+  z = 0,
+  half,
+  post,
+  beam,
+  postTop,
+  beamY,
+}: {
+  z?: number
+  half: number
+  post: number
+  beam: number
+  postTop: number
+  beamY: number
+}) {
   const wood = woodMat(PALETTE.wood)
   const postH = postTop + 0.75
   const beamLen = 2 * half + 2 * post + 0.9
@@ -194,7 +225,13 @@ function Gantry({ z = 0, half, post, beam, postTop, beamY }: { z?: number; half:
             material={wood}
           />
           {[-1, 1].map((x) => (
-            <mesh key={x} geometry={bracket(Math.max(post, beam) * 1.05)} position={[x * (post / 2 + 0.035), beamY, 0]} rotation={[0, x * (Math.PI / 2), 0]} material={paint} />
+            <mesh
+              key={x}
+              geometry={bracket(Math.max(post, beam) * 1.05)}
+              position={[x * (post / 2 + 0.035), beamY, 0]}
+              rotation={[0, x * (Math.PI / 2), 0]}
+              material={paint}
+            />
           ))}
         </group>
       ))}
@@ -399,7 +436,14 @@ function Piston({ def, item }: { def: Def<'piston'>; item: BakedItem }) {
 
 /** Every mine's beacon blinks together, off the shared clock, with a halo that blinks with it. */
 const mineLamp = new THREE.MeshBasicMaterial({ color: '#ff3b2f' })
-const mineHalo = new THREE.SpriteMaterial({ map: glowTexture(), color: '#ff5a3c', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
+const mineHalo = new THREE.SpriteMaterial({
+  map: glowTexture(),
+  color: '#ff5a3c',
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+})
 const lampGeo = tint(new THREE.SphereGeometry(0.09, 10, 8), '#ffffff')
 const lampBase = tint(new THREE.CylinderGeometry(0.1, 0.13, 0.12, 12), METAL)
 
@@ -463,11 +507,25 @@ function Bumper({ def, item }: { def: Def<'bumper'>; item: BakedItem }) {
 
 function Rock({ def }: { def: Def<'rock'> }) {
   const r = def.r ?? ITEM_SIZES.rock
-  const look = useMemo(() => ({ rot: [Math.random() * 0.3, Math.random() * 6, Math.random() * 0.3] as [number, number, number], seed: Math.floor(Math.random() * 3) }), [])
+  const look = useMemo(
+    () => ({ rot: [Math.random() * 0.3, Math.random() * 6, Math.random() * 0.3] as [number, number, number], seed: Math.floor(Math.random() * 3) }),
+    [],
+  )
   return (
     <group position={[0, 0, def.d]}>
-      <mesh geometry={boulder(look.seed, PALETTE.rock, '#7fa86a')} position={[0, 0.15, 0]} scale={[r, r * 0.75, r]} rotation={look.rot} material={stone} />
-      <mesh geometry={boulder((look.seed + 1) % 3, '#a39ea8')} position={[r * 0.5, 0.05, r * 0.4]} scale={[r * 0.45, r * 0.35, r * 0.45]} material={stone} />
+      <mesh
+        geometry={boulder(look.seed, PALETTE.rock, '#7fa86a')}
+        position={[0, 0.15, 0]}
+        scale={[r, r * 0.75, r]}
+        rotation={look.rot}
+        material={stone}
+      />
+      <mesh
+        geometry={boulder((look.seed + 1) % 3, '#a39ea8')}
+        position={[r * 0.5, 0.05, r * 0.4]}
+        scale={[r * 0.45, r * 0.35, r * 0.45]}
+        material={stone}
+      />
       <Foam inner={r * 0.8} outer={r * 1.7} spin={0.15} />
     </group>
   )
@@ -506,7 +564,11 @@ function Boost({ def }: { def: Def<'boost'> }) {
   const len = def.len ?? ITEM_SIZES.boostLen
   const w = def.w ?? ITEM_SIZES.boostWidth
   const mats = useMemo(() => [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ color: '#ff7b39', transparent: true, depthWrite: false })), [])
-  const glows = useMemo(() => [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ color: '#ffb36b', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })), [])
+  const glows = useMemo(
+    () =>
+      [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ color: '#ffb36b', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })),
+    [],
+  )
   const pad = useMemo(() => {
     const outer = roundedRect(len + 0.3, w + 0.3, 0.45)
     const hole = roundedRect(len + 0.05, w + 0.05, 0.35)
@@ -594,11 +656,20 @@ function Pickup({ def, slot }: { def: Def<'pickup'>; slot: number }) {
       <group ref={g}>
         <sprite ref={halo} material={glowSprite(PICKUP_RING[def.item], 0.75)} />
         <group ref={item}>
-          <mesh geometry={PICKUP_GEO[def.item]()} material={paint} rotation={def.item === 'beans' ? [0.2, 0, 0.15] : def.item === 'chili' ? [0, 0, -0.6] : [0, 0, 0]} />
+          <mesh
+            geometry={PICKUP_GEO[def.item]()}
+            material={paint}
+            rotation={def.item === 'beans' ? [0.2, 0, 0.15] : def.item === 'chili' ? [0, 0, -0.6] : [0, 0, 0]}
+          />
         </group>
         <group ref={sparks}>
           {[0, 1, 2].map((k) => (
-            <sprite key={k} material={glowSprite('#fff6c8')} position={[Math.cos((k * Math.PI * 2) / 3) * 0.75, (k - 1) * 0.25, Math.sin((k * Math.PI * 2) / 3) * 0.75]} scale={0.22} />
+            <sprite
+              key={k}
+              material={glowSprite('#fff6c8')}
+              position={[Math.cos((k * Math.PI * 2) / 3) * 0.75, (k - 1) * 0.25, Math.sin((k * Math.PI * 2) / 3) * 0.75]}
+              scale={0.22}
+            />
           ))}
         </group>
       </group>
@@ -796,7 +867,15 @@ function Sweeper({ def, hw }: { def: Def<'sweeper'>; hw: number }) {
   )
 }
 
-const nozzleGlowMat = () => new THREE.MeshBasicMaterial({ color: '#ff7a2f', map: glowTexture(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
+const nozzleGlowMat = () =>
+  new THREE.MeshBasicMaterial({
+    color: '#ff7a2f',
+    map: glowTexture(),
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
 
 /** Fire-jet shading clock, shared by every jet. */
 const fireTime = { value: 0 }
@@ -838,7 +917,12 @@ function fireLayer(hot: string, cool: string, opacity: number, speed: number) {
 }
 
 let fire: { outer: THREE.ShaderMaterial; middle: THREE.ShaderMaterial; core: THREE.ShaderMaterial } | null = null
-const fireMats = () => (fire ??= { outer: fireLayer('#ffb03a', '#ff3d1a', 0.82, 16), middle: fireLayer('#ffe27a', '#ff7a1f', 0.85, 22), core: fireLayer('#ffffff', '#ffd24a', 0.95, 28) })
+const fireMats = () =>
+  (fire ??= {
+    outer: fireLayer('#ffb03a', '#ff3d1a', 0.82, 16),
+    middle: fireLayer('#ffe27a', '#ff7a1f', 0.85, 22),
+    core: fireLayer('#ffffff', '#ffd24a', 0.95, 28),
+  })
 
 function Flame({ def, item }: { def: Def<'flame'>; item: BakedItem }) {
   const hw = item.hw
@@ -1014,7 +1098,14 @@ function kelpTexture() {
     ctx.lineWidth = 3 + (k % 4)
     ctx.beginPath()
     ctx.moveTo(x, y)
-    ctx.bezierCurveTo(x + Math.cos(a) * 30, y + Math.sin(a) * 30, x + Math.cos(a + 1) * 50, y + Math.sin(a + 1) * 20, x + Math.cos(a) * 60, y + Math.sin(a) * 60)
+    ctx.bezierCurveTo(
+      x + Math.cos(a) * 30,
+      y + Math.sin(a) * 30,
+      x + Math.cos(a + 1) * 50,
+      y + Math.sin(a + 1) * 20,
+      x + Math.cos(a) * 60,
+      y + Math.sin(a) * 60,
+    )
     ctx.stroke()
   }
   weeds = new THREE.CanvasTexture(c)
@@ -1074,7 +1165,14 @@ function Kelp({ def, item }: { def: Def<'kelp'>; item: BakedItem }) {
 
 const BOLT_TOP = GANTRY_TOP + 1
 const boltCore = new THREE.MeshBasicMaterial({ color: '#fffbe0', toneMapped: false })
-const boltGlow = new THREE.MeshBasicMaterial({ color: '#ffe066', transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false })
+const boltGlow = new THREE.MeshBasicMaterial({
+  color: '#ffe066',
+  transparent: true,
+  opacity: 0.5,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  toneMapped: false,
+})
 
 function Lightning({ def, item }: { def: Def<'lightning'>; item: BakedItem }) {
   const hw = item.hw
@@ -1088,8 +1186,22 @@ function Lightning({ def, item }: { def: Def<'lightning'>; item: BakedItem }) {
   const struck = useRef(false)
   const { glow, impact, cloud } = useMemo(
     () => ({
-      glow: new THREE.SpriteMaterial({ map: glowTexture(), color: '#fff2a0', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
-      impact: new THREE.SpriteMaterial({ map: glowTexture(), color: '#fff6c0', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
+      glow: new THREE.SpriteMaterial({
+        map: glowTexture(),
+        color: '#fff2a0',
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+      impact: new THREE.SpriteMaterial({
+        map: glowTexture(),
+        color: '#fff6c0',
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
       // The cloud lights up from inside as the strike charges, and blazes as it lands.
       cloud: Object.assign(stone.clone(), { emissive: new THREE.Color('#000000') }),
     }),
@@ -1196,13 +1308,19 @@ const geyserColumn = (() => {
   return g.translate(0, 0.5, 0)
 })()
 /** A lit lump of foam, shaded grey underneath: the crown of a blast and the bubbles before one. */
-const foamLump = paintGeo(blob(12, 8, (p, u) => p.multiplyScalar(1 + lumps(u.x * 3, u.y * 3, u.z * 3, 2) * 0.12)), (p, _n, out) => out.setScalar(0.78 + 0.25 * smoothstep(-0.8, 0.6, p.y)))
+const foamLump = paintGeo(
+  blob(12, 8, (p, u) => p.multiplyScalar(1 + lumps(u.x * 3, u.y * 3, u.z * 3, 2) * 0.12)),
+  (p, _n, out) => out.setScalar(0.78 + 0.25 * smoothstep(-0.8, 0.6, p.y)),
+)
 /** The crown: a ring of foam lumps round a domed middle, base at y = 0. */
 const foamCrown = mergeParts([
   foamLump.clone().scale(1, 0.45, 1),
   ...Array.from({ length: 7 }, (_, k) => {
     const a = (k / 7) * Math.PI * 2
-    return foamLump.clone().scale(0.42, 0.3, 0.42).translate(Math.cos(a) * 0.85, -0.05, Math.sin(a) * 0.85)
+    return foamLump
+      .clone()
+      .scale(0.42, 0.3, 0.42)
+      .translate(Math.cos(a) * 0.85, -0.05, Math.sin(a) * 0.85)
   }),
 ])
 
@@ -1228,7 +1346,7 @@ function Geyser({ def, item }: { def: Def<'geyser'>; item: BakedItem }) {
       const wob = 1 + Math.sin(t * 17) * 0.08
       crown.current.visible = st.blast > 0.02
       crown.current.position.y = height
-      crown.current.scale.set(r * 0.5 * wob, r * 0.5 * (0.8 + 0.4 * st.blast) / wob, r * 0.5 * wob)
+      crown.current.scale.set(r * 0.5 * wob, (r * 0.5 * (0.8 + 0.4 * st.blast)) / wob, r * 0.5 * wob)
     }
     // The ring shows how far the blast reaches: faint while it sleeps, pulsing while it bubbles.
     if (ringMat.current) ringMat.current.opacity = st.blast > 0 ? 0.7 * st.blast : st.warn ? 0.45 + Math.sin(t * 22) * 0.3 : 0.18

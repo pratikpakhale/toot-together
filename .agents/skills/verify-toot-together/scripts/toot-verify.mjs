@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { spawn, execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync, rmSync, copyFileSync, appendFileSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -64,7 +64,11 @@ async function pickPort(wanted, avoid = []) {
 
 function listeners(port) {
   try {
-    const pids = execFileSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map(Number)
+    const pids = execFileSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8' })
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(Number)
     return pids.map((pid) => ({ pid, pgid: Number(execFileSync('ps', ['-o', 'pgid=', '-p', String(pid)], { encoding: 'utf8' }).trim()) }))
   } catch {
     return []
@@ -190,9 +194,16 @@ async function doctor() {
   }
   check(alive(s.server.pid), `room server process ${s.server.pid} alive`)
   check(alive(s.web.pid), `vite process ${s.web.pid} alive`)
-  for (const [name, part] of [['room server', s.server], ['vite', s.web]]) {
+  for (const [name, part] of [
+    ['room server', s.server],
+    ['vite', s.web],
+  ]) {
     const owners = listeners(part.port)
-    check(owners.length > 0 && owners.every((l) => l.pgid === part.pgid), `${name} port ${part.port} owned by our process group ${part.pgid}`, owners.length ? owners.map((l) => `pid ${l.pid}/pgid ${l.pgid}`).join(', ') : 'nobody listening')
+    check(
+      owners.length > 0 && owners.every((l) => l.pgid === part.pgid),
+      `${name} port ${part.port} owned by our process group ${part.pgid}`,
+      owners.length ? owners.map((l) => `pid ${l.pid}/pgid ${l.pgid}`).join(', ') : 'nobody listening',
+    )
   }
   let health = null
   try {
@@ -210,7 +221,11 @@ async function doctor() {
     const { msg, ws } = await wsAsk(`ws://127.0.0.1:${s.web.port}/ws`, { type: 'watch', v: PROTOCOL_VERSION }, (m) => m.type === 'rooms')
     const during = (await (await fetch(`${s.server.url}/health`)).json()).sockets
     ws.close()
-    check(during > before, `vite /ws proxy reaches our room server`, `room list has ${msg.rooms.length} room(s); our server sockets ${before} -> ${during}`)
+    check(
+      during > before,
+      `vite /ws proxy reaches our room server`,
+      `room list has ${msg.rooms.length} room(s); our server sockets ${before} -> ${during}`,
+    )
   } catch (e) {
     check(false, 'vite /ws proxy reaches our room server', e.message)
   }
@@ -323,13 +338,21 @@ async function down() {
     } catch {}
   }
   mkdirSync(s.evidenceDir, { recursive: true })
-  for (const [file, name] of [[s.server.log, 'server.log'], [s.web.log, 'web.log'], [join(s.stateDir, 'run.json'), 'run.json']]) {
+  for (const [file, name] of [
+    [s.server.log, 'server.log'],
+    [s.web.log, 'web.log'],
+    [join(s.stateDir, 'run.json'), 'run.json'],
+  ]) {
     if (existsSync(file)) copyFileSync(file, join(s.evidenceDir, name))
   }
   rmSync(s.stateDir, { recursive: true, force: true })
   rmSync(CURRENT, { force: true })
   const leftovers = [s.server.port, s.web.port].flatMap((p) => listeners(p).filter((l) => l.pgid === s.server.pgid || l.pgid === s.web.pgid))
-  console.log(leftovers.length ? `WARNING still listening: ${JSON.stringify(leftovers)}` : `Stopped run ${s.runId}. Ports ${s.server.port}/${s.web.port} released.`)
+  console.log(
+    leftovers.length
+      ? `WARNING still listening: ${JSON.stringify(leftovers)}`
+      : `Stopped run ${s.runId}. Ports ${s.server.port}/${s.web.port} released.`,
+  )
   console.log(`Evidence kept in ${s.evidenceDir}`)
 }
 

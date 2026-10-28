@@ -1,12 +1,26 @@
 import { RAFT_RADIUS, SPIKE_REACH } from './constants'
-import { angleDiff, rightOffset, type Rng } from './math'
+import { angleDiff, type Rng, rightOffset } from './math'
 import { collideItem, geyserState, ITEM_SIZES } from './obstacles'
 import type { Sim } from './sim'
 import { type BakedCourse, type BakedItem, EDGE_CODE, nearestSampleAt, pointAt } from './track'
 import type { PlayerInput } from './types'
 
 const DODGE_KINDS = new Set(['mine', 'rock', 'piston', 'bumper', 'spinner', 'whirlpool'])
-const TIMED_KINDS = new Set(['mine', 'spinner', 'mace', 'slider', 'crusher', 'piston', 'whirlpool', 'sweeper', 'flame', 'fence', 'gate', 'lightning', 'geyser'])
+const TIMED_KINDS = new Set([
+  'mine',
+  'spinner',
+  'mace',
+  'slider',
+  'crusher',
+  'piston',
+  'whirlpool',
+  'sweeper',
+  'flame',
+  'fence',
+  'gate',
+  'lightning',
+  'geyser',
+])
 /** How far along the river a timed hazard can reach from where it stands (a sweeper's boom swings up and downstream). */
 const reachAlong = (item: BakedItem) => (item.def.kind === 'sweeper' ? item.def.len + 3 : 6)
 

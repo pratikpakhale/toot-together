@@ -55,7 +55,9 @@ export function CrewsPanel() {
     <Modal width={Math.min(940, 220 + rafts * 190)} shortWidth={820} onClose={() => setOverlay(null)}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="font-display text-4xl short:text-2xl">CREWS</div>
-        <p className="min-w-0 flex-1 text-sm font-extrabold text-ink/55 short:text-xs">{picked ? `Where should ${picked.id === myId ? 'you' : picked.name} go?` : 'Tap a hippo to move it.'}</p>
+        <p className="min-w-0 flex-1 text-sm font-extrabold text-ink/55 short:text-xs">
+          {picked ? `Where should ${picked.id === myId ? 'you' : picked.name} go?` : 'Tap a hippo to move it.'}
+        </p>
         <div className="flex items-center gap-1.5">
           <span className="font-display text-sm text-ink/50">RAFTS</span>
           {Array.from({ length: MAX_RAFTS - 1 }, (_, k) => k + 2).map((n) => {
@@ -75,7 +77,10 @@ export function CrewsPanel() {
               </button>
             )
           })}
-          <button className="btn btn-orange ml-1 flex items-center gap-1 rounded-xl px-3 py-0.5 text-sm shadow-[0_3px_0_var(--color-ink)]" onClick={click(() => session.act({ type: 'shuffle' }))}>
+          <button
+            className="btn btn-orange ml-1 flex items-center gap-1 rounded-xl px-3 py-0.5 text-sm shadow-[0_3px_0_var(--color-ink)]"
+            onClick={click(() => session.act({ type: 'shuffle' }))}
+          >
             <Icon name="move" size="1.2em" /> Shuffle
           </button>
         </div>
@@ -88,7 +93,10 @@ export function CrewsPanel() {
           const here = picked?.raft === r
           return (
             <div key={r} className="flex min-w-0 flex-col overflow-hidden rounded-[20px] border-[3px] border-ink bg-white">
-              <div className="font-display flex items-center gap-1.5 border-b-[3px] border-ink px-3 py-1 text-lg short:px-2 short:text-[15px]" style={{ background: TEAMS[r].color, color: TEAMS[r].text }}>
+              <div
+                className="font-display flex items-center gap-1.5 border-b-[3px] border-ink px-3 py-1 text-lg short:px-2 short:text-[15px]"
+                style={{ background: TEAMS[r].color, color: TEAMS[r].text }}
+              >
                 <TeamBadge raft={r} size="1.1em" />
                 <span className="truncate">{TEAMS[r].name}</span>
                 <span className="ml-auto text-[13px]">
@@ -101,7 +109,11 @@ export function CrewsPanel() {
               </div>
               {picked && (
                 <div className="px-2 pb-2">
-                  <button className={`btn ${here || full ? 'btn-cream' : 'btn-purple'} w-full px-2 py-1 text-sm short:py-0.5`} disabled={here || full} onClick={moveTo(r)}>
+                  <button
+                    className={`btn ${here || full ? 'btn-cream' : 'btn-purple'} w-full px-2 py-1 text-sm short:py-0.5`}
+                    disabled={here || full}
+                    onClick={moveTo(r)}
+                  >
                     {here ? 'Here now' : full ? 'Full' : 'Move here'}
                   </button>
                 </div>

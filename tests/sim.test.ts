@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { aimFromStick, walkFromTurn } from '../src/client/game/input'
 import { botInput } from '../src/sim/bot'
 import { DT, HIPPO_GAP, RAFT_RADIUS, RESPAWN_AHEAD_OF_CHECKPOINT } from '../src/sim/constants'
 import { COURSE_LIST, getCourse } from '../src/sim/courses'
+import { angleDiff } from '../src/sim/math'
+import { collideItem, fieldAt, flameState, gateState, geyserState, ITEM_SIZES, lightningState } from '../src/sim/obstacles'
+import { clampToSector, rimSector, sectorOffset } from '../src/sim/sectors'
 import { Sim } from '../src/sim/sim'
 import { type BakedItem, type ItemDef, nearestSampleAt } from '../src/sim/track'
-import { collideItem, fieldAt, flameState, gateState, geyserState, ITEM_SIZES, lightningState } from '../src/sim/obstacles'
-import { angleDiff } from '../src/sim/math'
-import { clampToSector, rimSector, sectorOffset } from '../src/sim/sectors'
-import { aimFromStick, walkFromTurn } from '../src/client/game/input'
 import type { PlayerInput, SimEvent } from '../src/sim/types'
 
 const course = getCourse('canyon-run')
@@ -51,7 +51,6 @@ describe.each(COURSE_LIST.map((def) => [def.name, def.id] as const))('course %s'
     }
     expect(overlaps).toEqual([])
   })
-
 })
 
 describe('sim', () => {
@@ -179,7 +178,7 @@ describe('walking around the rim', () => {
     expect(nearBack).toHaveLength(2)
   })
 
-  it('pointing at a teammate\'s spot sends the hippo to the nearest edge of its own slice, without flip-flopping', () => {
+  it("pointing at a teammate's spot sends the hippo to the nearest edge of its own slice, without flip-flopping", () => {
     const { sim } = raftWithCrew(2)
     const sector = rimSector(0, [0, 1])!
     let flips = 0

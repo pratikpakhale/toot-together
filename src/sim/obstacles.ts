@@ -13,8 +13,7 @@ export const spinnerAngle = (d: Def<'spinner'>, t: number) => (d.phase ?? 0) * T
 
 export const maceOffset = (d: Def<'mace'>, t: number) => d.amp * Math.sin((TAU * t) / d.period + (d.phase ?? 0) * TAU)
 
-export const sliderOffset = (d: Def<'slider'>, t: number) =>
-  (d.d ?? 0) + d.amp * Math.sin((TAU * t) / d.period + (d.phase ?? 0) * TAU)
+export const sliderOffset = (d: Def<'slider'>, t: number) => (d.d ?? 0) + d.amp * Math.sin((TAU * t) / d.period + (d.phase ?? 0) * TAU)
 
 /** 1 = fully open (panels hidden in walls), 0 = slammed shut. */
 export function crusherOpen(d: Def<'crusher'>, t: number) {
@@ -88,8 +87,7 @@ export const flameLength = (d: Def<'flame'>, hw: number) => d.len ?? 2 * hw
 /** Which way the water turns round a whirlpool (sign) and how hard, m/s² near its drain. */
 export const whirlpoolSwirl = (d: Def<'whirlpool'>) => d.swirl ?? 5
 
-export const fenceGapCentre = (d: Def<'fence'>, t: number) =>
-  (d.d ?? 0) + d.amp * Math.sin((TAU * t) / d.period + (d.phase ?? 0) * TAU)
+export const fenceGapCentre = (d: Def<'fence'>, t: number) => (d.d ?? 0) + d.amp * Math.sin((TAU * t) / d.period + (d.phase ?? 0) * TAU)
 
 export interface GateState {
   /** 1 = raised clear of the water, 0 = slammed shut. */

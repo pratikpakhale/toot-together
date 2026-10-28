@@ -4,7 +4,7 @@ import type { PlayerInput } from '../src/sim/types'
 import { aimTowards, itemS, type Shot } from './director'
 
 /** Seat by seat: the streamer, then the friends whose chat bubbles he reads out. */
-export const STREAM_CREW = ['Vik', 'Golu', 'Priya', 'Aarav'] as const
+const STREAM_CREW = ['Vik', 'Golu', 'Priya', 'Aarav'] as const
 const GOLU = 2
 const PRIYA = 3
 const AARAV = 4

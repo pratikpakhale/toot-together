@@ -1,4 +1,4 @@
-import { bakeCourse, type BakedCourse, type CourseDef } from './track'
+import { type BakedCourse, bakeCourse, type CourseDef } from './track'
 
 const LAZY_RIVER: CourseDef = {
   id: 'lazy-river',

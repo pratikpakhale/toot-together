@@ -160,7 +160,18 @@ const wallPoints: P[] = [
   [0, 0.25],
   [0, SHELF_H],
 ]
-const shelfPoints: P[] = [[0, SHELF_H], [0.6, SHELF_H], [1.6, SHELF_H], [3, SHELF_H], [4.6, SHELF_H], [6.2, SHELF_H], [7.8, SHELF_H], [9.2, SHELF_H], [SHELF_EDGE, SHELF_H], ...LIP]
+const shelfPoints: P[] = [
+  [0, SHELF_H],
+  [0.6, SHELF_H],
+  [1.6, SHELF_H],
+  [3, SHELF_H],
+  [4.6, SHELF_H],
+  [6.2, SHELF_H],
+  [7.8, SHELF_H],
+  [9.2, SHELF_H],
+  [SHELF_EDGE, SHELF_H],
+  ...LIP,
+]
 const wallCliff = cliffPoints(LIP[2][0], LIP[2][1])
 const openLip: P[] = [
   [-0.05, 0.07],
@@ -258,7 +269,8 @@ const CHUNK_SAMPLES = 120
 export function buildTrack(c: BakedCourse, theme: Theme): TrackMeshes {
   const paint = painters(theme)
   const parts: { ground: Builder; rail: Builder; tube: Builder; spikes: THREE.Matrix4[] }[] = []
-  const part = (i: number) => (parts[Math.floor(i / CHUNK_SAMPLES)] ??= { ground: new Builder(), rail: new Builder(), tube: new Builder(), spikes: [] })
+  const part = (i: number) =>
+    (parts[Math.floor(i / CHUNK_SAMPLES)] ??= { ground: new Builder(), rail: new Builder(), tube: new Builder(), spikes: [] })
 
   for (const side of [1, -1] as const) {
     for (const run of runs(c, side)) {
@@ -292,7 +304,9 @@ export function buildTrack(c: BakedCourse, theme: Theme): TrackMeshes {
   addEndCaps(caps.ground, caps.rails, c, theme)
 
   return {
-    chunks: parts.filter(Boolean).map((p) => ({ ground: p.ground.geometry(), rails: p.rail.geometry(), spikeTubes: p.tube.geometry(), spikes: p.spikes })),
+    chunks: parts
+      .filter(Boolean)
+      .map((p) => ({ ground: p.ground.geometry(), rails: p.rail.geometry(), spikeTubes: p.tube.geometry(), spikes: p.spikes })),
     caps: { ground: caps.ground.geometry(), rails: caps.rails.geometry() },
     water: buildWater(c),
   }

@@ -1,14 +1,14 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { EDGE_CODE, nearestSampleAt, pointAt, type BakedCourse } from '../../sim/track'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { type BakedCourse, EDGE_CODE, nearestSampleAt, pointAt } from '../../sim/track'
 import { RAFT_RESULT } from '../../sim/types'
 import { frame, isRace } from '../game/frame'
 import { CHASE_CAM_HEIGHT } from './CameraRig'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { useFogCull } from './fogCull'
 import { dome, painted, turnedPost } from './hazardKit'
 import { soft } from './materials'
-import { useFogCull } from './fogCull'
 import { blob, merge, paint as paintGeo, tint } from './sculpt'
 import { themeFor } from './themes'
 
@@ -93,7 +93,9 @@ function bunting(half: number, y: number, finish: boolean) {
   const parts: THREE.BufferGeometry[] = []
   const sag = 0.9
   const at = (z: number) => y - sag * (1 - (z / half) ** 2)
-  const rope = new THREE.CatmullRomCurve3(Array.from({ length: 13 }, (_, k) => new THREE.Vector3(0, at(-half + (k / 12) * 2 * half), -half + (k / 12) * 2 * half)))
+  const rope = new THREE.CatmullRomCurve3(
+    Array.from({ length: 13 }, (_, k) => new THREE.Vector3(0, at(-half + (k / 12) * 2 * half), -half + (k / 12) * 2 * half)),
+  )
   parts.push(tint(new THREE.TubeGeometry(rope, 48, 0.035, 5), '#f4ead8'))
   const n = Math.max(6, Math.floor((half * 2) / 0.75))
   for (let k = 1; k < n; k++) {
@@ -235,7 +237,9 @@ function Gate({ course, kind, s, index }: { course: BakedCourse; kind: GateKind;
     const board = new RoundedBoxGeometry(0.26, signH + 0.3, signW + 0.3, 3, 0.08)
     const bar = merge([
       tint(new THREE.CylinderGeometry(0.2, 0.2, postZ * 2, 16), theme.gate.post),
-      ...[-0.7, -0.35, 0, 0.35, 0.7].map((f) => tint(new THREE.TorusGeometry(0.21, 0.04, 6, 16).rotateX(Math.PI / 2).translate(0, f * postZ, 0), '#d9902f')),
+      ...[-0.7, -0.35, 0, 0.35, 0.7].map((f) =>
+        tint(new THREE.TorusGeometry(0.21, 0.04, 6, 16).rotateX(Math.PI / 2).translate(0, f * postZ, 0), '#d9902f'),
+      ),
     ]).rotateX(Math.PI / 2)
     const flags = bunting(postZ - 0.35, GATE_HEIGHT - 0.45, kind === 'finish')
     const line = kind !== 'start' ? buoyLine(hw, kind === 'finish') : null

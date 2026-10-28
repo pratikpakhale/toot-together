@@ -1,4 +1,4 @@
-import { REEL_SHOTS, type Shot, SHOTS } from './director'
+import { REEL_SHOTS, SHOTS, type Shot } from './director'
 import { STREAM_SHOTS } from './stream'
 
 interface Cut {

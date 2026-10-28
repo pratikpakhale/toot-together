@@ -1,7 +1,19 @@
 import type { CSSProperties } from 'react'
 import { ICONS, type IconName } from './icons'
 
-export function Icon({ name, size, className = '', style, label }: { name: IconName; size?: number | string; className?: string; style?: CSSProperties; label?: string }) {
+export function Icon({
+  name,
+  size,
+  className = '',
+  style,
+  label,
+}: {
+  name: IconName
+  size?: number | string
+  className?: string
+  style?: CSSProperties
+  label?: string
+}) {
   return (
     <svg
       className={`icon ${className}`}

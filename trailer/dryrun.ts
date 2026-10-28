@@ -17,10 +17,23 @@ shots.forEach((shot, n) => {
       sim.step()
       for (const e of sim.drainEvents()) {
         if (e.type === 'bump' || e.type === 'burst') continue
-        const extra = e.type === 'legendary' ? String(e.id) : e.type === 'death' ? `raft=${e.raft} ${e.cause} blame=${e.blame}${e.rival ? ' (rival)' : ''}` : e.type === 'raftFinish' ? `raft=${e.raft} place=${e.place}` : e.type === 'sync' ? e.ids.join('+') : e.type === 'pickup' ? `${e.id} ${e.item}` : ''
+        const extra =
+          e.type === 'legendary'
+            ? String(e.id)
+            : e.type === 'death'
+              ? `raft=${e.raft} ${e.cause} blame=${e.blame}${e.rival ? ' (rival)' : ''}`
+              : e.type === 'raftFinish'
+                ? `raft=${e.raft} place=${e.place}`
+                : e.type === 'sync'
+                  ? e.ids.join('+')
+                  : e.type === 'pickup'
+                    ? `${e.id} ${e.item}`
+                    : ''
         log.push(`${(i * DT).toFixed(2)} ${e.type} ${extra}`)
       }
     }
-    console.log(`#${n} ${shot.name} (${shot.course}) seed=${seed} s ${s0.toFixed(0)}→${sim.rafts.map((r) => r.s.toFixed(0)).join('/')} phase=${sim.phase}\n  ${log.join('\n  ')}`)
+    console.log(
+      `#${n} ${shot.name} (${shot.course}) seed=${seed} s ${s0.toFixed(0)}→${sim.rafts.map((r) => r.s.toFixed(0)).join('/')} phase=${sim.phase}\n  ${log.join('\n  ')}`,
+    )
   }
 })

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { type Region, REGIONS } from '../sim/regions'
+import { REGIONS, type Region } from '../sim/regions'
 
 /**
  * Deploy builds (`vite build --mode deploy`) reach each region at its URL in regions.json. Any other build, and

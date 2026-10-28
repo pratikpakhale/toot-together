@@ -131,7 +131,14 @@ function Pop({ t, at, children, style }: { t: number; at: number; children: Reac
   return <div style={{ transform: `scale(${0.3 + 0.7 * outBack(k)}) rotate(${(1 - k) * -6}deg)`, opacity: clamp(k * 3), ...style }}>{children}</div>
 }
 
-const center: CSSProperties = { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
+const center: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+}
 
 function Intro({ t }: { t: number }) {
   const puffs: [number, string, string, number][] = [
@@ -140,22 +147,41 @@ function Intro({ t }: { t: number }) {
     [0.6, '40%', '66%', 4],
   ]
   return (
-    <div style={{ ...center, background: 'radial-gradient(ellipse at 50% 45%, rgba(255,248,236,.92) 0%, rgba(253,231,207,.78) 38%, rgba(253,231,207,.15) 75%, rgba(253,231,207,0) 100%)' }}>
+    <div
+      style={{
+        ...center,
+        background:
+          'radial-gradient(ellipse at 50% 45%, rgba(255,248,236,.92) 0%, rgba(253,231,207,.78) 38%, rgba(253,231,207,.15) 75%, rgba(253,231,207,0) 100%)',
+      }}
+    >
       {puffs.map(([at, x, y, rot], n) => {
         const k = prog(t, at, 0.45)
         if (k <= 0) return null
         const fade = 1 - prog(t, at + 0.9, 0.6)
-        return <Cloud key={n} size={300} color={n === 1 ? '#b5ef6a' : '#c8f27d'} style={{ left: x, top: y, opacity: fade, transform: `scale(${outBack(k)}) rotate(${rot}deg) translateY(${-k * 30}px)` }} />
+        return (
+          <Cloud
+            key={n}
+            size={300}
+            color={n === 1 ? '#b5ef6a' : '#c8f27d'}
+            style={{ left: x, top: y, opacity: fade, transform: `scale(${outBack(k)}) rotate(${rot}deg) translateY(${-k * 30}px)` }}
+          />
+        )
       })}
       {t >= 0.95 && <Logo t={t - 0.95} />}
       <div style={{ marginTop: 58, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
         <Pop t={t} at={2.2}>
-          <div className="font-display stroke-text text-white" style={{ fontSize: 70, WebkitTextStrokeWidth: 9, filter: `drop-shadow(0 6px 0 ${INK})` }}>
+          <div
+            className="font-display stroke-text text-white"
+            style={{ fontSize: 70, WebkitTextStrokeWidth: 9, filter: `drop-shadow(0 6px 0 ${INK})` }}
+          >
             4 HIPPOS. 1 RAFT.
           </div>
         </Pop>
         <Pop t={t} at={2.85}>
-          <div className="font-display stroke-text" style={{ fontSize: 58, color: '#ffcf3f', WebkitTextStrokeWidth: 8, filter: `drop-shadow(0 6px 0 ${INK})` }}>
+          <div
+            className="font-display stroke-text"
+            style={{ fontSize: 58, color: '#ffcf3f', WebkitTextStrokeWidth: 8, filter: `drop-shadow(0 6px 0 ${INK})` }}
+          >
             ONLY ONE WAY TO STEER…
           </div>
         </Pop>
@@ -164,7 +190,18 @@ function Intro({ t }: { t: number }) {
         [0, 1, 2, 3, 4].map((n) => {
           const k = prog(t, 3.3 + n * 0.1, 0.5)
           if (k <= 0) return null
-          return <Cloud key={n} size={110 + n * 16} style={{ left: `${62 + n * 4.2}%`, top: `${71 - n * 1.5}%`, opacity: 1 - prog(t, 3.9 + n * 0.08, 0.4), transform: `scale(${outBack(k)})` }} />
+          return (
+            <Cloud
+              key={n}
+              size={110 + n * 16}
+              style={{
+                left: `${62 + n * 4.2}%`,
+                top: `${71 - n * 1.5}%`,
+                opacity: 1 - prog(t, 3.9 + n * 0.08, 0.4),
+                transform: `scale(${outBack(k)})`,
+              }}
+            />
+          )
         })}
     </div>
   )
@@ -180,7 +217,11 @@ function Wipe({ w }: { w: number }) {
     return (1 - outCubic(clamp((w - lag) / (WIPE - 0.18)))) * 330
   }
   return (
-    <svg viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+    <svg
+      viewBox={`0 0 ${STAGE_W} ${STAGE_H}`}
+      preserveAspectRatio="xMidYMid slice"
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+    >
       {blobs.map(([x, y], k) => (
         <circle key={`s${k}`} cx={x} cy={y} r={r(x) + 9} fill={INK} />
       ))}
@@ -200,7 +241,17 @@ function Caption({ t, caption }: { t: number; caption: CaptionCue }) {
   const inK = outBack(prog(k, 0, 0.28))
   const out = prog(k, 2.45, 0.35)
   return (
-    <div style={{ position: 'absolute', left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', ...(reel ? { top: REEL_CAPTION_TOP } : { bottom: '7%' }) }}>
+    <div
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        ...(reel ? { top: REEL_CAPTION_TOP } : { bottom: '7%' }),
+      }}
+    >
       <div
         className="font-display stroke-text"
         style={{
@@ -257,11 +308,31 @@ function Outro({ t }: { t: number }) {
           </div>
         </Pop>
         <Pop t={t} at={1.7}>
-          <div className="font-display" style={{ fontSize: 76, color: INK, background: '#fff8ec', border: `6px solid ${INK}`, borderRadius: 999, padding: '6px 46px 12px', boxShadow: `0 10px 0 ${INK}` }}>
+          <div
+            className="font-display"
+            style={{
+              fontSize: 76,
+              color: INK,
+              background: '#fff8ec',
+              border: `6px solid ${INK}`,
+              borderRadius: 999,
+              padding: '6px 46px 12px',
+              boxShadow: `0 10px 0 ${INK}`,
+            }}
+          >
             toottogether.fun
           </div>
         </Pop>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: reel ? 16 : 22, marginTop: 14, maxWidth: reel ? 720 : undefined }}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: reel ? 16 : 22,
+            marginTop: 14,
+            maxWidth: reel ? 720 : undefined,
+          }}
+        >
           <Pop t={t} at={2.3}>
             <Chip icon="hippo" text="SOLO" />
           </Pop>
@@ -283,14 +354,23 @@ function Outro({ t }: { t: number }) {
 export function Overlay({ beat }: { beat: Beat }) {
   sounds(beat)
   return (
-    <div className="pointer-events-none" style={{ position: 'fixed', left: 0, top: 0, width: STAGE_W, height: STAGE_H, zIndex: 100, transformOrigin: '0 0', transform: `scale(${window.innerWidth / STAGE_W})` }}>
+    <div
+      className="pointer-events-none"
+      style={{
+        position: 'fixed',
+        left: 0,
+        top: 0,
+        width: STAGE_W,
+        height: STAGE_H,
+        zIndex: 100,
+        transformOrigin: '0 0',
+        transform: `scale(${window.innerWidth / STAGE_W})`,
+      }}
+    >
       {beat.intro !== null && beat.intro < 4.4 && <Intro t={beat.intro} />}
       {beat.shotT !== null && beat.caption && <Caption t={beat.shotT} caption={beat.caption} />}
       {beat.outro !== null && <Outro t={beat.outro} />}
-      {CUT.wipes &&
-        beat.sinceShotStarts.map((w, n) => (
-          <Wipe key={n} w={w} />
-        ))}
+      {CUT.wipes && beat.sinceShotStarts.map((w, n) => <Wipe key={n} w={w} />)}
     </div>
   )
 }

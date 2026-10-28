@@ -31,7 +31,9 @@ export function PauseMenu() {
         <div className="font-display mb-1 flex items-center justify-center gap-2 text-5xl short:text-3xl">
           <Icon name="eye" size="0.9em" /> MENU
         </div>
-        <p className="mb-3 text-center text-sm font-extrabold text-ink/60 short:mb-0">You're watching room {info?.roomCode ?? ''}. Nobody can see you.</p>
+        <p className="mb-3 text-center text-sm font-extrabold text-ink/60 short:mb-0">
+          You're watching room {info?.roomCode ?? ''}. Nobody can see you.
+        </p>
         <div className="mt-4 flex flex-col gap-3 short:mt-2 short:gap-2.5 short:[&_.btn]:py-2">
           <button className="btn btn-green text-2xl" onClick={act(() => setOverlay(null))}>
             Keep watching
@@ -52,7 +54,9 @@ export function PauseMenu() {
   return (
     <Modal onClose={() => setOverlay(null)} width={420} shortWidth={560}>
       <div className="font-display mb-1 text-center text-5xl short:text-3xl">{online ? 'MENU' : 'PAUSED'}</div>
-      {online && <p className="mb-3 text-center text-sm font-extrabold text-ink/60 short:mb-0">The river keeps flowing for your crew while this is open.</p>}
+      {online && (
+        <p className="mb-3 text-center text-sm font-extrabold text-ink/60 short:mb-0">The river keeps flowing for your crew while this is open.</p>
+      )}
       <div className="mt-4 flex flex-col gap-3 short:mt-2 short:gap-2.5 short:[&_.btn]:py-2">
         <button className="btn btn-green text-2xl" onClick={act(() => setOverlay(null))}>
           Resume

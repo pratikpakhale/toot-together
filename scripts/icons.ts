@@ -22,7 +22,11 @@ function tile(scale: number) {
 }
 
 writeFileSync(new URL('favicon.svg', out), svg(hippo))
-const png = (body: string, size: number, name: string) => sharp(Buffer.from(body), { density: 72 * (size / 64) }).resize(size, size).png().toFile(fileURLToPath(new URL(name, out)))
+const png = (body: string, size: number, name: string) =>
+  sharp(Buffer.from(body), { density: 72 * (size / 64) })
+    .resize(size, size)
+    .png()
+    .toFile(fileURLToPath(new URL(name, out)))
 await Promise.all([
   png(tile(ICON_SCALE), 180, 'apple-touch-icon.png'),
   png(tile(ICON_SCALE), 192, 'icon-192.png'),

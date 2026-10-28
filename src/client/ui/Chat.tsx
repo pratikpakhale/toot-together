@@ -68,6 +68,7 @@ const SLIDE = 12
 const KEYBOARD_PX = 120
 
 /** Lines that are only emoji (a reaction) get a big bubble with no words to read. */
+// biome-ignore lint/suspicious/noMisleadingCharacterClass: the joiner and variation selector are allowed one at a time, between emoji.
 const EMOJI_ONLY = /^[\p{Extended_Pictographic}\p{Emoji_Modifier}‍️\s]+$/u
 
 const LOG_MS = 8000
@@ -167,7 +168,9 @@ export function ChatDock() {
     <>
       <div className="safe-area pointer-events-none z-40 select-none">
         {/* On a phone the player list has no field to lose focus, so a tap anywhere else closes it. */}
-        {(isTouch || !session.canChat) && panel === 'people' && <div className="pointer-events-auto absolute inset-0 bg-ink/25 anim-fade" onClick={() => setPanel(null)} />}
+        {(isTouch || !session.canChat) && panel === 'people' && (
+          <div className="pointer-events-auto absolute inset-0 bg-ink/25 anim-fade" onClick={() => setPanel(null)} />
+        )}
         <div
           className={`absolute left-3 flex gap-2 ${wide ? 'w-[min(680px,calc(100%-24px))]' : 'w-[min(480px,calc(100%-24px))]'} ${isTouch ? 'top-[110px] flex-col max-[620px]:top-[164px]' : 'bottom-[58px] flex-col-reverse'}`}
         >
@@ -190,7 +193,8 @@ export function ChatDock() {
                     {l.text}
                   </>
                 )
-                const look = 'max-w-full rounded-xl border-2 border-ink/20 bg-white/85 px-2 py-0.5 text-sm font-extrabold leading-snug break-words text-ink'
+                const look =
+                  'max-w-full rounded-xl border-2 border-ink/20 bg-white/85 px-2 py-0.5 text-sm font-extrabold leading-snug break-words text-ink'
                 const at = shownAt(l)
                 return panel === 'type' || at === null ? (
                   <div key={l.key} className={look}>
@@ -468,7 +472,9 @@ function Wheel({ aimed, setAimed, calls, say }: WheelProps) {
               <>
                 <Icon name="chat" size="calc(var(--d) * 0.068)" />
                 <span className="font-display text-[calc(var(--d)*0.032)] leading-none">QUICK CHAT</span>
-                <span className="text-[11px] font-extrabold leading-tight text-ink/55">{isTouch ? 'slide, let go' : aiming ? 'aim, let go of Q' : 'click or 1–8'}</span>
+                <span className="text-[11px] font-extrabold leading-tight text-ink/55">
+                  {isTouch ? 'slide, let go' : aiming ? 'aim, let go of Q' : 'click or 1–8'}
+                </span>
               </>
             )}
           </div>
@@ -476,7 +482,11 @@ function Wheel({ aimed, setAimed, calls, say }: WheelProps) {
       </div>
       {!isTouch && (
         <>
-          <div className="panel flex items-center gap-0.5 rounded-full! px-2 py-1" onPointerDown={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()}>
+          <div
+            className="panel flex items-center gap-0.5 rounded-full! px-2 py-1"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
+          >
             <Reactions say={say} />
             <div className="mx-1.5 h-7 w-[3px] rounded-full bg-ink/15" />
             <button
@@ -528,7 +538,13 @@ function Slice({ call, index, aimed, numbered, onPick }: { call: Call; index: nu
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => (e.stopPropagation(), onPick())}
     >
-      <path d={SLICE_PATHS[index]} fill={aimed ? 'var(--color-sun)' : 'var(--color-cream)'} stroke="var(--color-ink)" strokeWidth={4} strokeLinejoin="round" />
+      <path
+        d={SLICE_PATHS[index]}
+        fill={aimed ? 'var(--color-sun)' : 'var(--color-cream)'}
+        stroke="var(--color-ink)"
+        strokeWidth={4}
+        strokeLinejoin="round"
+      />
       {aimed && <path d={SLICE_PATHS[index]} fill="none" stroke="white" strokeWidth={3} opacity={0.55} transform="scale(0.94)" />}
       <g transform={call.flip ? `translate(${ix + size / 2} ${iconY}) scale(-1 1)` : `translate(${ix - size / 2} ${iconY})`}>
         <svg
@@ -681,7 +697,12 @@ function TypePanel({ roster, myId, say }: { roster: RosterEntry[]; myId: number 
             <Icon name="people" size={26} />
             <span className="font-display text-xl">PLAYERS</span>
             <span className="text-xs font-extrabold text-ink/55">tap to mute or unmute</span>
-            <button tabIndex={-1} className="btn btn-cream ml-auto flex size-10 items-center justify-center p-0" aria-label="Done" onClick={() => (audio.click(), setPanel(null))}>
+            <button
+              tabIndex={-1}
+              className="btn btn-cream ml-auto flex size-10 items-center justify-center p-0"
+              aria-label="Done"
+              onClick={() => (audio.click(), setPanel(null))}
+            >
               <Icon name="check" size={22} />
             </button>
           </div>

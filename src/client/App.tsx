@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { audio, unlockOnGesture } from './audio/audio'
-import { isHippocamRoute, joinRoom, roomFromUrl, showMenu, showHippocam } from './game/controller'
+import { isHippocamRoute, joinRoom, roomFromUrl, showHippocam, showMenu } from './game/controller'
 import { frame, isRace } from './game/frame'
 import { input } from './game/input'
 import { enterFullscreen, isIOS, isTouch, keepAwake, usePortraitPhone } from './platform'
@@ -81,7 +81,9 @@ export function App() {
 
   useEffect(() => {
     // The menu's demo raft keeps floating behind Settings and How to play.
-    session?.setPaused((screen === 'game' && (overlay === 'pause' || overlay === 'settings' || overlay === 'howto' || overlay === 'feedback')) || sideways)
+    session?.setPaused(
+      (screen === 'game' && (overlay === 'pause' || overlay === 'settings' || overlay === 'howto' || overlay === 'feedback')) || sideways,
+    )
     if (overlay || sideways) audio.stopAllFarts()
   }, [session, screen, overlay, sideways])
 

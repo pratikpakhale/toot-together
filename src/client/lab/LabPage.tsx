@@ -6,8 +6,8 @@ import { isTouch } from '../platform'
 import { THEMES } from '../scene/themes'
 import { useApp } from '../state/store'
 import { Icon } from '../ui/Icon'
-import { EXHIBITS, exhibitById, POSES, THEME_IDS, useLab } from './labState'
 import { LabScene } from './LabScene'
+import { EXHIBITS, exhibitById, POSES, THEME_IDS, useLab } from './labState'
 import { riverFor } from './showcase'
 
 const POSE_LABEL: Record<(typeof POSES)[number], string> = {
@@ -33,7 +33,10 @@ export default function LabPage() {
   }, [])
 
   useEffect(unlockOnGesture, [])
-  useEffect(() => audio.setVolumes({ master: settings.master, music: settings.music, sfx: settings.sfx }), [settings.master, settings.music, settings.sfx])
+  useEffect(
+    () => audio.setVolumes({ master: settings.master, music: settings.music, sfx: settings.sfx }),
+    [settings.master, settings.music, settings.sfx],
+  )
 
   // Hold Space to toot, as in the game. Space would also press whichever chip has focus, so it's kept from them.
   useEffect(() => {
@@ -80,7 +83,9 @@ export default function LabPage() {
             <h1 className="font-display text-2xl leading-none sm:text-3xl short:text-lg">
               Asset lab<span className="text-toot-dark"> · {exhibit.name}</span>
             </h1>
-            <p className="mt-1 text-sm font-extrabold opacity-75 sm:text-base short:hidden">{exhibit.stage === 'river' ? `${riverFor(lab.theme).name}. ${exhibit.blurb}` : exhibit.blurb}</p>
+            <p className="mt-1 text-sm font-extrabold opacity-75 sm:text-base short:hidden">
+              {exhibit.stage === 'river' ? `${riverFor(lab.theme).name}. ${exhibit.blurb}` : exhibit.blurb}
+            </p>
           </div>
           <a href="/" className="btn btn-green pointer-events-auto shrink-0 px-4 py-2 text-lg short:px-3 short:py-1 short:text-base">
             Play
@@ -89,48 +94,52 @@ export default function LabPage() {
 
         <footer className="flex items-end gap-3">
           <div className="flex min-w-0 flex-1 flex-col items-start gap-2 short:gap-1.5">
-          {(exhibit.poses || exhibit.id === 'hippo') && (
+            {(exhibit.poses || exhibit.id === 'hippo') && (
+              <div className="pointer-events-auto flex max-w-full flex-wrap gap-2">
+                {exhibit.id === 'hippo' &&
+                  SEAT_COLORS.map((color, seat) => (
+                    <button
+                      key={color}
+                      aria-label={`Hippo ${seat + 1}`}
+                      className="chip size-9 short:size-7"
+                      style={{ background: color, outline: lab.seat === seat ? '3px solid white' : undefined }}
+                      onClick={() => lab.set({ seat })}
+                    />
+                  ))}
+                {exhibit.poses &&
+                  POSES.map((pose) => (
+                    <Chip key={pose} on={lab.pose === pose} onClick={() => lab.set({ pose })}>
+                      {POSE_LABEL[pose]}
+                    </Chip>
+                  ))}
+              </div>
+            )}
             <div className="pointer-events-auto flex max-w-full flex-wrap gap-2">
-              {exhibit.id === 'hippo' &&
-                SEAT_COLORS.map((color, seat) => (
-                  <button
-                    key={color}
-                    aria-label={`Hippo ${seat + 1}`}
-                    className="chip size-9 short:size-7"
-                    style={{ background: color, outline: lab.seat === seat ? '3px solid white' : undefined }}
-                    onClick={() => lab.set({ seat })}
-                  />
-                ))}
-              {exhibit.poses &&
-                POSES.map((pose) => (
-                  <Chip key={pose} on={lab.pose === pose} onClick={() => lab.set({ pose })}>
-                    {POSE_LABEL[pose]}
-                  </Chip>
-                ))}
+              {THEME_IDS.map((id) => (
+                <button
+                  key={id}
+                  className="chip px-3 py-1 font-display text-sm tracking-wide capitalize short:px-2 short:py-0 short:text-xs"
+                  style={{ background: lab.theme === id ? THEMES[id].skyTop : undefined, color: lab.theme === id ? 'white' : undefined }}
+                  onClick={() => lab.set({ theme: id })}
+                >
+                  {id}
+                </button>
+              ))}
+              <Chip on={lab.spin} onClick={() => lab.set({ spin: !lab.spin })}>
+                {lab.spin ? 'Spinning' : 'Spin'}
+              </Chip>
             </div>
-          )}
-          <div className="pointer-events-auto flex max-w-full flex-wrap gap-2">
-            {THEME_IDS.map((id) => (
-              <button
-                key={id}
-                className="chip px-3 py-1 font-display text-sm tracking-wide capitalize short:px-2 short:py-0 short:text-xs"
-                style={{ background: lab.theme === id ? THEMES[id].skyTop : undefined, color: lab.theme === id ? 'white' : undefined }}
-                onClick={() => lab.set({ theme: id })}
-              >
-                {id}
-              </button>
-            ))}
-            <Chip on={lab.spin} onClick={() => lab.set({ spin: !lab.spin })}>
-              {lab.spin ? 'Spinning' : 'Spin'}
-            </Chip>
-          </div>
-          <nav className="pointer-events-auto -mx-1 flex max-w-full touch-pan-x gap-2 overflow-x-auto px-1 pb-2">
-            {EXHIBITS.map((e) => (
-              <button key={e.id} className={`btn shrink-0 px-3 py-1.5 text-base short:rounded-xl short:border-[3px] short:px-2 short:py-0.5 short:text-sm ${e.id === exhibit.id ? 'btn-orange' : 'btn-cream'}`} onClick={() => lab.set({ exhibit: e.id })}>
-                {e.name}
-              </button>
-            ))}
-          </nav>
+            <nav className="pointer-events-auto -mx-1 flex max-w-full touch-pan-x gap-2 overflow-x-auto px-1 pb-2">
+              {EXHIBITS.map((e) => (
+                <button
+                  key={e.id}
+                  className={`btn shrink-0 px-3 py-1.5 text-base short:rounded-xl short:border-[3px] short:px-2 short:py-0.5 short:text-sm ${e.id === exhibit.id ? 'btn-orange' : 'btn-cream'}`}
+                  onClick={() => lab.set({ exhibit: e.id })}
+                >
+                  {e.name}
+                </button>
+              ))}
+            </nav>
           </div>
           {exhibit.poses && <TootButton held={lab.tooting} onHold={(tooting) => lab.set({ tooting })} />}
         </footer>
@@ -165,7 +174,10 @@ function TootButton({ held, onHold }: { held: boolean; onHold: (held: boolean) =
 
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button className={`chip px-3 py-1 font-display text-sm tracking-wide short:px-2 short:py-0 short:text-xs ${on ? '!bg-sun' : ''}`} onClick={onClick}>
+    <button
+      className={`chip px-3 py-1 font-display text-sm tracking-wide short:px-2 short:py-0 short:text-xs ${on ? '!bg-sun' : ''}`}
+      onClick={onClick}
+    >
       {children}
     </button>
   )

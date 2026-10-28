@@ -16,12 +16,13 @@ Production is one game server per region plus the page on Vercel. `regions.json`
   - A restart that takes longer than the 30 s seat hold. The new process ignores the parked rooms.
 - **Changes under `deploy/`** (service, Caddyfile, setup) take effect only after re-running the setup on the box: copy `deploy/` over and run `sudo bash setup-server.sh <region> <domain> [redirect domains…]` with the same region and domains as before (`AGENTS.local.md` has the exact line). It is safe to re-run.
 - **Redirect domains** (www, domains the game moved from) 301 to the main one, keeping path and query, and still proxy `/ws` for pages opened before a move.
-- **Logs:** `ssh $DEPLOY_HOST_<ID> journalctl -u toot-together -f`
+- **Logs:** the server writes one JSON line per event (sockets, rooms, joins, refusals, runs, deaths, minute stats) to journald, and Caddy keeps a JSON access log. `scripts/logs.sh [<ID>|all] [--since T] [--caddy]` pulls either, read-only; `ssh $DEPLOY_HOST_<ID> journalctl -u toot-together -f` follows live.
+- **Analysis:** the `analyze-toot-together` skill answers questions about players and servers from PostHog and those logs.
 - **Analytics:** production builds send PostHog events only when `VITE_POSTHOG_KEY` is set in `.env.local`. Player feedback goes through two PostHog API surveys the game draws itself (`VITE_POSTHOG_RUN_SURVEY`, `VITE_POSTHOG_FEEDBACK_SURVEY`; see `.env.example`); without them the results row and Feedback buttons stay hidden.
 
 ## Testing
 
-Test with `pnpm test` (vitest; `tests/handoff.test.ts`, `tests/chat.test.ts`, `tests/race-room.test.ts` and `tests/regions.test.ts` spawn real servers), node scripts against `pnpm dev`, `pnpm typecheck`, and `pnpm react-doctor` (React Doctor: errors fail it, warnings are advisory; `--no-score` keeps results off react.doctor's servers).
+Test with `pnpm test` (vitest; `tests/handoff.test.ts`, `tests/chat.test.ts`, `tests/race-room.test.ts` and `tests/regions.test.ts` spawn real servers), node scripts against `pnpm dev`, `pnpm typecheck`, `pnpm lint` (Biome: formatting, lint and import order; `pnpm format` fixes what it can. Accessibility and hook rules are off there because React Doctor owns them; `src/sim/courses.ts` keeps its hand-laid river layouts unformatted), `pnpm knip`, and `pnpm react-doctor` (React Doctor: errors fail it, warnings are advisory; `--no-score` keeps results off react.doctor's servers).
 
 ## Design
 

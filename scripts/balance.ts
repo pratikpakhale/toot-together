@@ -10,7 +10,9 @@ const only = process.argv[2]
 for (const def of COURSE_LIST) {
   if (only && def.id !== only) continue
   const course = getCourse(def.id)
-  console.log(`\n${def.name}: ${course.length.toFixed(0)} m, checkpoints ${course.checkpoints.map((s) => s.toFixed(0)).join(',')}, finish ${course.finishS.toFixed(0)}, medals ${def.medals.join('/')}s`)
+  console.log(
+    `\n${def.name}: ${course.length.toFixed(0)} m, checkpoints ${course.checkpoints.map((s) => s.toFixed(0)).join(',')}, finish ${course.finishS.toFixed(0)}, medals ${def.medals.join('/')}s`,
+  )
   for (const sloppy of [false, true]) {
     for (const crew of [1, 2, 4]) {
       for (const seed of sloppy ? [1, 2, 3] : [11]) {
@@ -26,8 +28,13 @@ for (const def of COURSE_LIST) {
           sim.step()
           for (const e of sim.drainEvents()) if (e.type === 'death') causes[e.cause] = (causes[e.cause] ?? 0) + 1
         }
-        const top = Object.entries(causes).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(', ')
-        console.log(`  ${sloppy ? 'sloppy' : 'clean '} crew ${crew} seed ${seed}: ${sim.phase === 'finished' ? 'finished' : 'DNF     '} ${sim.raceTime.toFixed(0).padStart(4)}s deaths ${String(sim.rafts[0].deaths).padStart(3)}  ${top}`)
+        const top = Object.entries(causes)
+          .sort((a, b) => b[1] - a[1])
+          .map(([k, n]) => `${k} ${n}`)
+          .join(', ')
+        console.log(
+          `  ${sloppy ? 'sloppy' : 'clean '} crew ${crew} seed ${seed}: ${sim.phase === 'finished' ? 'finished' : 'DNF     '} ${sim.raceTime.toFixed(0).padStart(4)}s deaths ${String(sim.rafts[0].deaths).padStart(3)}  ${top}`,
+        )
       }
     }
   }

@@ -119,6 +119,7 @@ function cleanText(raw: unknown, maxLength: number): string {
   const text = typeof raw === 'string' ? raw : ''
   const clean = text
     .replace(/\s+/g, ' ')
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control characters is the point.
     .replace(/[\u0000-\u001f\u007f\u200b\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
     .trim()
   // By code point, so an emoji at the limit isn't cut in half.

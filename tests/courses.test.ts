@@ -54,7 +54,8 @@ describe.each(COURSE_LIST.map((def) => [def.name, def.id] as const))('course %s'
       for (const p of players) sim.setInput(p.id, p.drive(sim, p.id))
       sim.step()
       for (const e of sim.drainEvents()) {
-        if (e.type === 'death' && e.cause !== 'reset' && !explained(c, e.cause, raft.x, raft.z, raft.s)) unexplained.push(`${e.cause} at ${raft.s.toFixed(1)} m`)
+        if (e.type === 'death' && e.cause !== 'reset' && !explained(c, e.cause, raft.x, raft.z, raft.s))
+          unexplained.push(`${e.cause} at ${raft.s.toFixed(1)} m`)
       }
     }
     expect(unexplained).toEqual([])

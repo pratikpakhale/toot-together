@@ -1,5 +1,5 @@
 import { useShortScreen } from '../platform'
-import { useApp, type Toast } from '../state/store'
+import { type Toast, useApp } from '../state/store'
 import { Icon } from './Icon'
 
 const TONE: Record<Toast['tone'], { color: string; stroke: string; sticker: string }> = {
@@ -22,7 +22,12 @@ export function Toasts() {
           <div className="anim-pop">
             <div
               className="font-display stroke-text whitespace-nowrap"
-              style={{ fontSize: 'clamp(44px, 7vw, 92px)', color: TONE[t.tone].color, WebkitTextStrokeColor: TONE[t.tone].stroke, filter: 'drop-shadow(0 6px 0 rgba(28,53,87,.45))' }}
+              style={{
+                fontSize: 'clamp(44px, 7vw, 92px)',
+                color: TONE[t.tone].color,
+                WebkitTextStrokeColor: TONE[t.tone].stroke,
+                filter: 'drop-shadow(0 6px 0 rgba(28,53,87,.45))',
+              }}
             >
               {t.icon && <Icon name={t.icon} size="0.85em" className="mr-[0.15em] align-[-0.08em]" />}
               {t.text}

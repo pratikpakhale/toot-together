@@ -293,7 +293,11 @@ describe('crews', () => {
 
   it('swapping walks you one spot round the rim, wrapping at the ends, skipping anyone reconnecting, only between races', () => {
     const sim = raceRoom([3, 1])
-    const order = () => sim.crew(0).sort((a, b) => a.ord - b.ord).map((p) => p.id)
+    const order = () =>
+      sim
+        .crew(0)
+        .sort((a, b) => a.ord - b.ord)
+        .map((p) => p.id)
     expect(sim.swapSpot(1, 1)).toBeNull()
     expect(order()).toEqual([2, 1, 3])
     expect(sim.swapSpot(2, -1)).toBeNull()

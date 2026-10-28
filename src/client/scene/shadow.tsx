@@ -34,7 +34,13 @@ export function BlobShadow({ size, opacity, stretch = [1, 1] }: { size: number; 
   )
   useEffect(() => () => material.dispose(), [material])
   return (
-    <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[size * stretch[0], size * stretch[1], 1]} material={material} renderOrder={1}>
+    <mesh
+      position={[0, 0.03, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      scale={[size * stretch[0], size * stretch[1], 1]}
+      material={material}
+      renderOrder={1}
+    >
       <planeGeometry args={[1, 1]} />
     </mesh>
   )

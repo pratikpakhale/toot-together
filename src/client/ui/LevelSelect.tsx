@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { MAX_RAFTS } from '../../sim/constants'
 import { COURSE_LIST } from '../../sim/courses'
-import { type Region, REGIONS } from '../../sim/regions'
+import { REGIONS, type Region } from '../../sim/regions'
 import { type CourseDef, MAX_DIFFICULTY } from '../../sim/track'
 import { audio } from '../audio/audio'
 import { createRoom, startSolo } from '../game/controller'
@@ -55,7 +55,10 @@ export function LevelCards({ onPick, compact = false }: { onPick: (id: string) =
           >
             <div className={`relative w-full shrink-0 ${compact ? 'h-14' : 'h-28 short:h-16'}`} style={{ background: preview(def) }}>
               <img src={`/levels/${def.id}.webp`} alt="" draggable={false} className="absolute inset-0 h-full w-full object-cover object-[50%_62%]" />
-              <span className="font-display stroke-text absolute left-2 top-1 text-white" style={{ fontSize: compact ? 22 : 30, WebkitTextStrokeWidth: 5 }}>
+              <span
+                className="font-display stroke-text absolute left-2 top-1 text-white"
+                style={{ fontSize: compact ? 22 : 30, WebkitTextStrokeWidth: 5 }}
+              >
                 {i + 1}
               </span>
               {rec.medal !== 0 && <Icon name={MEDAL_ICON[rec.medal]} size={compact ? 26 : 40} className="absolute right-2 top-1.5" />}
@@ -74,7 +77,9 @@ export function LevelCards({ onPick, compact = false }: { onPick: (id: string) =
                 <Difficulty level={def.difficulty} size={13} />
               ) : (
                 <>
-                  <p className="text-sm font-bold leading-snug text-ink/70 short:hidden">{open ? def.blurb : `Finish ${COURSE_LIST[i - 1].name} to unlock.`}</p>
+                  <p className="text-sm font-bold leading-snug text-ink/70 short:hidden">
+                    {open ? def.blurb : `Finish ${COURSE_LIST[i - 1].name} to unlock.`}
+                  </p>
                   <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-1 text-sm font-extrabold">
                     <span className="flex items-center gap-1.5 whitespace-nowrap tabular-nums">
                       <Icon name="clock" size={20} />

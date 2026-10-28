@@ -59,7 +59,8 @@ const shapes = (() => {
   const sphere = blob(18, 12)
   // For the tiniest bits (nails, eye glints): nobody counts their facets.
   const tiny = blob(7, 5)
-  const part = (g: THREE.BufferGeometry, color: string, [sx, sy, sz]: number[], [x, y, z]: number[]) => tint(g.clone().scale(sx, sy, sz).translate(x, y, z), color)
+  const part = (g: THREE.BufferGeometry, color: string, [sx, sy, sz]: number[], [x, y, z]: number[]) =>
+    tint(g.clone().scale(sx, sy, sz).translate(x, y, z), color)
   // Small parts are merged into one mesh each, so a hippo costs a few draw calls rather than dozens.
   const eye = (side: number) =>
     merge([
@@ -86,7 +87,7 @@ const shapes = (() => {
     brow: new THREE.CapsuleGeometry(0.016, 0.07, 2, 6).rotateX(Math.PI / 2),
     // A teardrop of sweat, point up.
     drop: blob(8, 6, (p) => {
-      if (p.y > 0) p.multiplyScalar(1 - p.y * 0.55).setY(p.y + (p.y * p.y) * 0.9)
+      if (p.y > 0) p.multiplyScalar(1 - p.y * 0.55).setY(p.y + p.y * p.y * 0.9)
     }),
   }
 })()
@@ -296,7 +297,9 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
       smile.current.visible = !p.farting && !gasping
       grit.current.visible = p.farting && !gasping
       gasp.current.visible = gasping
-      if (gasping) gasp.current.scale.y = 0.05 + (p.exhausted ? Math.abs(Math.sin(t * 7)) * 0.03 : Math.max(0.04 * p.burst, (0.03 + Math.abs(Math.sin(t * 8)) * 0.03) * dizzy))
+      if (gasping)
+        gasp.current.scale.y =
+          0.05 + (p.exhausted ? Math.abs(Math.sin(t * 7)) * 0.03 : Math.max(0.04 * p.burst, (0.03 + Math.abs(Math.sin(t * 8)) * 0.03) * dizzy))
       const puff = p.farting ? 1.25 + Math.sin(t * 46) * 0.04 : 1
       for (const c of cheeks.current.children) c.scale.set(0.1 * puff, 0.07 * puff, 0.04)
 
@@ -307,7 +310,8 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
         sweat.current.scale.setScalar(0.05 * Math.min(1, k * 6) * (1 - k * 0.5))
       }
 
-      const target = p.buff === BUFF_CODE.chili ? CHEEK.chili : p.buff === BUFF_CODE.prune ? CHEEK.prune : p.strain > 0.5 ? CHEEK.strain : CHEEK.normal
+      const target =
+        p.buff === BUFF_CODE.chili ? CHEEK.chili : p.buff === BUFF_CODE.prune ? CHEEK.prune : p.strain > 0.5 ? CHEEK.strain : CHEEK.normal
       cheekMat.color.lerp(target, 0.15)
     },
   }))
@@ -363,7 +367,14 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
             <mesh ref={grit} geometry={shapes.grit} position={[0, -0.06, 0]} material={dark} visible={false} />
             <mesh ref={gasp} geometry={shapes.sphere} position={[0.285, -0.07, 0]} scale={[0.03, 0.05, 0.075]} material={mouthMat} visible={false} />
             {SIDES.map((side) => (
-              <mesh key={`t${side}`} geometry={shapes.tusk} position={[0.272, -0.05, side * 0.12]} rotation={[0, 0, -0.2]} scale={0.8} material={tooth} />
+              <mesh
+                key={`t${side}`}
+                geometry={shapes.tusk}
+                position={[0.272, -0.05, side * 0.12]}
+                rotation={[0, 0, -0.2]}
+                scale={0.8}
+                material={tooth}
+              />
             ))}
             {SIDES.map((side) => (
               <group key={`n${side}`} position={[0.19, 0.17, side * 0.11]}>
@@ -373,7 +384,14 @@ export const Hippo = forwardRef<HippoHandle, { color: string; seat: number }>(fu
             ))}
             <group ref={cheeks}>
               {SIDES.map((side) => (
-                <mesh key={`c${side}`} geometry={shapes.small} position={[0.04, 0.04, side * 0.31]} rotation={[0, side * -0.35, 0]} scale={[0.1, 0.07, 0.04]} material={cheekMat} />
+                <mesh
+                  key={`c${side}`}
+                  geometry={shapes.small}
+                  position={[0.04, 0.04, side * 0.31]}
+                  rotation={[0, side * -0.35, 0]}
+                  scale={[0.1, 0.07, 0.04]}
+                  material={cheekMat}
+                />
               ))}
             </group>
           </group>

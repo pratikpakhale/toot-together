@@ -1,7 +1,7 @@
 import { audio } from '../audio/audio'
 import { useApp } from '../state/store'
-import { Modal } from './Modal'
 import { Icon } from './Icon'
+import { Modal } from './Modal'
 
 export function Notice() {
   const notice = useApp((s) => s.notice)

@@ -73,7 +73,15 @@ const HAZARDS: Record<Exclude<Stage, 'pond' | 'gates'>, { width: number; flow?: 
 }
 
 function define(stage: Stage, theme: ThemeId): CourseDef {
-  const base = { id: `lab-${stage}-${theme}`, name: 'Asset lab', blurb: '', theme, difficulty: 1 as const, medals: [0, 0, 0] as [number, number, number], startHeading: 0 }
+  const base = {
+    id: `lab-${stage}-${theme}`,
+    name: 'Asset lab',
+    blurb: '',
+    theme,
+    difficulty: 1 as const,
+    medals: [0, 0, 0] as [number, number, number],
+    startHeading: 0,
+  }
   if (stage === 'pond') return { ...base, pieces: [{ len: 80, width: 22, flow: 0.2, shelf: 12 }] }
   if (stage === 'gates')
     return {

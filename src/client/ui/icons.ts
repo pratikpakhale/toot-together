@@ -80,7 +80,13 @@ function hippo(mood: Mood, color = '#4aa8ff') {
   return s
 }
 
-const CLOUD = ['circle cx="36" cy="24" r="12"', 'circle cx="24" cy="32" r="11"', 'circle cx="47" cy="31" r="11"', 'circle cx="30" cy="43" r="11"', 'circle cx="44" cy="42" r="11"']
+const CLOUD = [
+  'circle cx="36" cy="24" r="12"',
+  'circle cx="24" cy="32" r="11"',
+  'circle cx="47" cy="31" r="11"',
+  'circle cx="30" cy="43" r="11"',
+  'circle cx="44" cy="42" r="11"',
+]
 const cloudAt = (dy: number) => CLOUD.map((c) => c.replace(/cy="(\d+)"/, (_, y) => `cy="${Number(y) + dy}"`))
 
 const toot =
@@ -157,7 +163,8 @@ function keyboardKeys() {
   return s + `<rect x="17" y="38.5" width="30" height="6" rx="2" fill="#9be23a" stroke="${INK}" stroke-width="2"/>`
 }
 
-const corners = (d: string) => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="12"/><path d="${d}" fill="none" stroke="#ffcf3f" stroke-width="5"/>`
+const corners = (d: string) =>
+  `<path d="${d}" fill="none" stroke="${INK}" stroke-width="12"/><path d="${d}" fill="none" stroke="#ffcf3f" stroke-width="5"/>`
 
 export const ICONS = {
   hippo: hippo('happy'),
@@ -201,7 +208,10 @@ export const ICONS = {
       [40, 39, 30],
       [30, 41, -5],
     ]
-      .map(([x, y, a]) => `<ellipse cx="${x}" cy="${y}" rx="4" ry="2.9" transform="rotate(${a} ${x} ${y})" fill="#b5562a" stroke="${INK}" stroke-width="2"/>`)
+      .map(
+        ([x, y, a]) =>
+          `<ellipse cx="${x}" cy="${y}" rx="4" ry="2.9" transform="rotate(${a} ${x} ${y})" fill="#b5562a" stroke="${INK}" stroke-width="2"/>`,
+      )
       .join('') +
     `<ellipse cx="32" cy="14" rx="17" ry="5.5" fill="#cfd8e6" ${O}/>` +
     `<ellipse cx="27" cy="9" rx="4" ry="2.9" transform="rotate(-25 27 9)" fill="#b5562a" stroke="${INK}" stroke-width="2"/>` +
@@ -334,9 +344,7 @@ export const ICONS = {
     `<path d="M28 13l4-4 4 4M28 51l4 4 4-4M13 28l-4 4 4 4M51 28l4 4-4 4" fill="none" ${O3}/>` +
     `<circle cx="32" cy="32" r="12" fill="#fff" ${O}/><circle cx="32" cy="32" r="6" fill="#dfe6ef"/>`,
 
-  heart:
-    `<path d="M32 56C15 44 6 35 6 23a13 13 0 0 1 26-6 13 13 0 0 1 26 6c0 12-9 21-26 33z" fill="#ff5b8a" ${O}/>` +
-    shine(18, 22, 6, 3.5),
+  heart: `<path d="M32 56C15 44 6 35 6 23a13 13 0 0 1 26-6 13 13 0 0 1 26 6c0 12-9 21-26 33z" fill="#ff5b8a" ${O}/>` + shine(18, 22, 6, 3.5),
   lock:
     `<path d="M21 30v-8a11 11 0 0 1 22 0v8" fill="none" stroke="${INK}" stroke-width="11"/><path d="M21 30v-8a11 11 0 0 1 22 0v8" fill="none" stroke="#dfe6ef" stroke-width="4.5"/>` +
     `<rect x="12" y="28" width="40" height="30" rx="7" fill="#ffcf3f" ${O}/>` +
@@ -365,9 +373,7 @@ export const ICONS = {
   /** The "more" button in an app's own browser bar. */
   more: [12, 32, 52].map((x) => `<circle cx="${x}" cy="32" r="7" fill="${INK}"/>`).join(''),
 
-  next:
-    `<path d="M8 25h24V12l24 20-24 20V39H8z" fill="#9be23a" ${O}/>` +
-    `<path d="M12 29h22" stroke="#fff" stroke-width="3" opacity=".6"/>`,
+  next: `<path d="M8 25h24V12l24 20-24 20V39H8z" fill="#9be23a" ${O}/>` + `<path d="M12 29h22" stroke="#fff" stroke-width="3" opacity=".6"/>`,
 
   /** Points right; flip it with `-scale-x-100` for left. */
   chevron:
@@ -413,9 +419,7 @@ export const ICONS = {
     `<rect x="16" y="27" width="32" height="10" rx="4" fill="#fff" ${O3}/>` +
     shine(19, 17, 3, 6, 45, 0.5),
 
-  speaker:
-    `<path d="M8 24h11l15-12v40L19 40H8z" fill="#ffcf3f" ${O}/>` +
-    `<path d="M43 23c4 5 4 13 0 18M50 17c8 9 8 21 0 30" fill="none" ${O}/>`,
+  speaker: `<path d="M8 24h11l15-12v40L19 40H8z" fill="#ffcf3f" ${O}/>` + `<path d="M43 23c4 5 4 13 0 18M50 17c8 9 8 21 0 30" fill="none" ${O}/>`,
 
   speakerOff:
     `<path d="M8 24h11l15-12v40L19 40H8z" fill="#cfd6e0" ${O}/>` +

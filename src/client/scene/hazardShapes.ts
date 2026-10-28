@@ -34,7 +34,9 @@ export function rotor(arm: number, arms: number, armR: number, start: number, sp
       merge([
         bandedTube(start, arm + (arms > 1 ? 0.05 : 0), armR, PALETTE.spikeTube, 1.3).clone(),
         spikeRow(spikeFrom, arm, armR).clone(),
-        paint(blob(16, 12).scale(knobR, knobR, knobR), (p, _n, out) => out.set(knob).multiplyScalar(0.85 + 0.25 * smoothstep(-knobR, knobR, p.y))).translate(arm, 0, 0),
+        paint(blob(16, 12).scale(knobR, knobR, knobR), (p, _n, out) =>
+          out.set(knob).multiplyScalar(0.85 + 0.25 * smoothstep(-knobR, knobR, p.y)),
+        ).translate(arm, 0, 0),
         tint(new THREE.TorusGeometry(armR + 0.04, 0.045, 6, 16).rotateY(Math.PI / 2).translate(arm - knobR * 0.75, 0, 0), METAL),
       ])
     const parts = Array.from({ length: arms }, (_, k) => one().rotateY((k * Math.PI * 2) / arms))
@@ -48,7 +50,9 @@ export function rotor(arm: number, arms: number, armR: number, start: number, sp
 
 /** A spiked log along x (slider, fence), banded, with its spikes. */
 export function spikedLog(len: number, r: number) {
-  return cached(`log|${len}|${r}`, () => merge([bandedTube(-len / 2, len / 2, r, PALETTE.spikeTube, 1.5).clone(), spikeRow(-len / 2, len / 2, r).clone()]))
+  return cached(`log|${len}|${r}`, () =>
+    merge([bandedTube(-len / 2, len / 2, r, PALETTE.spikeTube, 1.5).clone(), spikeRow(-len / 2, len / 2, r).clone()]),
+  )
 }
 
 export function wheel(r: number, thick: number) {
@@ -64,7 +68,15 @@ export function crusherDetail(depth: number, width: number, s: number) {
       const z = -width / 2 + 0.25 + (k / straps) * (width - 0.5)
       for (const x of [-1, 1]) {
         parts.push(tint(new RoundedBoxGeometry(0.06, 2.6, 0.28, 1, 0.02).translate((x * depth) / 2 + x * 0.03, 1.15, z), METAL))
-        for (const y of [0.15, 0.85, 1.55, 2.25]) parts.push(tint(new THREE.SphereGeometry(0.055, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2).rotateZ(-x * (Math.PI / 2)).translate((x * depth) / 2 + x * 0.06, y, z), '#c9c4d2'))
+        for (const y of [0.15, 0.85, 1.55, 2.25])
+          parts.push(
+            tint(
+              new THREE.SphereGeometry(0.055, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2)
+                .rotateZ(-x * (Math.PI / 2))
+                .translate((x * depth) / 2 + x * 0.06, y, z),
+              '#c9c4d2',
+            ),
+          )
       }
     }
     // The spiked face plate and its spikes, pointing across at the other wall.
@@ -84,7 +96,10 @@ export function crusherDetail(depth: number, width: number, s: number) {
 export function pistonTrim(r: number, headLen: number) {
   return cached(`piston|${r}|${headLen}`, () =>
     merge([
-      ...[0.3, headLen - 0.3].flatMap((y) => [tint(new THREE.CylinderGeometry(r + 0.07, r + 0.07, 0.3, 32).translate(0, y, 0), METAL), rivets(r + 0.075, 14, y, 0.05)]),
+      ...[0.3, headLen - 0.3].flatMap((y) => [
+        tint(new THREE.CylinderGeometry(r + 0.07, r + 0.07, 0.3, 32).translate(0, y, 0), METAL),
+        rivets(r + 0.075, 14, y, 0.05),
+      ]),
       tint(new THREE.CylinderGeometry(r + 0.03, r + 0.1, 0.14, 32).translate(0, 0.02, 0), METAL_DARK),
       tint(new THREE.CylinderGeometry(r * 0.75, r + 0.05, 0.2, 32).translate(0, headLen + 0.1, 0), METAL),
       rivets(r * 0.55, 8, headLen + 0.2, 0.06),
@@ -133,7 +148,11 @@ export function mushroomCap(r: number) {
     const spots = BUMPER_SPOTS.map((d) => {
       const n = new THREE.Vector3(d.x / r, d.y / (r * 0.62), d.z / r).normalize()
       const q = new THREE.Quaternion().setFromUnitVectors(up, n)
-      const m = new THREE.Matrix4().compose(new THREE.Vector3(d.x * r * 0.99, d.y * r * 0.61, d.z * r * 0.99), q, new THREE.Vector3(r * 0.17, r * 0.05, r * 0.17))
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(d.x * r * 0.99, d.y * r * 0.61, d.z * r * 0.99),
+        q,
+        new THREE.Vector3(r * 0.17, r * 0.05, r * 0.17),
+      )
       return tint(blob(12, 8).applyMatrix4(m), '#ffffff')
     })
     return merge([dome, rim, gills, ...spots])
@@ -146,7 +165,9 @@ export function beansCan() {
     const label = new THREE.Color('#ffe7b8')
     return merge([
       tint(new THREE.CylinderGeometry(0.38, 0.38, 0.8, 32), '#e94b3c'),
-      paint(new THREE.CylinderGeometry(0.392, 0.392, 0.44, 32, 1, true), (p, _n, out) => out.copy(label).multiplyScalar(0.92 + 0.08 * Math.sin(Math.atan2(p.z, p.x) * 3))),
+      paint(new THREE.CylinderGeometry(0.392, 0.392, 0.44, 32, 1, true), (p, _n, out) =>
+        out.copy(label).multiplyScalar(0.92 + 0.08 * Math.sin(Math.atan2(p.z, p.x) * 3)),
+      ),
       ...[0.4, -0.4].map((y) => tint(new THREE.TorusGeometry(0.375, 0.03, 6, 32).rotateX(Math.PI / 2).translate(0, y, 0), '#c9c9d1')),
       tint(new THREE.CylinderGeometry(0.35, 0.35, 0.03, 32).translate(0, 0.41, 0), '#d8d8e0'),
       tint(new THREE.TorusGeometry(0.08, 0.018, 6, 14).rotateX(Math.PI / 2).translate(0.15, 0.43, 0), '#b0b0bb'),
@@ -171,11 +192,13 @@ export function chili() {
     const red = new THREE.Color('#ff3b2f')
     const body = blob(24, 20, (p, u) => {
       const t = (u.y + 1) / 2
-      const w = 0.3 * Math.pow(t, 0.55) * (1 - 0.15 * t)
+      const w = 0.3 * t ** 0.55 * (1 - 0.15 * t)
       p.set(u.x * w, u.y * 0.78, u.z * w)
       p.x += 0.22 * (1 - t) * (1 - t)
     })
-    paint(body, (p, n, out) => out.copy(red).multiplyScalar(0.85 + 0.2 * smoothstep(-0.6, 0.7, p.y) + 0.25 * smoothstep(0.75, 0.95, n.x * 0.5 + n.y * 0.5 + n.z * 0.7)))
+    paint(body, (p, n, out) =>
+      out.copy(red).multiplyScalar(0.85 + 0.2 * smoothstep(-0.6, 0.7, p.y) + 0.25 * smoothstep(0.75, 0.95, n.x * 0.5 + n.y * 0.5 + n.z * 0.7)),
+    )
     const calyx = Array.from({ length: 5 }, (_, k) =>
       tint(
         blob(8, 6)
@@ -212,8 +235,18 @@ export function prune() {
 export function flameTrim(side: number) {
   return cached(`flame|${side}`, () => {
     const parts: THREE.BufferGeometry[] = []
-    for (let k = -2; k <= 2; k++) parts.push(tint(new RoundedBoxGeometry(0.12, 0.06, 0.9, 1, 0.02).translate(k * 0.24, 1.41, side * 0.35), METAL_DARK))
-    for (const x of [-0.7, 0.7]) for (const y of [0.45, 1.25]) parts.push(tint(new THREE.SphereGeometry(0.06, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2).rotateZ(-Math.sign(x) * (Math.PI / 2)).translate(x * 1.08, y, side * 0.35), '#c9c4d2'))
+    for (let k = -2; k <= 2; k++)
+      parts.push(tint(new RoundedBoxGeometry(0.12, 0.06, 0.9, 1, 0.02).translate(k * 0.24, 1.41, side * 0.35), METAL_DARK))
+    for (const x of [-0.7, 0.7])
+      for (const y of [0.45, 1.25])
+        parts.push(
+          tint(
+            new THREE.SphereGeometry(0.06, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2)
+              .rotateZ(-Math.sign(x) * (Math.PI / 2))
+              .translate(x * 1.08, y, side * 0.35),
+            '#c9c4d2',
+          ),
+        )
     // Nozzle: a flared steel mouth with a sooty inside.
     const mouth = new THREE.LatheGeometry(
       [
@@ -265,9 +298,14 @@ export function gateGrille(width: number, height: number, beam: number) {
     }
     for (const y of [height * 0.45, height * 0.9]) {
       parts.push(tint(new RoundedBoxGeometry(0.22, 0.2, width + 0.2, 2, 0.05).translate(0, y, 0), METAL_DARK))
-      for (let k = 0; k <= bars; k++) parts.push(tint(new THREE.SphereGeometry(0.05, 8, 4).translate(0.12, y, -width / 2 + (k * width) / bars), '#c9c4d2'))
+      for (let k = 0; k <= bars; k++)
+        parts.push(tint(new THREE.SphereGeometry(0.05, 8, 4).translate(0.12, y, -width / 2 + (k * width) / bars), '#c9c4d2'))
     }
-    parts.push(spikedLog(width, beam).clone().rotateY(Math.PI / 2))
+    parts.push(
+      spikedLog(width, beam)
+        .clone()
+        .rotateY(Math.PI / 2),
+    )
     return merge(parts)
   })
 }
@@ -301,7 +339,12 @@ export function boltGeo(top: number, variant: number, radius: number) {
     ]) {
       const a = pts[at]
       const out = (0.7 + rand() * 0.3) * dir
-      parts.push(zigzag([a, a.clone().add(new THREE.Vector3(out, -top * 0.08, rand())), a.clone().add(new THREE.Vector3(out * 1.6, -top * 0.15, rand() * 1.4))], radius * 0.6))
+      parts.push(
+        zigzag(
+          [a, a.clone().add(new THREE.Vector3(out, -top * 0.08, rand())), a.clone().add(new THREE.Vector3(out * 1.6, -top * 0.15, rand() * 1.4))],
+          radius * 0.6,
+        ),
+      )
     }
     return merge(parts)
   })
@@ -344,7 +387,13 @@ export function ventRocks(r: number) {
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2 + Math.sin(k * 2.3) * 0.15
       const s = 0.38 + 0.14 * Math.abs(Math.sin(k * 1.7))
-      parts.push(boulder(k % 3, '#6f6872').clone().scale(s, s * 0.8, s).rotateY(a).translate(Math.cos(a) * (r + 0.15), 0.08, Math.sin(a) * (r + 0.15)))
+      parts.push(
+        boulder(k % 3, '#6f6872')
+          .clone()
+          .scale(s, s * 0.8, s)
+          .rotateY(a)
+          .translate(Math.cos(a) * (r + 0.15), 0.08, Math.sin(a) * (r + 0.15)),
+      )
     }
     return merge(parts)
   })
@@ -374,7 +423,15 @@ export function kelpFronds(len: number, w: number, seed: number) {
         pos.setX(i, pos.getX(i) + bend * (y / h) * (y / h) * 0.6)
       }
       blade.computeVertexNormals()
-      parts.push(tint(blade.translate(0, h / 2, 0).rotateY(rand() * Math.PI * 2).translate(x, 0, z), greens[k % greens.length]))
+      parts.push(
+        tint(
+          blade
+            .translate(0, h / 2, 0)
+            .rotateY(rand() * Math.PI * 2)
+            .translate(x, 0, z),
+          greens[k % greens.length],
+        ),
+      )
       if (k % 5 === 0) {
         const pad = new THREE.CylinderGeometry(0.32 + rand() * 0.2, 0.32, 0.04, 12, 1, false, 0.4, Math.PI * 2 - 0.4)
         parts.push(tint(pad.translate(rand() * len, 0.04, (rand() - 0.5) * (w - 1)), '#5fa043'))

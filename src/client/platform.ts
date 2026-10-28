@@ -47,7 +47,11 @@ export const useShortScreen = () => useMediaQuery(SHORT_SCREEN)
 
 export const usePortraitPhone = () => useMediaQuery('(orientation: portrait) and (pointer: coarse) and (max-width: 540px)')
 
-type FsDocument = Document & { webkitFullscreenEnabled?: boolean; webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => Promise<void> }
+type FsDocument = Document & {
+  webkitFullscreenEnabled?: boolean
+  webkitFullscreenElement?: Element | null
+  webkitExitFullscreen?: () => Promise<void>
+}
 type FsElement = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }
 type LockableOrientation = ScreenOrientation & { lock?: (orientation: 'landscape') => Promise<void> }
 

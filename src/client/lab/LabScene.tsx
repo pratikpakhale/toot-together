@@ -2,24 +2,24 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { audio } from '../audio/audio'
 import { getCourse } from '../../sim/courses'
 import { rimSector } from '../../sim/sectors'
 import { pointAt } from '../../sim/track'
+import { audio } from '../audio/audio'
 import { frame, SEAT_COLORS, TEAMS } from '../game/frame'
 import { Decor } from '../scene/Decor'
 import { Environment } from '../scene/Environment'
-import { fx, FxLayer } from '../scene/Fx'
+import { FxLayer, fx } from '../scene/Fx'
 import { Gates } from '../scene/Gates'
 import { Hippo, type HippoHandle } from '../scene/Hippo'
 import { PALETTE, soft } from '../scene/materials'
 import { Obstacles } from '../scene/Obstacles'
-import { HIPPO_SCALE, hullKit, SEAT_R, SEAT_Y, SLICE_GAP, vinyl } from '../scene/raftKit'
 import { RaftHull } from '../scene/RaftHull'
+import { HIPPO_SCALE, hullKit, SEAT_R, SEAT_Y, SLICE_GAP, vinyl } from '../scene/raftKit'
 import { lumps, paint, smoothstep } from '../scene/sculpt'
 import { BlobShadow } from '../scene/shadow'
-import { type Theme, THEMES } from '../scene/themes'
 import { Track } from '../scene/Track'
+import { THEMES, type Theme } from '../scene/themes'
 import { type Exhibit, exhibitById, livePose, poseAt, useLab } from './labState'
 import { FOCUS_S, riverFor, showcaseCourse } from './showcase'
 
@@ -234,7 +234,10 @@ function ShowRaft({ crew, team, position = [0, 0, 0] }: { crew: number; team?: n
               ref={(g) => {
                 bodies.current[seat] = g
               }}
-              position={[Math.cos(rim) * SEAT_R, SEAT_Y, Math.sin(rim) * SEAT_R]} rotation={[0, -(rim + Math.PI), 0]} scale={HIPPO_SCALE}>
+              position={[Math.cos(rim) * SEAT_R, SEAT_Y, Math.sin(rim) * SEAT_R]}
+              rotation={[0, -(rim + Math.PI), 0]}
+              scale={HIPPO_SCALE}
+            >
               <Hippo
                 ref={(h) => {
                   hippos.current[seat] = h
@@ -327,7 +330,11 @@ function Camera({ exhibit, focus, heading }: { exhibit: Exhibit; focus: THREE.Ve
     // The bearing is in the exhibit's frame (0 = from downstream, looking up it); turn it into the world's.
     const a = yaw + heading
     c.target.set(focus.x, focus.y + lift, focus.z)
-    camera.position.set(focus.x + Math.cos(a) * Math.cos(pitch) * dist, focus.y + lift + Math.sin(pitch) * dist, focus.z + Math.sin(a) * Math.cos(pitch) * dist)
+    camera.position.set(
+      focus.x + Math.cos(a) * Math.cos(pitch) * dist,
+      focus.y + lift + Math.sin(pitch) * dist,
+      focus.z + Math.sin(a) * Math.cos(pitch) * dist,
+    )
     c.update()
     controls.current = c
     return () => {

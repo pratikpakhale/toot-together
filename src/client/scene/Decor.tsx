@@ -74,7 +74,11 @@ function decorShapes(detail: boolean) {
     [0.55, 0.25, 0.3, 0.62],
     [-0.5, 0.2, 0.35, 0.58],
     [0.05, 0.35, -0.6, 0.6],
-  ].map(([x, y, z, r], k) => puffShape(k + 1, seg(k ? 10 : 16)).scale(r, r * 0.9, r).translate(x, y, z))
+  ].map(([x, y, z, r], k) =>
+    puffShape(k + 1, seg(k ? 10 : 16))
+      .scale(r, r * 0.9, r)
+      .translate(x, y, z),
+  )
   const canopy = shadeUnder(merge(lobes), 0.62, 1.12)
   const puff = shadeUnder(puffShape(7, seg(12)), 0.68, 1.1)
 
@@ -100,21 +104,24 @@ function decorShapes(detail: boolean) {
   )
 
   // Cane: a bamboo stalk with nodes and a couple of leaves near the top.
-  const nodes = [-0.32, -0.08, 0.16, 0.38].map((y) => paint(new THREE.TorusGeometry(0.1, 0.022, 3, 8).rotateX(Math.PI / 2).translate(0, y, 0), (_p, _n, o) => o.setScalar(0.72)))
+  const nodes = [-0.32, -0.08, 0.16, 0.38].map((y) =>
+    paint(new THREE.TorusGeometry(0.1, 0.022, 3, 8).rotateX(Math.PI / 2).translate(0, y, 0), (_p, _n, o) => o.setScalar(0.72)),
+  )
   const leaf = (a: number, y: number) =>
-    paint(
-      new THREE.SphereGeometry(1, 6, 3)
-        .scale(0.32, 0.015, 0.07)
-        .translate(0.3, 0, 0)
-        .rotateZ(0.5)
-        .rotateY(a)
-        .translate(0, y, 0),
-      (_p, _n, o) => o.setScalar(1.1),
+    paint(new THREE.SphereGeometry(1, 6, 3).scale(0.32, 0.015, 0.07).translate(0.3, 0, 0).rotateZ(0.5).rotateY(a).translate(0, y, 0), (_p, _n, o) =>
+      o.setScalar(1.1),
     )
-  const cane = merge([shadeUnder(new THREE.CylinderGeometry(0.085, 0.1, 1, 7, 1, true), 0.8, 1.05, -0.5, 0.5), ...nodes, leaf(0.4, 0.4), leaf(2.6, 0.22)])
+  const cane = merge([
+    shadeUnder(new THREE.CylinderGeometry(0.085, 0.1, 1, 7, 1, true), 0.8, 1.05, -0.5, 0.5),
+    ...nodes,
+    leaf(0.4, 0.4),
+    leaf(2.6, 0.22),
+  ])
 
   // Lily pad: the notched disc, paler towards the middle.
-  const pad = paint(new THREE.CylinderGeometry(1, 1, 0.06, 28, 1, false, 0.3, Math.PI * 2 - 0.6), (p, _n, o) => o.setScalar(1.08 - 0.2 * Math.hypot(p.x, p.z)))
+  const pad = paint(new THREE.CylinderGeometry(1, 1, 0.06, 28, 1, false, 0.3, Math.PI * 2 - 0.6), (p, _n, o) =>
+    o.setScalar(1.08 - 0.2 * Math.hypot(p.x, p.z)),
+  )
 
   // Flower: five petals round a golden middle (the instance colour tints the petals).
   const petals = Array.from({ length: 5 }, (_, k) =>
@@ -129,10 +136,15 @@ function decorShapes(detail: boolean) {
 
   // Glow: a cluster of crystals, faceted on purpose.
   const crystal = (h: number, r: number, lean: number, a: number) =>
-    merge([new THREE.CylinderGeometry(r, r * 0.9, h * 0.7, 6).translate(0, h * 0.35, 0), new THREE.CylinderGeometry(0, r, h * 0.3, 6).translate(0, h * 0.85, 0)])
+    merge([
+      new THREE.CylinderGeometry(r, r * 0.9, h * 0.7, 6).translate(0, h * 0.35, 0),
+      new THREE.CylinderGeometry(0, r, h * 0.3, 6).translate(0, h * 0.85, 0),
+    ])
       .rotateZ(lean)
       .rotateY(a)
-  const glow = merge([crystal(1.4, 0.32, 0, 0), crystal(0.9, 0.22, 0.5, 0.6), crystal(0.75, 0.2, -0.45, 2.4)]).translate(0, -0.4, 0).scale(1.5, 1.4, 1.5)
+  const glow = merge([crystal(1.4, 0.32, 0, 0), crystal(0.9, 0.22, 0.5, 0.6), crystal(0.75, 0.2, -0.45, 2.4)])
+    .translate(0, -0.4, 0)
+    .scale(1.5, 1.4, 1.5)
   glow.computeVertexNormals()
 
   // Pine: three tiers with frilly hems, each darker underneath.
@@ -142,9 +154,8 @@ function decorShapes(detail: boolean) {
     [1.4, 0.62, 0.8],
   ]
   const tier = (y: number, r: number, h: number, grow: number) =>
-    paint(
-      new THREE.ConeGeometry(r * grow, h, seg(14), detail ? 8 : 4).translate(0, y + h / 2, 0),
-      (p, _n, o) => o.setScalar(0.62 + 0.5 * smoothstep(y, y + h * 0.8, p.y)),
+    paint(new THREE.ConeGeometry(r * grow, h, seg(14), detail ? 8 : 4).translate(0, y + h / 2, 0), (p, _n, o) =>
+      o.setScalar(0.62 + 0.5 * smoothstep(y, y + h * 0.8, p.y)),
     )
   const frill = (g: THREE.BufferGeometry) => {
     const pos = g.attributes.position
@@ -193,7 +204,11 @@ function decorShapes(detail: boolean) {
 
   // Dead tree: a bare trunk with a few crooked branches.
   const branch = (len: number, r: number, y: number, tiltZ: number, yaw: number) =>
-    new THREE.CylinderGeometry(r * 0.35, r, len, 6).translate(0, len / 2, 0).rotateZ(tiltZ).rotateY(yaw).translate(0, y, 0)
+    new THREE.CylinderGeometry(r * 0.35, r, len, 6)
+      .translate(0, len / 2, 0)
+      .rotateZ(tiltZ)
+      .rotateY(yaw)
+      .translate(0, y, 0)
   const deadTree = shadeUnder(
     merge([
       new THREE.LatheGeometry(profile, 8),
@@ -409,7 +424,8 @@ function buildDecor(c: BakedCourse, theme: Theme, detail: boolean): THREE.Instan
         // Reeds by the water and mushrooms in the shade, here and there.
         const near = c.x[i] + ox * (c.hw[i] + rc.range(0.5, 1.1))
         const nearZ = c.z[i] + oz * (c.hw[i] + rc.range(0.5, 1.1))
-        if (look.lilyPads && clutter === 'grass' && rc.next() < 0.05) put(cattail, near, y, nearZ, 1, rc.range(0.8, 1.2), 1, '#ffffff', rc.range(0, 6))
+        if (look.lilyPads && clutter === 'grass' && rc.next() < 0.05)
+          put(cattail, near, y, nearZ, 1, rc.range(0.8, 1.2), 1, '#ffffff', rc.range(0, 6))
         if ((c.def.theme === 'bayou' || c.def.theme === 'temple' || c.def.theme === 'meadow') && rc.next() < 0.02) {
           const out = rc.range(1.2, Math.max(1.3, shelf - 1))
           const s = rc.range(0.8, 1.5)
@@ -455,7 +471,10 @@ function buildDecor(c: BakedCourse, theme: Theme, detail: boolean): THREE.Instan
   const meshes: THREE.InstancedMesh[] = []
   for (const b of batches) {
     if (!b.items.length) continue
-    const base = b === glow && look.glow ? soft(look.glow, { emissive: look.glow, vertexColors: true }) : soft('#ffffff', { vertexColors: true, rim: b === pad ? 0 : 0.25 })
+    const base =
+      b === glow && look.glow
+        ? soft(look.glow, { emissive: look.glow, vertexColors: true })
+        : soft('#ffffff', { vertexColors: true, rim: b === pad ? 0 : 0.25 })
     const breeze = detail ? sway.get(b) : undefined
     const mat = breeze ? swaying(base, ...breeze) : base
     const byChunk = new Map<number, Batch['items']>()

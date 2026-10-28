@@ -7,7 +7,7 @@ import type { PlayerInput } from '../src/sim/types'
 
 const TOOT_TURN_SECONDS = 1.1
 
-export const CREW = ['Aarav', 'Priya', 'Kabir', 'Ananya'] as const
+const CREW = ['Aarav', 'Priya', 'Kabir', 'Ananya'] as const
 const RIVALS = ['Meera', 'Rohan', 'Isha', 'Dev', 'Zoya', 'Arjun']
 
 interface ChatCue {
@@ -152,7 +152,8 @@ export function prime(shot: Shot): Sim {
   const crew = crewOf(shot)
   crew.forEach((name, seat) => sim.addPlayer(seat + 1, name, seat))
   if (sim.race) {
-    for (let raft = 1; raft < sim.rafts.length; raft++) for (const seat of [0, 1]) sim.addPlayer(sim.players.size + 1, RIVALS[sim.players.size - crew.length], seat, raft)
+    for (let raft = 1; raft < sim.rafts.length; raft++)
+      for (const seat of [0, 1]) sim.addPlayer(sim.players.size + 1, RIVALS[sim.players.size - crew.length], seat, raft)
     sim.start()
   }
   for (let i = 0; i < 60 * 240 && !shot.startWhen(sim); i++) {
@@ -174,4 +175,3 @@ export function steer(shot: Shot, sim: Sim, t: number) {
 }
 
 export const shotSteps = (shot: Shot) => Math.round(shot.seconds / DT)
-
