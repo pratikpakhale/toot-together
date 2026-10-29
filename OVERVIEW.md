@@ -10,11 +10,11 @@
   5. **Sunken Temple** (jungle ruins): introduces fire jets and sluice gates (one straight after a drop, so you have to brake), mixed with crushers, sweepers and pistons.
   6. **Canyon Run** (desert canyon), the longest river: spike alley, spinner plaza, the drop, the rapids, the ice shelf, crusher canyon and the sky-ribbon finale.
   7. **Dragon's Gullet** (lava): fire-jet waves, geysers by open edges, whirlpool pairs, a climb up rapids through fire and a double sweeper.
-  8. **Thunder Run** (storm): introduces lightning, then every hazard in the game stacked back to back, finishing with a lightning climb up the rapids.
-  Hazards get quicker and tighter and stack up more river by river, and the balance script's sloppy crews die roughly 0, 9, 13, 12, 9, 8, 23 and 32 times down rivers 1–8. Canyon Run sits sixth for its length: players die on it more than on any river before it, and online crews take over 15 minutes.
+  8. **Storm Surge** (storm), the finale: introduces cannons that fire spiked balls across the river and surge waves that roll back upstream and carry the raft with them, then mixes them with lightning, cannon batteries beside spiked banks, sweepers, fences and crushers.
+  Hazards get quicker and tighter and stack up more river by river, and the balance script's sloppy crews die roughly 0, 9, 13, 12, 9, 8, 23 and 8 times down rivers 1–8; Storm Surge costs its time in waves that carry the raft back rather than in deaths. Canyon Run sits sixth for its length: players die on it more than on any river before it, and online crews take over 15 minutes.
 - **Progression**: finishing a river unlocks the next. Best times and bronze/silver/gold medals are saved per river, and the results screen has *Next river*, *Again* and *Share*.
 - **Hippo school**: first-time players get a hands-on checklist in the practice pond (walk, toot, burst, then START).
-- **Hazards**: spiked walls, spinning spike crosses, swinging maces, sliding spike logs, crusher doors, slamming pistons, floating mines, sweeper booms hinged on a bank, wall-mounted fire jets, spike fences with a sliding gap, spiked sluice gates that slam shut across the whole river, lightning that marches across the river strike by strike, geysers that blast the raft away, whirlpools that drag the raft in, sideways currents, kelp beds that hold the raft back, rapids running back upstream, bouncy mushrooms, rocks, boost pads, and open edges you can fall off. Hit shapes cover the spikes you can see, so a raft that looks like it touched them did.
+- **Hazards**: spiked walls, spinning spike crosses, swinging maces, sliding spike logs, crusher doors, slamming pistons, floating mines, sweeper booms hinged on a bank, wall-mounted fire jets, spike fences with a sliding gap, spiked sluice gates that slam shut across the whole river, lightning that marches across the river strike by strike, bank cannons that roll a spiked ball across the river, surge waves that roll back upstream and carry the raft with them, geysers that blast the raft away, whirlpools that drag the raft in, sideways currents, kelp beds that hold the raft back, rapids running back upstream, bouncy mushrooms, rocks, boost pads, and open edges you can fall off. Hit shapes cover the spikes you can see, so a raft that looks like it touched them did.
 - **Gas tank**: tooting drains stamina. Run dry and you wheeze until it refills.
 - **Toot Sync**: two or more hippos tooting the same way at the same moment get a rainbow speed boost and a chord.
 - **Snacks**: beans (turbo), chili (endless fire farts), prune (you can't stop tooting).
@@ -35,7 +35,7 @@ src/sim/        Deterministic, framework-free game simulation (runs in browser A
   courses.ts      The eight rivers (pieces, difficulty, medal times)
   bot.ts          Autopilot: plans a lane and speed (or waits, or backs off) clear of timed hazards (tests, balance, menu raft),
                   and a sloppy, human-ish version of it for fuzz tests and balance runs
-  obstacles.ts    Hazards as pure functions of time (+ collision shapes, and the force fields of boosts, currents, whirlpools, kelp and geysers)
+  obstacles.ts    Hazards as pure functions of time (+ collision shapes, and the force fields of boosts, currents, whirlpools, kelp, geysers and surges)
   sim.ts          Raft physics, hippos, stamina, sync, pickups, deaths, checkpoints; crews, countdown, places and the rest of a race
                   (co-op is simply a race with one raft)
   sectors.ts      Which slice of the rim each hippo in a crew may stand on

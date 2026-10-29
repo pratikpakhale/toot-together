@@ -7,7 +7,7 @@ import { type BakedCourse, bakeCourse, type CourseDef, type ItemDef, type ThemeI
  */
 export const FOCUS_S = 40
 
-type Stage = 'pond' | 'gates' | 'spinners' | 'gantries' | 'walls' | 'floaters' | 'flames' | 'rapids' | 'storm'
+type Stage = 'pond' | 'gates' | 'spinners' | 'gantries' | 'walls' | 'floaters' | 'flames' | 'rapids' | 'storm' | 'surge'
 
 /** Hazards spread over a 60 m stretch whose middle lands on FOCUS_S; `x` is metres from that middle. */
 const HAZARDS: Record<Exclude<Stage, 'pond' | 'gates'>, { width: number; flow?: number; items: { x: number; def: ItemDef }[] }> = {
@@ -68,6 +68,14 @@ const HAZARDS: Record<Exclude<Stage, 'pond' | 'gates'>, { width: number; flow?: 
       { x: -8, def: { kind: 'lightning', at: 0, beat: 1.2 } },
       { x: 6, def: { kind: 'geyser', at: 0, d: -2.8, period: 3.2 } },
       { x: 12, def: { kind: 'geyser', at: 0, d: 2.8, period: 3.2, phase: 0.5 } },
+    ],
+  },
+  surge: {
+    width: 13,
+    items: [
+      { x: -12, def: { kind: 'cannon', at: 0, side: 1, period: 3 } },
+      { x: -6, def: { kind: 'cannon', at: 0, side: -1, period: 3, phase: 0.5 } },
+      { x: 0, def: { kind: 'surge', at: 0, len: 16, period: 5 } },
     ],
   },
 }

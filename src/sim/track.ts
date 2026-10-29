@@ -36,6 +36,10 @@ export type ItemDef =
   | { kind: 'lightning'; at: number; beat: number; spots?: number; r?: number; phase?: number }
   /** Vent that bubbles, then erupts and blasts the raft away from it (`power` m/s² at the vent). */
   | { kind: 'geyser'; at: number; d: number; period: number; r?: number; power?: number; phase?: number }
+  /** Cannon on one bank that fires a spiked ball straight across the river once a period, `speed` m/s. */
+  | { kind: 'cannon'; at: number; side: Side; period: number; speed?: number; phase?: number }
+  /** Wave that rises `len` metres downstream and rolls back up to here once a period, carrying the raft with it. */
+  | { kind: 'surge'; at: number; len: number; period: number; speed?: number; phase?: number }
 
 type Side = 1 | -1
 

@@ -4,7 +4,7 @@ import { botInput } from '../src/sim/bot'
 import { DT, HIPPO_GAP, RAFT_RADIUS, RESPAWN_AHEAD_OF_CHECKPOINT } from '../src/sim/constants'
 import { COURSE_LIST, getCourse } from '../src/sim/courses'
 import { angleDiff } from '../src/sim/math'
-import { collideItem, fieldAt, flameState, gateState, geyserState, ITEM_SIZES, lightningState } from '../src/sim/obstacles'
+import { cannonState, collideItem, fieldAt, flameState, gateState, geyserState, ITEM_SIZES, lightningState, surgeState } from '../src/sim/obstacles'
 import { clampToSector, rimSector, sectorOffset } from '../src/sim/sectors'
 import { Sim } from '../src/sim/sim'
 import { type BakedItem, type ItemDef, nearestSampleAt } from '../src/sim/track'
@@ -332,6 +332,32 @@ describe('hazards', () => {
     const f = fieldAt(geyser, 3.5, 0, 2, 0, 0)!
     expect(f.az).toBeGreaterThan(10)
     expect(kills(geyser, 3.5, 0, 0)).toBe(false)
+  })
+
+  it('a cannon warns, then its ball rolls across the river and kills only where it is', () => {
+    const def: ItemDef = { kind: 'cannon', at: 0, side: 1, period: 4, speed: 9 }
+    const cannon = at(def)
+    // Fired at t = 0 from just past the right bank, it is 2.4 m right of the middle half a second later.
+    expect(cannonState(def, 0.5, 6).ball).toBeCloseTo(2.4)
+    expect(kills(cannon, 0.5, 0, 2.4)).toBe(true)
+    expect(kills(cannon, 0.5, 0, -3)).toBe(false)
+    expect(kills(cannon, 0.5, 3, 2.4)).toBe(false)
+    // Past the far bank the ball is gone; the next shot is warned of.
+    expect(cannonState(def, 2, 6)).toMatchObject({ ball: null, warn: false })
+    expect(kills(cannon, 2, 0, 0)).toBe(false)
+    expect(cannonState(def, 3.5, 6).warn).toBe(true)
+  })
+
+  it('a surge rolls back up its stretch and carries the raft with it, without killing it', () => {
+    const def: ItemDef = { kind: 'surge', at: 0, len: 20, period: 8, speed: 6 }
+    const surge = at(def)
+    expect(surgeState(def, 1).crest).toBeCloseTo(14)
+    expect(fieldAt(surge, 1, 14, 0, 3, 0)!.ax).toBeLessThan(-50)
+    expect(fieldAt(surge, 1, 14, 0, -6, 0)).toBeNull()
+    expect(fieldAt(surge, 1, 8, 0, 3, 0)).toBeNull()
+    expect(kills(surge, 1, 14, 0)).toBe(false)
+    expect(surgeState(def, 5)).toMatchObject({ crest: null, warn: false })
+    expect(surgeState(def, 7).warn).toBe(true)
   })
 
   it('a sweeper boom sweeps across the river and leaves its far bank clear', () => {

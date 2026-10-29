@@ -433,75 +433,86 @@ const DRAGONS_GULLET: CourseDef = {
   ],
 }
 
-const THUNDER_RUN: CourseDef = {
-  id: 'thunder-run',
-  name: 'Thunder Run',
-  blurb: 'A storm-lashed river: lightning, and every trap at once.',
+const STORM_SURGE: CourseDef = {
+  id: 'storm-surge',
+  name: 'Storm Surge',
+  blurb: 'Cannons on the banks, waves rolling back upstream and lightning overhead.',
   theme: 'storm',
   difficulty: 5,
-  medals: [265, 365, 550],
+  medals: [250, 345, 520],
   startHeading: 0,
   pieces: [
     { len: 28, width: 20, flow: 0.25, shelf: 10 },
-    { len: 12, width: 10, flow: 1.8, shelf: 7 },
+    { len: 12, width: 11, flow: 1.8, shelf: 7 },
 
-    { len: 18, start: true, width: 10, flow: 2.6, items: [{ kind: 'boost', at: 8 }] },
-    { len: 30, turn: -40, width: 11, items: [{ kind: 'current', at: 4, push: 5.5, len: 12 }, { kind: 'mine', at: 22, d: -2.2 }] },
-    { len: 24, width: 12, items: [{ kind: 'lightning', at: 12, beat: 1.25 }] },
-    { len: 30, turn: 45, width: 12, right: 'spikes', items: [{ kind: 'sweeper', at: 15, side: -1, len: 7.5, swing: 78, period: 3.2 }] },
-    { len: 16, width: 12, items: [{ kind: 'fence', at: 8, gap: 5, amp: 2.5, period: 4.4 }] },
-
-    { len: 26, checkpoint: true, width: 14 },
-    { len: 24, width: 16, items: [{ kind: 'spinner', at: 12, arm: 3.4, speed: -1.9, arms: 3 }, { kind: 'whirlpool', at: 12, d: 5.8, r: 3, pull: 11.5 }] },
-    { len: 28, turn: -45, width: 13, items: [{ kind: 'flame', at: 9, side: 1, period: 2.7, len: 7, on: 0.45 }, { kind: 'flame', at: 19, side: -1, period: 2.7, len: 7, on: 0.45, phase: 0.5 }] },
-    {
-      len: 24,
-      width: 12,
-      items: [
-        { kind: 'slider', at: 8, len: 4.8, amp: 3.4, period: 3 },
-        { kind: 'slider', at: 17, len: 4.8, amp: 3.4, period: 3, phase: 0.5 },
-      ],
-    },
-    { len: 16, width: 12, items: [{ kind: 'pickup', at: 8, d: 0, item: 'beans' }] },
-
-    { len: 26, checkpoint: true, width: 10 },
-    { len: 24, drop: 8, flow: 4.6, width: 8.5 },
-    { len: 28, ice: true, left: 'open', right: 'open', width: 12, flow: 1.3, items: [{ kind: 'whirlpool', at: 14, d: 0, r: 5, pull: 11.5 }] },
-    { len: 30, turn: 55, ice: true, left: 'open', right: 'open', width: 11, items: [{ kind: 'current', at: 4, push: -3.5, len: 14 }, { kind: 'mine', at: 24, d: 2 }] },
-    { len: 26, turn: -35, ice: true, left: 'open', width: 11, items: [{ kind: 'piston', at: 9, d: -2.4, period: 2.7, r: 1.3 }, { kind: 'piston', at: 18, d: 2.4, period: 2.7, phase: 0.5, r: 1.3 }] },
-    { len: 14, flow: 2.2, width: 11 },
-
-    { len: 26, checkpoint: true, width: 10 },
-    { len: 20, left: 'spikes', right: 'spikes', items: [{ kind: 'crusher', at: 10, period: 2.9 }] },
-    { len: 24, width: 11, items: [{ kind: 'kelp', at: 0, len: 9 }, { kind: 'gate', at: 15, period: 4.2, open: 0.33 }] },
-    { len: 20, left: 'spikes', right: 'spikes', width: 10, items: [{ kind: 'crusher', at: 10, period: 2.7, phase: 0.3 }] },
-    { len: 26, turn: 40, width: 12, items: [{ kind: 'sweeper', at: 13, side: 1, len: 7.5, swing: 80, period: 2.9 }] },
-    { len: 18, width: 12, items: [{ kind: 'pickup', at: 9, d: -3, item: 'chili' }, { kind: 'pickup', at: 9, d: 3, item: 'prune' }] },
+    { len: 18, start: true, width: 11, flow: 2.4, items: [{ kind: 'boost', at: 8 }] },
+    { len: 30, turn: 40, width: 12, items: [{ kind: 'mine', at: 16, d: 2.4 }] },
+    { len: 26, width: 12, items: [{ kind: 'cannon', at: 13, side: -1, period: 3 }] },
+    { len: 30, turn: -40, width: 13, left: 'spikes', items: [{ kind: 'pickup', at: 15, d: 0, item: 'beans' }] },
+    { len: 30, width: 13, items: [{ kind: 'surge', at: 5, len: 20, period: 8 }] },
+    { len: 12, width: 13 },
 
     { len: 26, checkpoint: true, width: 13 },
-    { len: 28, width: 14, items: [{ kind: 'whirlpool', at: 9, d: 3.4, pull: 11.5 }, { kind: 'lightning', at: 15, beat: 1.05 }, { kind: 'whirlpool', at: 21, d: -3.4, swirl: -5, pull: 11.5 }] },
-    { len: 30, turn: -45, width: 11, right: 'spikes', items: [{ kind: 'flame', at: 10, side: -1, period: 2.8, len: 5, on: 0.45 }, { kind: 'current', at: 16, push: 5, len: 12 }] },
-    { len: 16, width: 12, items: [{ kind: 'gate', at: 7, period: 4, open: 0.35 }] },
-    { len: 20, width: 12, items: [{ kind: 'fence', at: 10, gap: 5.2, amp: 2.6, period: 4.4 }] },
-    { len: 18, width: 12, items: [{ kind: 'geyser', at: 9, d: 0, period: 3 }] },
+    {
+      len: 36,
+      width: 13,
+      right: 'spikes',
+      items: [
+        { kind: 'cannon', at: 8, side: -1, period: 3 },
+        { kind: 'cannon', at: 18, side: -1, period: 3, phase: 0.33 },
+        { kind: 'cannon', at: 28, side: -1, period: 3, phase: 0.66 },
+      ],
+    },
+    { len: 30, turn: 45, width: 12, left: 'spikes', items: [{ kind: 'mine', at: 15, d: 2.2 }] },
+    { len: 26, width: 13, items: [{ kind: 'lightning', at: 13, beat: 1.2 }] },
+    { len: 24, width: 13, items: [{ kind: 'fence', at: 12, gap: 5.2, amp: 3, period: 4.2 }] },
+    { len: 14, width: 12, items: [{ kind: 'pickup', at: 7, d: 0, item: 'chili' }] },
 
-    { len: 26, checkpoint: true, width: 12 },
-    { len: 26, width: 13, items: [{ kind: 'mace', at: 8, amp: 4, period: 2.6 }, { kind: 'flame', at: 19, side: -1, period: 2.7, on: 0.45, phase: 0.4 }] },
-    { len: 30, turn: -50, width: 12, left: 'spikes', items: [{ kind: 'current', at: 4, push: -5, len: 16 }, { kind: 'mine', at: 24, d: 2.5 }] },
-    { len: 24, checkpoint: true, width: 12 },
-    { len: 26, width: 12, flow: -2.6, items: [{ kind: 'lightning', at: 13, beat: 1.3 }] },
-    { len: 22, drop: 6, left: 'open', right: 'open', flow: 3.8, width: 9.5 },
+    { len: 26, checkpoint: true, width: 13 },
+    { len: 34, width: 13, items: [{ kind: 'surge', at: 5, len: 22, period: 9 }, { kind: 'cannon', at: 17, side: 1, period: 2.8 }] },
+    { len: 12, width: 13 },
+    { len: 28, turn: -45, width: 12, right: 'spikes', items: [{ kind: 'mine', at: 14, d: -2.4 }] },
+    { len: 24, width: 12, items: [{ kind: 'sweeper', at: 12, side: 1, len: 7.5, swing: 75, period: 3 }] },
+    { len: 22, width: 12, left: 'spikes', right: 'spikes', items: [{ kind: 'crusher', at: 11, period: 2.8 }] },
+    { len: 12, width: 12 },
 
-    { len: 24, checkpoint: true, width: 13, flow: 2 },
-    { len: 34, width: 13, flow: 2, items: [{ kind: 'sweeper', at: 12, side: -1, len: 8.5, swing: 76, period: 3.3 }, { kind: 'sweeper', at: 28, side: 1, len: 8.5, swing: 76, period: 3.3 }] },
-    { len: 22, width: 13, items: [{ kind: 'fence', at: 8, gap: 4.8, amp: 3.4, period: 4.2 }, { kind: 'spinner', at: 17, arm: 3.2, speed: 2.3, arms: 2 }] },
+    { len: 26, checkpoint: true, width: 10 },
+    { len: 24, drop: 6, flow: 4.2, width: 9 },
+    { len: 16, width: 12, flow: 2 },
+    { len: 30, width: 12, flow: -2.4, items: [{ kind: 'lightning', at: 15, beat: 1.3 }] },
+    { len: 14, width: 12, flow: 2.2 },
+    { len: 22, width: 12, items: [{ kind: 'gate', at: 11, period: 4, open: 0.38 }] },
+    { len: 16, width: 12, items: [{ kind: 'pickup', at: 8, d: -3, item: 'chili' }, { kind: 'pickup', at: 8, d: 3, item: 'prune' }] },
+
+    { len: 26, checkpoint: true, width: 13 },
+    { len: 30, width: 13, items: [{ kind: 'sweeper', at: 13, side: -1, len: 7.5, swing: 75, period: 3 }] },
+    { len: 28, turn: 40, width: 12, right: 'spikes', items: [{ kind: 'mine', at: 14, d: -2.4 }] },
+    {
+      len: 30,
+      width: 12,
+      left: 'spikes',
+      items: [
+        { kind: 'cannon', at: 8, side: 1, period: 2.6 },
+        { kind: 'cannon', at: 15, side: 1, period: 2.6, phase: 0.33 },
+        { kind: 'cannon', at: 22, side: 1, period: 2.6, phase: 0.66 },
+      ],
+    },
+    { len: 24, width: 12, items: [{ kind: 'fence', at: 12, gap: 5, amp: 3, period: 4 }] },
+    { len: 14, width: 12 },
+
+    { len: 26, checkpoint: true, width: 14 },
+    { len: 36, width: 14, items: [{ kind: 'surge', at: 5, len: 22, period: 9 }] },
+    { len: 30, width: 14, items: [{ kind: 'cannon', at: 9, side: 1, period: 2.8 }, { kind: 'cannon', at: 21, side: -1, period: 2.8, phase: 0.5 }] },
+    { len: 24, width: 14, items: [{ kind: 'spinner', at: 12, arm: 3.4, speed: 2, arms: 3 }] },
+    { len: 26, width: 13, items: [{ kind: 'lightning', at: 13, beat: 1.1 }] },
+    { len: 22, width: 12, left: 'spikes', right: 'spikes', items: [{ kind: 'crusher', at: 11, period: 2.6 }] },
     { len: 10, finish: true, width: 16, flow: 1.2 },
     { len: 26, width: 20, flow: 0.15, shelf: 10 },
   ],
 }
 
 /** Levels in play order; each unlocks the next. */
-export const COURSE_LIST: CourseDef[] = [LAZY_RIVER, BAYOU_BENDS, VOLCANO_PEAK, FROSTBITE_FALLS, SUNKEN_TEMPLE, CANYON_RUN, DRAGONS_GULLET, THUNDER_RUN]
+export const COURSE_LIST: CourseDef[] = [LAZY_RIVER, BAYOU_BENDS, VOLCANO_PEAK, FROSTBITE_FALLS, SUNKEN_TEMPLE, CANYON_RUN, DRAGONS_GULLET, STORM_SURGE]
 /** Null-prototype so untrusted ids like "constructor" or "__proto__" never match. */
 export const COURSES: Readonly<Record<string, CourseDef>> = Object.assign(Object.create(null) as Record<string, CourseDef>, Object.fromEntries(COURSE_LIST.map((c) => [c.id, c])))
 export const DEFAULT_COURSE = LAZY_RIVER.id

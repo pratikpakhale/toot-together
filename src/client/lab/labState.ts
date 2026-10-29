@@ -119,6 +119,14 @@ export const EXHIBITS: Exhibit[] = [
     view: { dist: 28, lift: 2, pitch: 0.45, yaw: 1.9 },
   },
   {
+    id: 'surge',
+    name: 'Cannons & surge',
+    blurb: 'Cannons firing across the river, and a wave rolling back upstream.',
+    stage: 'surge',
+    poses: false,
+    view: { dist: 28, lift: 2, pitch: 0.45, yaw: 1.9 },
+  },
+  {
     id: 'gates',
     name: 'Gates',
     blurb: 'The start, a checkpoint and the finish.',

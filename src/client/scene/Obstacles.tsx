@@ -3,6 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {
+  cannonMuzzle,
+  cannonState,
   crusherInner,
   crusherOpen,
   crusherWarning,
@@ -17,6 +19,7 @@ import {
   pistonState,
   sliderOffset,
   spinnerAngle,
+  surgeState,
   sweeperAngle,
   sweeperPivot,
   whirlpoolSwirl,
@@ -162,6 +165,10 @@ function ItemView({ item, slot }: { item: BakedItem; slot: number }) {
       return <Lightning def={def} item={item} />
     case 'geyser':
       return <Geyser def={def} item={item} />
+    case 'cannon':
+      return <Cannon def={def} item={item} />
+    case 'surge':
+      return <Surge def={def} item={item} />
   }
 }
 
@@ -1180,6 +1187,7 @@ function Lightning({ def, item }: { def: Def<'lightning'>; item: BakedItem }) {
   const target = useRef<THREE.Group>(null)
   const ring = useRef<THREE.Mesh>(null)
   const ringMat = useRef<THREE.MeshBasicMaterial>(null)
+  const rimMat = useRef<THREE.MeshBasicMaterial>(null)
   const scorch = useRef<THREE.MeshBasicMaterial>(null)
   const bolts = useRef<(THREE.Group | null)[]>([])
   const glowSpot = useRef<THREE.Sprite>(null)
@@ -1221,6 +1229,8 @@ function Lightning({ def, item }: { def: Def<'lightning'>; item: BakedItem }) {
     if (ring.current) ring.current.scale.setScalar(charging ? 1 + (1 - st.charge) * 1.3 : 1)
     // The ring closes in on the spot as the strike charges, over a danger zone that fills in.
     if (ringMat.current) ringMat.current.opacity = charging ? 0.35 + 0.6 * st.charge * (0.7 + 0.3 * Math.sin(t * (10 + st.charge * 30))) : st.flash
+    // A dark rim round the ring, so it still reads on white water.
+    if (rimMat.current) rimMat.current.opacity = charging ? 0.3 + 0.4 * st.charge : 0.7 * st.flash
     if (scorch.current) {
       scorch.current.color.set(charging ? '#ffd23a' : '#fff8d0')
       scorch.current.opacity = charging ? 0.12 + 0.3 * st.charge : 0.25 + st.flash * 0.6
@@ -1252,6 +1262,10 @@ function Lightning({ def, item }: { def: Def<'lightning'>; item: BakedItem }) {
         <mesh ref={ring} position={[0, 0.07, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[r * 0.78, r, 48]} />
           <meshBasicMaterial ref={ringMat} color="#fff07a" transparent opacity={0} depthWrite={false} toneMapped={false} />
+          <mesh>
+            <ringGeometry args={[r, r + 0.22, 48]} />
+            <meshBasicMaterial ref={rimMat} color="#1b1d3a" transparent opacity={0} depthWrite={false} />
+          </mesh>
         </mesh>
         <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[r, 40]} />
@@ -1402,6 +1416,177 @@ function Geyser({ def, item }: { def: Def<'geyser'>; item: BakedItem }) {
         <mesh geometry={geyserColumn} material={geyserWater} />
       </group>
       <mesh ref={crown} geometry={foamCrown} material={stone} visible={false} />
+    </group>
+  )
+}
+
+const BARREL_LEN = 2.2
+const BALL_Y = 0.4
+const cannonCarriage = (() =>
+  tintMerge([
+    [new RoundedBoxGeometry(1.5, 0.55, 1.9, 2, 0.08).translate(0, 0.45, 0), '#d2453c'],
+    [new THREE.BoxGeometry(1.56, 0.08, 1.96).translate(0, 0.74, 0), GOLD],
+  ]))()
+const cannonBarrel = (() =>
+  tintMerge([
+    [new THREE.CylinderGeometry(0.42, 0.52, BARREL_LEN, 20).rotateX(Math.PI / 2), METAL],
+    [new THREE.TorusGeometry(0.47, 0.09, 8, 20).translate(0, 0, -BARREL_LEN / 2 + 0.05), GOLD],
+    [new THREE.TorusGeometry(0.5, 0.06, 6, 20).translate(0, 0, 0.1), GOLD],
+    [new THREE.TorusGeometry(0.54, 0.07, 6, 20).translate(0, 0, BARREL_LEN / 2 - 0.15), GOLD],
+    [new THREE.SphereGeometry(0.5, 16, 10).translate(0, 0, BARREL_LEN / 2), METAL],
+    [new THREE.CylinderGeometry(0.06, 0.06, 0.35, 8).translate(0, 0.55, BARREL_LEN / 2 - 0.1), '#d8c9a0'],
+  ]))()
+const cannonMouth = new THREE.CircleGeometry(0.34, 20).rotateY(Math.PI).translate(0, 0, -BARREL_LEN / 2 - 0.01)
+const fuseSpark = new THREE.SpriteMaterial({
+  map: glowTexture(),
+  color: '#ffd23a',
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+})
+
+/**
+ * A cannon on its carriage on one bank, barrel across the river. The ball's lane is marked on the water all the
+ * time and flashes while the fuse burns, so the shot is seen coming; then the spiked ball rolls across.
+ */
+function Cannon({ def, item }: { def: Def<'cannon'>; item: BakedItem }) {
+  const hw = item.hw
+  const side = def.side
+  const barrel = useRef<THREE.Group>(null)
+  const ball = useRef<THREE.Group>(null)
+  const spark = useRef<THREE.Sprite>(null)
+  const lane = useRef<THREE.MeshBasicMaterial>(null)
+  const sound = useRef({ warn: false, fired: false })
+  const metal = useMemo(() => flashMaterial(METAL), [])
+  useEffect(() => () => metal.dispose(), [metal])
+  useFrame(({ camera }) => {
+    const t = simTime()
+    const st = cannonState(def, t, hw)
+    const flying = st.ball !== null
+    const blink = st.warn && Math.sin(t * 28) > 0
+    barrel.current?.position.set(0, 1.15, side * (hw + 2.1 + st.recoil * 0.6))
+    metal.emissive.setRGB(blink ? 0.6 : 0, blink ? 0.12 : 0, 0)
+    if (spark.current) {
+      spark.current.visible = st.warn
+      spark.current.scale.setScalar(0.5 + Math.random() * 0.35)
+    }
+    // Faint while the cannon reloads, blinking red while the fuse burns, solid while the ball is out.
+    if (lane.current) {
+      lane.current.color.set(st.warn || flying ? '#ff3b30' : '#ffb070')
+      lane.current.opacity = st.warn ? (blink ? 0.6 : 0.25) : flying ? 0.45 : 0.1
+    }
+    if (ball.current) {
+      ball.current.visible = st.ball !== null
+      if (st.ball !== null) {
+        ball.current.position.set(0, BALL_Y, st.ball)
+        ball.current.rotation.x = (side * st.ball) / ITEM_SIZES.cannonBall
+      }
+    }
+    if (st.warn && !sound.current.warn && nearRaft(item)) audio.fuse()
+    if (flying && !sound.current.fired) {
+      if (nearRaft(item)) audio.boom()
+      if (inView(item, camera)) {
+        const at = worldAt(item, cannonMuzzle(def, hw))
+        for (let k = 0; k < 8; k++) fx.fart(at.x, at.y + 1.1, at.z, side * item.hz, -side * item.hx, '#d9dce6', 1.6)
+        fx.splash(at.x, at.y, at.z, 0.6)
+      }
+    }
+    sound.current.warn = st.warn
+    sound.current.fired = flying
+  })
+  return (
+    <group>
+      <group position={[0, 0, side * (hw + 2.3)]}>
+        <mesh geometry={cannonCarriage} material={paint} />
+        {[-1, 1].map((k) => (
+          <mesh key={k} geometry={wheel(0.5, 0.22)} position={[k * 0.85, 0.5, 0.25 * side]} rotation={[0, Math.PI / 2, 0]} material={paint} />
+        ))}
+      </group>
+      <group ref={barrel}>
+        <group rotation={[0, side < 0 ? Math.PI : 0, 0]}>
+          <mesh geometry={cannonBarrel} material={metal} />
+          <mesh geometry={cannonMouth}>
+            <meshBasicMaterial color="#14121a" />
+          </mesh>
+          <sprite ref={spark} material={fuseSpark} position={[0, 0.75, BARREL_LEN / 2 - 0.1]} visible={false} />
+        </group>
+      </group>
+      {/* The ball's lane, straight across the river. */}
+      <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[2 * ITEM_SIZES.cannonBall + 0.5, 2 * hw]} />
+        <meshBasicMaterial ref={lane} color="#ffb070" transparent opacity={0.1} depthWrite={false} />
+      </mesh>
+      <group ref={ball} visible={false}>
+        <mesh geometry={spikeBall(ITEM_SIZES.cannonBall, '#3b3742')} material={paint} />
+        <group position={[0, -BALL_Y, 0]}>
+          <Foam inner={ITEM_SIZES.cannonBall * 0.8} outer={ITEM_SIZES.cannonBall * 2} spin={1} />
+        </group>
+      </group>
+    </group>
+  )
+}
+
+const SURGE_HEIGHT = 2
+/**
+ * The crest, a unit roll of water across the river (along z): deep blue at the back, paling to a white breaking lip
+ * on the upstream face it rolls towards. The river hides its lower half.
+ */
+const surgeCrestGeo = (() => {
+  const body = paintGeo(new THREE.CylinderGeometry(1, 1, 1, 28, 1).rotateX(Math.PI / 2), (p, _n, out) =>
+    out.set('#3f8fd0').lerp(new THREE.Color('#e9f7ff'), smoothstep(0.1, -0.9, p.x) * smoothstep(0, 0.9, p.y)),
+  )
+  const lip = tint(new THREE.CylinderGeometry(0.38, 0.38, 1.02, 16).rotateX(Math.PI / 2).translate(-0.55, 0.72, 0), '#ffffff')
+  return mergeParts([body, lip])
+})()
+const surgeMarkGeo = (() =>
+  tintMerge([
+    [new THREE.CylinderGeometry(0.22, 0.28, 1.6, 12).translate(0, 0.8, 0), '#ffffff'],
+    [new THREE.CylinderGeometry(0.23, 0.23, 0.3, 12).translate(0, 0.55, 0), '#2f7fd6'],
+    [new THREE.CylinderGeometry(0.23, 0.23, 0.3, 12).translate(0, 1.15, 0), '#2f7fd6'],
+    [new THREE.SphereGeometry(0.26, 12, 8).translate(0, 1.65, 0), GOLD],
+  ]))()
+
+/**
+ * A wave that swells at the far end of its stretch and rolls back up it, carrying the raft. Striped posts on both
+ * banks mark the stretch, so the crew can see where waves rise and where they die out.
+ */
+function Surge({ def, item }: { def: Def<'surge'>; item: BakedItem }) {
+  const hw = item.hw
+  const crest = useRef<THREE.Group>(null)
+  const sound = useRef(false)
+  const foamAt = useRef(0)
+  useFrame(({ camera }, dt) => {
+    const t = simTime()
+    const st = surgeState(def, t)
+    const g = crest.current
+    if (!g) return
+    // While a wave is coming, the water at the far end heaves; then the crest rises and rolls up.
+    const swell = st.warn ? 0.12 + 0.1 * Math.sin(t * 14) : 0
+    const rolling = st.crest !== null
+    const height = rolling ? st.height : swell
+    g.visible = height > 0.02
+    g.position.x = st.crest ?? def.len
+    g.scale.set(ITEM_SIZES.surgeCrest, SURGE_HEIGHT * height, 2 * hw)
+    if (rolling && !sound.current && nearRaft(item)) audio.whoosh()
+    sound.current = rolling
+    if (st.crest !== null && st.height > 0.4 && inView(item, camera)) {
+      foamAt.current += Math.min(dt, 0.05) * 30
+      while (foamAt.current >= 1) {
+        foamAt.current -= 1
+        const at = worldAt(item, (Math.random() * 2 - 1) * hw)
+        const along = st.crest - ITEM_SIZES.surgeCrest * 0.6
+        fx.spray(at.x + item.hx * along, at.y + SURGE_HEIGHT * st.height, at.z + item.hz * along, 1, 2.5, 1.2, at.y)
+      }
+    }
+  })
+  return (
+    <group>
+      {[0, def.len].flatMap((x) =>
+        [-1, 1].map((s) => <mesh key={`${x}${s}`} geometry={surgeMarkGeo} position={[x, 0, s * (hw + 0.7)]} scale={1.4} material={paint} />),
+      )}
+      <group ref={crest} visible={false}>
+        <mesh geometry={surgeCrestGeo} material={stone} />
+      </group>
     </group>
   )
 }

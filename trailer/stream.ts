@@ -12,7 +12,7 @@ const AARAV = 4
 const temple = getCourse('sunken-temple')
 const lazy = getCourse('lazy-river')
 const bayou = getCourse('bayou-bends')
-const thunder = getCourse('thunder-run')
+const storm = getCourse('storm-surge')
 
 const idle: PlayerInput = { aim: null, walk: 0, fart: false, burst: 0 }
 /** Stands behind the raft and toots it towards `d` metres right of the centreline, a little way ahead. */
@@ -59,10 +59,10 @@ export const STREAM_SHOTS: Shot[] = [
   },
   {
     name: 'On two',
-    course: 'thunder-run',
+    course: 'storm-surge',
     seed: 9,
     crew: STREAM_CREW,
-    startWhen: (sim) => sim.rafts[0].s >= itemS(thunder, 'lightning') - 16,
+    startWhen: (sim) => sim.rafts[0].s >= itemS(storm, 'lightning') - 16,
     seconds: 6.4,
     everyoneToots: true,
     chat: [{ at: 5.6, seat: GOLU - 1, text: 'planned 😎' }],
@@ -74,10 +74,10 @@ export const STREAM_SHOTS: Shot[] = [
   },
   {
     name: 'Finish',
-    course: 'thunder-run',
+    course: 'storm-surge',
     seed: 4,
     crew: STREAM_CREW,
-    startWhen: (sim) => sim.rafts[0].s >= thunder.finishS - 16,
+    startWhen: (sim) => sim.rafts[0].s >= storm.finishS - 16,
     seconds: 5,
     everyoneToots: true,
     chat: [{ at: 3.4, seat: AARAV - 1, text: 'GGGGGG' }],

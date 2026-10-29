@@ -164,6 +164,59 @@ export function geyserState(d: Def<'geyser'>, t: number): GeyserState {
   return { warn: false, blast: k < 0.15 ? smoothstep(k / 0.15) : 1 - smoothstep((k - 0.15) / 0.85) }
 }
 
+export interface CannonState {
+  /** Across the river, where the ball is; null while the cannon reloads. */
+  ball: number | null
+  /** The fuse is lit: it fires within a second. */
+  warn: boolean
+  /** 1 at the shot, easing to 0 as the barrel runs back out. */
+  recoil: number
+}
+
+const CANNON_WARN = 1
+const CANNON_SPEED = 9
+const CANNON_RECOIL = 0.35
+
+/** Across the river, where the ball leaves the muzzle for a bank at half width `hw`. */
+export const cannonMuzzle = (d: Def<'cannon'>, hw: number) => d.side * (hw + 0.9)
+
+export function cannonState(d: Def<'cannon'>, t: number, hw: number): CannonState {
+  const speed = d.speed ?? CANNON_SPEED
+  const at = cycle(t, d.period, d.phase) * d.period
+  // The ball flies from one muzzle to just past the far bank, then drops out of play.
+  const flight = (2 * Math.abs(cannonMuzzle(d, hw))) / speed
+  return {
+    ball: at < flight ? cannonMuzzle(d, hw) - d.side * speed * at : null,
+    warn: d.period - at < CANNON_WARN,
+    recoil: at < CANNON_RECOIL ? 1 - smoothstep(at / CANNON_RECOIL) : 0,
+  }
+}
+
+export interface SurgeState {
+  /** How far downstream of where it ends the crest is; null between waves. */
+  crest: number | null
+  /** 0 … 1: the wave rises at the far end and sinks back into the river at this end. */
+  height: number
+  /** The water at the far end is swelling: a wave is coming. */
+  warn: boolean
+}
+
+const SURGE_SPEED = 6
+const SURGE_WARN = 1.2
+const SURGE_RISE = 0.5
+const SURGE_SINK = 0.6
+/** How hard the crest drags a raft it holds to its own speed, per second. */
+const SURGE_GRIP = 7
+
+export function surgeState(d: Def<'surge'>, t: number): SurgeState {
+  const speed = d.speed ?? SURGE_SPEED
+  const travel = d.len / speed
+  const at = cycle(t, d.period, d.phase) * d.period
+  if (at >= travel) return { crest: null, height: 0, warn: d.period - at < SURGE_WARN }
+  const height = smoothstep(Math.min(1, at / SURGE_RISE, (travel - at) / SURGE_SINK))
+  return { crest: d.len - speed * at, height, warn: false }
+}
+
 export const ITEM_SIZES = {
   spinnerArm: 0.24,
   spinnerHub: 0.5,
@@ -191,6 +244,9 @@ export const ITEM_SIZES = {
   bolt: 1.7,
   geyser: 3.2,
   geyserPower: 34,
+  cannonBall: 0.75,
+  /** Half the thickness of a surge's crest along the river. */
+  surgeCrest: 1.4,
 } as const
 
 /**
@@ -220,6 +276,7 @@ export type KillCause =
   | 'fence'
   | 'gate'
   | 'lightning'
+  | 'cannon'
   | 'fall'
   | 'reset'
 
@@ -325,16 +382,22 @@ export function collideItem(item: BakedItem, t: number, px: number, pz: number, 
       if (!st.lethal) return null
       return Math.hypot(along, across - st.d) < r + (def.r ?? ITEM_SIZES.bolt) ? { type: 'kill', cause: 'lightning' } : null
     }
+    case 'cannon': {
+      const ball = cannonState(def, t, item.hw).ball
+      if (ball === null) return null
+      return Math.hypot(along, across - ball) < r + ITEM_SIZES.cannonBall + SPIKE_HIT ? { type: 'kill', cause: 'cannon' } : null
+    }
     case 'boost':
     case 'current':
     case 'kelp':
     case 'geyser':
+    case 'surge':
       return null
   }
 }
 
 /** Hazards that shove the raft around rather than touching it. */
-export const FIELD_KINDS: ReadonlySet<ItemDef['kind']> = new Set(['boost', 'current', 'whirlpool', 'kelp', 'geyser'])
+export const FIELD_KINDS: ReadonlySet<ItemDef['kind']> = new Set(['boost', 'current', 'whirlpool', 'kelp', 'geyser', 'surge'])
 
 /** How far upstream (negative) and downstream of where it stands a field item reaches. */
 export function fieldSpan(item: BakedItem): [number, number] {
@@ -350,6 +413,8 @@ export function fieldSpan(item: BakedItem): [number, number] {
       return [-(def.r ?? ITEM_SIZES.whirlpool), def.r ?? ITEM_SIZES.whirlpool]
     case 'geyser':
       return [-(def.r ?? ITEM_SIZES.geyser), def.r ?? ITEM_SIZES.geyser]
+    case 'surge':
+      return [-ITEM_SIZES.surgeCrest, def.len + ITEM_SIZES.surgeCrest]
     default:
       return [0, 0]
   }
@@ -422,6 +487,14 @@ export function fieldAt(item: BakedItem, t: number, px: number, pz: number, vx: 
       const iv = dist > 1e-3 ? v / dist : 0
       const push = (def.power ?? ITEM_SIZES.geyserPower) * blast * (0.4 + 0.6 * (1 - dist / reach))
       return { ax: (iu * item.hx + iv * rx) * push, az: (iu * item.hz + iv * rz) * push, spin: (iv >= 0 ? 1 : -1) * 4 * blast }
+    }
+    case 'surge': {
+      const st = surgeState(def, t)
+      if (st.crest === null || Math.abs(along - st.crest) > ITEM_SIZES.surgeCrest + RAFT_RADIUS || Math.abs(across) > item.hw) return null
+      // The crest picks the raft up and carries it back upstream at the wave's own speed.
+      const v = vx * item.hx + vz * item.hz
+      const a = SURGE_GRIP * st.height * (-(def.speed ?? SURGE_SPEED) - v)
+      return a < 0 ? { ax: item.hx * a, az: item.hz * a, spin: 0 } : null
     }
     default:
       return null

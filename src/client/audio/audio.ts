@@ -722,6 +722,52 @@ class AudioEngine {
     roll.stop(t + 1.35)
   }
 
+  /** A cannon's fuse: a short fizz. */
+  fuse() {
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    const n = this.noise()
+    const hp = ctx.createBiquadFilter()
+    hp.type = 'highpass'
+    hp.frequency.value = 3200
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0, t)
+    g.gain.linearRampToValueAtTime(0.12, t + 0.08)
+    g.gain.linearRampToValueAtTime(0.06, t + 0.8)
+    g.gain.linearRampToValueAtTime(0, t + 0.95)
+    n.connect(hp).connect(g).connect(this.sfx)
+    n.start(t)
+    n.stop(t + 1)
+  }
+
+  /** A cannon firing: a thump with a puff of noise on top. */
+  boom() {
+    const ctx = this.ctx
+    if (!ctx) return
+    const t = ctx.currentTime
+    const o = ctx.createOscillator()
+    o.frequency.setValueAtTime(120, t)
+    o.frequency.exponentialRampToValueAtTime(38, t + 0.35)
+    const og = ctx.createGain()
+    og.gain.setValueAtTime(0.6, t)
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.4)
+    o.connect(og).connect(this.sfx)
+    o.start(t)
+    o.stop(t + 0.45)
+    const n = this.noise()
+    const lp = ctx.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.setValueAtTime(1600, t)
+    lp.frequency.exponentialRampToValueAtTime(200, t + 0.5)
+    const ng = ctx.createGain()
+    ng.gain.setValueAtTime(0.35, t)
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.55)
+    n.connect(lp).connect(ng).connect(this.sfx)
+    n.start(t)
+    n.stop(t + 0.6)
+  }
+
   slam() {
     const ctx = this.ctx
     if (!ctx) return
