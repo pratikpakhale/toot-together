@@ -253,15 +253,15 @@ const BAYOU_BENDS: CourseDef = {
     { len: 24, width: 13, items: [{ kind: 'whirlpool', at: 10, d: 3, swirl: -6, pull: 11.5 }, { kind: 'pickup', at: 12, d: -4, item: 'chili' }, { kind: 'mace', at: 20, amp: 3.6, period: 3.6 }] },
 
     { len: 26, checkpoint: true, width: 12 },
-    { len: 22, width: 12, items: [{ kind: 'fence', at: 11, gap: 5.2, amp: 2.8, period: 4.6 }] },
+    { len: 22, width: 12, items: [{ kind: 'fence', at: 11, amp: 2.4, period: 5.5 }] },
     { len: 28, turn: -45, width: 12, right: 'spikes', items: [{ kind: 'current', at: 4, push: 4.5, len: 18 }] },
-    { len: 24, width: 12, items: [{ kind: 'kelp', at: 0, len: 9 }, { kind: 'fence', at: 13, gap: 5, amp: 3, period: 4.4, phase: 0.3 }, { kind: 'rock', at: 21, d: 0 }] },
+    { len: 24, width: 12, items: [{ kind: 'kelp', at: 0, len: 9 }, { kind: 'fence', at: 13, gap: 6, amp: 2.4, period: 5.5, phase: 0.3 }, { kind: 'rock', at: 21, d: 0 }] },
 
     { len: 26, checkpoint: true, width: 13 },
     { len: 20, drop: 4, flow: 3.4, width: 11 },
     { len: 26, width: 15, flow: 1.6, items: [{ kind: 'whirlpool', at: 9, d: -3.6, pull: 11.5 }, { kind: 'mine', at: 14, d: 1.2 }, { kind: 'whirlpool', at: 19, d: 3.6, swirl: -5, pull: 11.5 }] },
     { len: 30, turn: 50, width: 12, left: 'spikes', items: [{ kind: 'current', at: 4, push: -4.5, len: 14 }, { kind: 'mace', at: 23, amp: 3.6, period: 2.9 }] },
-    { len: 22, width: 12, items: [{ kind: 'kelp', at: 0, len: 8 }, { kind: 'fence', at: 13, gap: 5, amp: 3, period: 4.2 }] },
+    { len: 22, width: 12, items: [{ kind: 'kelp', at: 0, len: 8 }, { kind: 'fence', at: 13, gap: 5.5, amp: 2.6, period: 5 }] },
     { len: 18, width: 13, items: [{ kind: 'boost', at: 6 }] },
     { len: 10, finish: true, width: 16, flow: 1.2 },
     { len: 26, width: 20, flow: 0.15, shelf: 10 },
