@@ -12,7 +12,7 @@ const AARAV = 4
 const temple = getCourse('sunken-temple')
 const lazy = getCourse('lazy-river')
 const bayou = getCourse('bayou-bends')
-const storm = getCourse('storm-surge')
+const storm = getCourse('krakens-wake')
 
 const idle: PlayerInput = { aim: null, walk: 0, fart: false, burst: 0 }
 /** Stands behind the raft and toots it towards `d` metres right of the centreline, a little way ahead. */
@@ -59,7 +59,7 @@ export const STREAM_SHOTS: Shot[] = [
   },
   {
     name: 'On two',
-    course: 'storm-surge',
+    course: 'krakens-wake',
     seed: 9,
     crew: STREAM_CREW,
     startWhen: (sim) => sim.rafts[0].s >= itemS(storm, 'lightning') - 16,
@@ -74,7 +74,7 @@ export const STREAM_SHOTS: Shot[] = [
   },
   {
     name: 'Finish',
-    course: 'storm-surge',
+    course: 'krakens-wake',
     seed: 4,
     crew: STREAM_CREW,
     startWhen: (sim) => sim.rafts[0].s >= storm.finishS - 16,

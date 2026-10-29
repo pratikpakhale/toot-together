@@ -722,26 +722,7 @@ class AudioEngine {
     roll.stop(t + 1.35)
   }
 
-  /** A cannon's fuse: a short fizz. */
-  fuse() {
-    const ctx = this.ctx
-    if (!ctx) return
-    const t = ctx.currentTime
-    const n = this.noise()
-    const hp = ctx.createBiquadFilter()
-    hp.type = 'highpass'
-    hp.frequency.value = 3200
-    const g = ctx.createGain()
-    g.gain.setValueAtTime(0, t)
-    g.gain.linearRampToValueAtTime(0.12, t + 0.08)
-    g.gain.linearRampToValueAtTime(0.06, t + 0.8)
-    g.gain.linearRampToValueAtTime(0, t + 0.95)
-    n.connect(hp).connect(g).connect(this.sfx)
-    n.start(t)
-    n.stop(t + 1)
-  }
-
-  /** A cannon firing: a thump with a puff of noise on top. */
+  /** A heavy slam on the water: a thump with a puff of noise on top. */
   boom() {
     const ctx = this.ctx
     if (!ctx) return
@@ -766,6 +747,12 @@ class AudioEngine {
     n.connect(lp).connect(ng).connect(this.sfx)
     n.start(t)
     n.stop(t + 0.6)
+  }
+
+  /** A ghost ship's bell: two low, out-of-tune tolls. */
+  shipBell() {
+    this.bell([523.3, 493.9], 0.32, 0.16, 'sine')
+    this.bell([1444, 1363], 0.32, 0.05, 'sine')
   }
 
   slam() {

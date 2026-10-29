@@ -903,7 +903,7 @@ export class Sim {
     for (let k = 0; k < items.length; k++) {
       const item = items[k]
       if (Math.abs(item.s - raft.s) > item.hw + 10) continue
-      if (FIELD_KINDS.has(item.def.kind) && item.def.kind !== 'whirlpool') continue
+      if (FIELD_KINDS.has(item.def.kind) && item.def.kind !== 'whirlpool' && item.def.kind !== 'twister') continue
       if (item.def.kind === 'pickup') {
         const slot = this.pickupItems.indexOf(k)
         if (this.pickupReadyAt[slot] > this.t) continue

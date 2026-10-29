@@ -1,6 +1,6 @@
 import { RAFT_RADIUS, SPIKE_REACH } from './constants'
 import { angleDiff, type Rng, rightOffset } from './math'
-import { collideItem, geyserState, ITEM_SIZES, surgeState } from './obstacles'
+import { collideItem, geyserState, ITEM_SIZES, shipRun } from './obstacles'
 import type { Sim } from './sim'
 import { type BakedCourse, type BakedItem, EDGE_CODE, nearestSampleAt, pointAt } from './track'
 import type { PlayerInput } from './types'
@@ -20,16 +20,17 @@ const TIMED_KINDS = new Set([
   'gate',
   'lightning',
   'geyser',
-  'cannon',
-  'surge',
+  'tentacle',
+  'twister',
+  'ship',
 ])
 /**
  * How far along the river a timed hazard can reach from where it stands (a sweeper's boom swings up and downstream,
- * a surge rolls back up its whole stretch).
+ * a ghost ship sails its whole run).
  */
 function reachAlong(item: BakedItem) {
   if (item.def.kind === 'sweeper') return item.def.len + 3
-  if (item.def.kind === 'surge') return item.def.len + 4
+  if (item.def.kind === 'ship') return shipRun(item.def) / 2 + ITEM_SIZES.shipLen / 2 + 1
   return 6
 }
 
@@ -162,24 +163,16 @@ function clearFor(sim: Sim, raft: Raft, timed: BakedItem[], fromD: number, d: nu
   return LOOKAHEAD
 }
 
-/**
- * Whether a raft centred at (x, z) at time `t` should keep away from `item`: it would die, a geyser is about to
- * throw it, or a surge's crest would carry it back.
- */
+/** Whether a raft centred at (x, z) at time `t` should keep away from `item`: it would die, or a geyser is about to throw it. */
 function blocks(item: BakedItem, t: number, x: number, z: number) {
   const def = item.def
-  if (def.kind !== 'geyser' && def.kind !== 'surge') return collideItem(item, t, x, z, RAFT_RADIUS + SAFETY)?.type === 'kill'
-  const dx = x - item.x
-  const dz = z - item.z
-  const along = dx * item.hx + dz * item.hz
-  if (def.kind === 'surge') {
-    const crest = surgeState(def, t).crest
-    return crest !== null && Math.abs(along - crest) < ITEM_SIZES.surgeCrest + RAFT_RADIUS + SAFETY
-  }
+  if (def.kind !== 'geyser') return collideItem(item, t, x, z, RAFT_RADIUS + SAFETY)?.type === 'kill'
   const st = geyserState(def, t)
   if (!st.warn && st.blast <= 0) return false
+  const dx = x - item.x
+  const dz = z - item.z
   const across = rightOffset(dx, dz, item.hx, item.hz)
-  return Math.hypot(along, across - def.d) < (def.r ?? ITEM_SIZES.geyser) + RAFT_RADIUS + SAFETY
+  return Math.hypot(dx * item.hx + dz * item.hz, across - def.d) < (def.r ?? ITEM_SIZES.geyser) + RAFT_RADIUS + SAFETY
 }
 
 /**

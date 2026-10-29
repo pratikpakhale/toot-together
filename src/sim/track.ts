@@ -36,10 +36,12 @@ export type ItemDef =
   | { kind: 'lightning'; at: number; beat: number; spots?: number; r?: number; phase?: number }
   /** Vent that bubbles, then erupts and blasts the raft away from it (`power` m/s² at the vent). */
   | { kind: 'geyser'; at: number; d: number; period: number; r?: number; power?: number; phase?: number }
-  /** Cannon on one bank that fires a spiked ball straight across the river once a period, `speed` m/s. */
-  | { kind: 'cannon'; at: number; side: Side; period: number; speed?: number; phase?: number }
-  /** Wave that rises `len` metres downstream and rolls back up to here once a period, carrying the raft with it. */
-  | { kind: 'surge'; at: number; len: number; period: number; speed?: number; phase?: number }
+  /** Kraken tentacle on one bank that rears back, then slams `len` metres across the river and lies there a moment. */
+  | { kind: 'tentacle'; at: number; side: Side; period: number; len?: number; phase?: number }
+  /** Waterspout that wanders `amp` metres either way of `d` across the river, sucking the raft in; its core kills. */
+  | { kind: 'twister'; at: number; amp: number; period: number; d?: number; phase?: number }
+  /** Ghost ship that rises `run / 2` metres downstream and sails `run` metres back upstream along lane `d`, once a period. */
+  | { kind: 'ship'; at: number; d: number; period: number; run?: number; phase?: number }
 
 type Side = 1 | -1
 

@@ -25,7 +25,9 @@ const DEATH_LINES: Record<KillCause, [string, string]> = {
   fence: ['SNAGGED!', 'Aim for the gap, not the spikes.'],
   gate: ['SHUT OUT!', 'The gate waits for no hippo.'],
   lightning: ['ZAPPED!', 'Hippos: excellent conductors.'],
-  cannon: ['CANNONBALLED!', 'Wait for the boom, then go.'],
+  tentacle: ['KRAKEN SLAP!', 'It rears back before it slams. That was the hint.'],
+  twister: ['SWEPT UP!', 'Toot clear before the twister pulls you in.'],
+  ship: ['RAMMED!', 'Ghost ships give way to no hippo.'],
   fall: ['OVERBOARD!', 'Hippos cannot fly. Confirmed.'],
   reset: ['RESET!', 'Back to the last checkpoint.'],
 }

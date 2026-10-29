@@ -3,8 +3,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {
-  cannonMuzzle,
-  cannonState,
   crusherInner,
   crusherOpen,
   crusherWarning,
@@ -17,11 +15,17 @@ import {
   lightningState,
   maceOffset,
   pistonState,
+  shipRun,
+  shipState,
   sliderOffset,
   spinnerAngle,
-  surgeState,
   sweeperAngle,
   sweeperPivot,
+  type TentaclePose,
+  tentacleLength,
+  tentacleRoot,
+  tentacleState,
+  twisterAt,
   whirlpoolSwirl,
 } from '../../sim/obstacles'
 import type { BakedCourse, BakedItem, ItemDef } from '../../sim/track'
@@ -165,10 +169,12 @@ function ItemView({ item, slot }: { item: BakedItem; slot: number }) {
       return <Lightning def={def} item={item} />
     case 'geyser':
       return <Geyser def={def} item={item} />
-    case 'cannon':
-      return <Cannon def={def} item={item} />
-    case 'surge':
-      return <Surge def={def} item={item} />
+    case 'tentacle':
+      return <Tentacle def={def} item={item} />
+    case 'twister':
+      return <Twister def={def} item={item} />
+    case 'ship':
+      return <Ship def={def} item={item} />
   }
 }
 
@@ -1420,172 +1426,376 @@ function Geyser({ def, item }: { def: Def<'geyser'>; item: BakedItem }) {
   )
 }
 
-const BARREL_LEN = 2.2
-const BALL_Y = 0.4
-const cannonCarriage = (() =>
-  tintMerge([
-    [new RoundedBoxGeometry(1.5, 0.55, 1.9, 2, 0.08).translate(0, 0.45, 0), '#d2453c'],
-    [new THREE.BoxGeometry(1.56, 0.08, 1.96).translate(0, 0.74, 0), GOLD],
-  ]))()
-const cannonBarrel = (() =>
-  tintMerge([
-    [new THREE.CylinderGeometry(0.42, 0.52, BARREL_LEN, 20).rotateX(Math.PI / 2), METAL],
-    [new THREE.TorusGeometry(0.47, 0.09, 8, 20).translate(0, 0, -BARREL_LEN / 2 + 0.05), GOLD],
-    [new THREE.TorusGeometry(0.5, 0.06, 6, 20).translate(0, 0, 0.1), GOLD],
-    [new THREE.TorusGeometry(0.54, 0.07, 6, 20).translate(0, 0, BARREL_LEN / 2 - 0.15), GOLD],
-    [new THREE.SphereGeometry(0.5, 16, 10).translate(0, 0, BARREL_LEN / 2), METAL],
-    [new THREE.CylinderGeometry(0.06, 0.06, 0.35, 8).translate(0, 0.55, BARREL_LEN / 2 - 0.1), '#d8c9a0'],
-  ]))()
-const cannonMouth = new THREE.CircleGeometry(0.34, 20).rotateY(Math.PI).translate(0, 0, -BARREL_LEN / 2 - 0.01)
-const fuseSpark = new THREE.SpriteMaterial({
-  map: glowTexture(),
-  color: '#ffd23a',
-  transparent: true,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
-})
+const TENTACLE_SEGMENTS = 12
+const tentacleSkin = new THREE.Color('#7b3496')
+const tentacleBelly = new THREE.Color('#f29cc4')
+const tentacleGeos = new Map<number, THREE.BufferGeometry[]>()
 
 /**
- * A cannon on its carriage on one bank, barrel across the river. The ball's lane is marked on the water all the
- * time and flashes while the fuse burns, so the shot is seen coming; then the spiked ball rolls across.
+ * The segments of a tentacle `len` long, root first, each a tapered tube standing on y = 0 with pale suckers on its
+ * river side (−z), which face the water once it slams down. They taper as the hit shape does.
  */
-function Cannon({ def, item }: { def: Def<'cannon'>; item: BakedItem }) {
+function tentacleSegments(len: number) {
+  let geos = tentacleGeos.get(len)
+  if (geos) return geos
+  const seg = len / TENTACLE_SEGMENTS
+  const radius = (k: number) => THREE.MathUtils.lerp(ITEM_SIZES.tentacleBase, ITEM_SIZES.tentacleTip, k / TENTACLE_SEGMENTS)
+  geos = Array.from({ length: TENTACLE_SEGMENTS }, (_, k) => {
+    const r0 = radius(k)
+    const r1 = radius(k + 1)
+    const tube = paintGeo(new THREE.CylinderGeometry(r1, r0, seg * 1.1, 14, 1).translate(0, seg / 2, 0), (_p, n, out) =>
+      out.copy(tentacleSkin).lerp(tentacleBelly, smoothstep(0.1, -0.7, n.z)),
+    )
+    const sucker = (y: number, r: number) => tint(new THREE.SphereGeometry(r * 0.42, 10, 6).scale(1, 1, 0.4).translate(0, y, -r * 0.9), '#ffd6e6')
+    const parts = [tube, sucker(seg * 0.3, (r0 * 2 + r1) / 3), sucker(seg * 0.78, (r0 + r1 * 2) / 3)]
+    if (k === TENTACLE_SEGMENTS - 1) parts.push(tint(new THREE.ConeGeometry(r1, r1 * 3, 12).translate(0, seg + r1 * 1.4, 0), '#7b3496'))
+    return mergeParts(parts)
+  })
+  tentacleGeos.set(len, geos)
+  return geos
+}
+
+/**
+ * A kraken's tentacle growing out of one bank, curled over the river. It rears back with its suckers flashing and
+ * its landing strip blinking on the water, then slams down across the river, lies there a moment and curls back up.
+ * Drawn for the right bank and turned round for the left.
+ */
+function Tentacle({ def, item }: { def: Def<'tentacle'>; item: BakedItem }) {
   const hw = item.hw
-  const side = def.side
-  const barrel = useRef<THREE.Group>(null)
-  const ball = useRef<THREE.Group>(null)
-  const spark = useRef<THREE.Sprite>(null)
+  const len = tentacleLength(def, hw)
+  // Drawn for the right bank, so the root is always on the +z side here.
+  const root = def.side * tentacleRoot(def, hw)
+  const seg = len / TENTACLE_SEGMENTS
+  const geos = tentacleSegments(len)
+  const joints = useRef<(THREE.Group | null)[]>([])
   const lane = useRef<THREE.MeshBasicMaterial>(null)
-  const sound = useRef({ warn: false, fired: false })
-  const metal = useMemo(() => flashMaterial(METAL), [])
-  useEffect(() => () => metal.dispose(), [metal])
+  const pose = useRef<TentaclePose>('idle')
+  const skin = useMemo(() => paint.clone(), [])
+  useEffect(() => () => skin.dispose(), [skin])
   useFrame(({ camera }) => {
     const t = simTime()
-    const st = cannonState(def, t, hw)
-    const flying = st.ball !== null
-    const blink = st.warn && Math.sin(t * 28) > 0
-    barrel.current?.position.set(0, 1.15, side * (hw + 2.1 + st.recoil * 0.6))
-    metal.emissive.setRGB(blink ? 0.6 : 0, blink ? 0.12 : 0, 0)
-    if (spark.current) {
-      spark.current.visible = st.warn
-      spark.current.scale.setScalar(0.5 + Math.random() * 0.35)
+    const st = tentacleState(def, t)
+    const idleCurl = (k: number) => 0.15 + 0.06 * Math.sin(t * 1.6 - k * 0.5)
+    // How far the root leans over the river (radians from upright), and how much each joint curls on towards it.
+    let lean: number
+    let curl: (k: number) => number
+    if (st.pose === 'rear') {
+      const e = smoothstep(0, 1, st.k)
+      lean = -0.12 - 0.5 * e
+      curl = (k) => THREE.MathUtils.lerp(idleCurl(k), -0.04, e) + 0.03 * e * Math.sin(t * 40 + k)
+    } else if (st.pose === 'slam') {
+      const e = st.k * st.k
+      lean = THREE.MathUtils.lerp(-0.62, Math.PI / 2, e)
+      curl = (k) => -0.04 * (1 - e) - 0.1 * Math.sin(Math.PI * st.k) * (k / TENTACLE_SEGMENTS)
+    } else if (st.pose === 'down') {
+      lean = Math.PI / 2
+      curl = (k) => 0.015 * Math.sin(t * 22 + k * 1.4) * (1 - st.k)
+    } else if (st.pose === 'lift') {
+      const e = smoothstep(0, 1, st.k)
+      lean = THREE.MathUtils.lerp(Math.PI / 2, -0.12, e)
+      curl = (k) => e * idleCurl(k)
+    } else {
+      lean = -0.12 + 0.05 * Math.sin(t * 1.1)
+      curl = idleCurl
     }
-    // Faint while the cannon reloads, blinking red while the fuse burns, solid while the ball is out.
+    joints.current.forEach((g, k) => {
+      if (g) g.rotation.x = -(curl(k) + (k === 0 ? lean : 0))
+    })
+    const blink = st.pose === 'rear' && Math.sin(t * 26) > 0
+    skin.emissive.setRGB(blink ? 0.55 : 0, blink ? 0.06 : 0, blink ? 0.1 : 0)
+    // Its landing strip: faint while it waits, blinking red as it rears, dark while it lies across the river.
     if (lane.current) {
-      lane.current.color.set(st.warn || flying ? '#ff3b30' : '#ffb070')
-      lane.current.opacity = st.warn ? (blink ? 0.6 : 0.25) : flying ? 0.45 : 0.1
+      lane.current.color.set(st.pose === 'rear' ? '#ff3b30' : '#3a1450')
+      lane.current.opacity = st.pose === 'rear' ? (blink ? 0.6 : 0.25) : st.lethal ? 0.4 : 0.12
     }
-    if (ball.current) {
-      ball.current.visible = st.ball !== null
-      if (st.ball !== null) {
-        ball.current.position.set(0, BALL_Y, st.ball)
-        ball.current.rotation.x = (side * st.ball) / ITEM_SIZES.cannonBall
+    if (st.pose !== pose.current) {
+      if (st.pose === 'rear' && nearRaft(item)) audio.rumble()
+      if (st.pose === 'down') {
+        if (nearRaft(item)) {
+          audio.boom()
+          audio.splash(1)
+        }
+        if (inView(item, camera)) {
+          for (let j = 0; j < 6; j++) {
+            const at = worldAt(item, def.side * (root - (len * (j + 0.5)) / 6))
+            fx.splash(at.x, at.y, at.z, 0.8)
+          }
+          const mid = worldAt(item, def.side * (root - len / 2))
+          fx.ring(mid.x, mid.y, mid.z, len * 0.7, '#ffffff', 0.8)
+        }
       }
+      pose.current = st.pose
     }
-    if (st.warn && !sound.current.warn && nearRaft(item)) audio.fuse()
-    if (flying && !sound.current.fired) {
-      if (nearRaft(item)) audio.boom()
-      if (inView(item, camera)) {
-        const at = worldAt(item, cannonMuzzle(def, hw))
-        for (let k = 0; k < 8; k++) fx.fart(at.x, at.y + 1.1, at.z, side * item.hz, -side * item.hx, '#d9dce6', 1.6)
-        fx.splash(at.x, at.y, at.z, 0.6)
-      }
-    }
-    sound.current.warn = st.warn
-    sound.current.fired = flying
   })
+  const chain = geos.reduceRight<React.ReactNode>(
+    (inner, g, k) => (
+      <group
+        key={k}
+        ref={(el) => {
+          joints.current[k] = el
+        }}
+        position={[0, k === 0 ? 0.35 : seg, 0]}
+      >
+        <mesh geometry={g} material={skin} />
+        {inner}
+      </group>
+    ),
+    null,
+  )
   return (
-    <group>
-      <group position={[0, 0, side * (hw + 2.3)]}>
-        <mesh geometry={cannonCarriage} material={paint} />
-        {[-1, 1].map((k) => (
-          <mesh key={k} geometry={wheel(0.5, 0.22)} position={[k * 0.85, 0.5, 0.25 * side]} rotation={[0, Math.PI / 2, 0]} material={paint} />
-        ))}
+    <group rotation={[0, def.side < 0 ? Math.PI : 0, 0]}>
+      <group position={[0, 0, root]}>
+        {chain}
+        <Foam inner={0.9} outer={2.2} spin={0.4} />
       </group>
-      <group ref={barrel}>
-        <group rotation={[0, side < 0 ? Math.PI : 0, 0]}>
-          <mesh geometry={cannonBarrel} material={metal} />
-          <mesh geometry={cannonMouth}>
-            <meshBasicMaterial color="#14121a" />
-          </mesh>
-          <sprite ref={spark} material={fuseSpark} position={[0, 0.75, BARREL_LEN / 2 - 0.1]} visible={false} />
-        </group>
-      </group>
-      {/* The ball's lane, straight across the river. */}
-      <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[2 * ITEM_SIZES.cannonBall + 0.5, 2 * hw]} />
-        <meshBasicMaterial ref={lane} color="#ffb070" transparent opacity={0.1} depthWrite={false} />
+      <mesh position={[0, 0.06, root - len / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[2 * ITEM_SIZES.tentacleBase + 0.5, len]} />
+        <meshBasicMaterial ref={lane} color="#3a1450" transparent opacity={0.12} depthWrite={false} />
       </mesh>
-      <group ref={ball} visible={false}>
-        <mesh geometry={spikeBall(ITEM_SIZES.cannonBall, '#3b3742')} material={paint} />
-        <group position={[0, -BALL_Y, 0]}>
-          <Foam inner={ITEM_SIZES.cannonBall * 0.8} outer={ITEM_SIZES.cannonBall * 2} spin={1} />
-        </group>
-      </group>
     </group>
   )
 }
 
-const SURGE_HEIGHT = 2
-/**
- * The crest, a unit roll of water across the river (along z): deep blue at the back, paling to a white breaking lip
- * on the upstream face it rolls towards. The river hides its lower half.
- */
-const surgeCrestGeo = (() => {
-  const body = paintGeo(new THREE.CylinderGeometry(1, 1, 1, 28, 1).rotateX(Math.PI / 2), (p, _n, out) =>
-    out.set('#3f8fd0').lerp(new THREE.Color('#e9f7ff'), smoothstep(0.1, -0.9, p.x) * smoothstep(0, 0.9, p.y)),
-  )
-  const lip = tint(new THREE.CylinderGeometry(0.38, 0.38, 1.02, 16).rotateX(Math.PI / 2).translate(-0.55, 0.72, 0), '#ffffff')
-  return mergeParts([body, lip])
-})()
-const surgeMarkGeo = (() =>
-  tintMerge([
-    [new THREE.CylinderGeometry(0.22, 0.28, 1.6, 12).translate(0, 0.8, 0), '#ffffff'],
-    [new THREE.CylinderGeometry(0.23, 0.23, 0.3, 12).translate(0, 0.55, 0), '#2f7fd6'],
-    [new THREE.CylinderGeometry(0.23, 0.23, 0.3, 12).translate(0, 1.15, 0), '#2f7fd6'],
-    [new THREE.SphereGeometry(0.26, 12, 8).translate(0, 1.65, 0), GOLD],
-  ]))()
+const TWISTER_TOP = 15
+/** Waterspout shading clock, shared by every waterspout. */
+const twisterTime = { value: 0 }
+let funnelTex: THREE.CanvasTexture | undefined
+/** Ragged streaks of spray, slanting as they spiral up the funnel; tiles round and up it. */
+function funnelTexture() {
+  if (funnelTex) return funnelTex
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const ctx = c.getContext('2d')!
+  for (let k = 0; k < 70; k++) {
+    const x = (k * 97) % 256
+    const y = (k * 61) % 256
+    ctx.strokeStyle = `rgba(255,255,255,${0.25 + ((k * 37) % 60) / 100})`
+    ctx.lineWidth = 3 + ((k * 13) % 9)
+    ctx.lineCap = 'round'
+    for (const dx of [-256, 0, 256]) {
+      ctx.beginPath()
+      ctx.moveTo(x + dx, y)
+      ctx.lineTo(x + dx + 70, y - 40)
+      ctx.stroke()
+    }
+  }
+  funnelTex = new THREE.CanvasTexture(c)
+  funnelTex.wrapS = funnelTex.wrapT = THREE.RepeatWrapping
+  return funnelTex
+}
+/** The funnel, narrow where it touches the water and flaring up into the cloud. */
+const funnelGeo = new THREE.LatheGeometry(
+  Array.from({ length: 17 }, (_, i) => {
+    const y = (i / 16) * TWISTER_TOP
+    return new THREE.Vector2(0.75 + 3.6 * (y / TWISTER_TOP) ** 1.7, y)
+  }),
+  32,
+)
+const funnelMats = () => {
+  const layer = (color: string, opacity: number, repeat: number) => {
+    const map = funnelTexture().clone()
+    map.repeat.set(repeat, 2)
+    return new THREE.MeshBasicMaterial({ map, color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false })
+  }
+  return { outer: layer('#dfe6f3', 0.6, 3), inner: layer('#7d86a3', 0.85, 2) }
+}
+let funnel: ReturnType<typeof funnelMats> | undefined
+const debrisGeo = [
+  tint(new THREE.BoxGeometry(1.1, 0.14, 0.32), '#8a5a3c'),
+  tint(new THREE.CylinderGeometry(0.28, 0.28, 0.6, 10), '#c46a3a'),
+  tint(new THREE.BoxGeometry(0.5, 0.5, 0.5), '#b88a52'),
+  tint(new THREE.BoxGeometry(0.9, 0.12, 0.25), '#6f4a33'),
+]
 
 /**
- * A wave that swells at the far end of its stretch and rolls back up it, carrying the raft. Striped posts on both
- * banks mark the stretch, so the crew can see where waves rise and where they die out.
+ * A waterspout from the storm cloud to the river, wandering across it. The swirl on the water shows how far it
+ * drags the raft in; the core, where planks and barrels whirl round, kills.
  */
-function Surge({ def, item }: { def: Def<'surge'>; item: BakedItem }) {
-  const hw = item.hw
-  const crest = useRef<THREE.Group>(null)
-  const sound = useRef(false)
-  const foamAt = useRef(0)
+function Twister({ def, item }: { def: Def<'twister'>; item: BakedItem }) {
+  const reach = ITEM_SIZES.twisterPull
+  const spout = useRef<THREE.Group>(null)
+  const spin = useRef<THREE.Group>(null)
+  const swirl = useRef<THREE.Mesh>(null)
+  const debris = useRef<THREE.Group>(null)
+  const spray = useRef(0)
+  const gust = useRef(0)
+  const tex = vortexTextures()
+  funnel ??= funnelMats()
+  const mats = funnel
   useFrame(({ camera }, dt) => {
     const t = simTime()
-    const st = surgeState(def, t)
-    const g = crest.current
-    if (!g) return
-    // While a wave is coming, the water at the far end heaves; then the crest rises and rolls up.
-    const swell = st.warn ? 0.12 + 0.1 * Math.sin(t * 14) : 0
-    const rolling = st.crest !== null
-    const height = rolling ? st.height : swell
-    g.visible = height > 0.02
-    g.position.x = st.crest ?? def.len
-    g.scale.set(ITEM_SIZES.surgeCrest, SURGE_HEIGHT * height, 2 * hw)
-    if (rolling && !sound.current && nearRaft(item)) audio.whoosh()
-    sound.current = rolling
-    if (st.crest !== null && st.height > 0.4 && inView(item, camera)) {
-      foamAt.current += Math.min(dt, 0.05) * 30
-      while (foamAt.current >= 1) {
-        foamAt.current -= 1
-        const at = worldAt(item, (Math.random() * 2 - 1) * hw)
-        const along = st.crest - ITEM_SIZES.surgeCrest * 0.6
-        fx.spray(at.x + item.hx * along, at.y + SURGE_HEIGHT * st.height, at.z + item.hz * along, 1, 2.5, 1.2, at.y)
-      }
+    const core = twisterAt(def, t)
+    if (twisterTime.value !== t) {
+      twisterTime.value = t
+      mats.outer.map!.offset.set(t * 0.9, -t * 0.5)
+      mats.inner.map!.offset.set(t * 1.6, -t * 0.8)
+    }
+    if (spout.current) {
+      spout.current.position.set(core.along, 0, core.across)
+      // The top trails the base as it wanders.
+      spout.current.rotation.set(0.06 * Math.sin(t * 0.8), 0, -0.05 * Math.cos(t * 0.6))
+    }
+    if (spin.current) spin.current.rotation.y = -t * 3
+    if (swirl.current) swirl.current.rotation.z = t * 2.4
+    debris.current?.children.forEach((d, k) => {
+      const a = -t * (3.4 + k * 0.4) + k * 1.6
+      const r = 0.9 + 0.25 * Math.sin(t * 1.3 + k)
+      d.position.set(Math.cos(a) * r, 0.6 + 1.4 * (0.5 + 0.5 * Math.sin(t * 1.7 + k * 2)), Math.sin(a) * r)
+      d.rotation.set(t * 3 + k, t * 2, t * 4 - k)
+    })
+    if (!inView(item, camera)) return
+    const at = worldAt(item, core.across)
+    const x = at.x + item.hx * core.along
+    const z = at.z + item.hz * core.along
+    spray.current += Math.min(dt, 0.05) * 30
+    const n = Math.floor(spray.current)
+    spray.current -= n
+    if (n) fx.spray(x, at.y + 0.3, z, n, 4, 2.2, at.y)
+    gust.current -= dt
+    if (gust.current <= 0 && nearRaft(item)) {
+      audio.whoosh()
+      gust.current = 1.4
     }
   })
   return (
+    <group ref={spout}>
+      <group position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh>
+          <circleGeometry args={[reach, 48]} />
+          <meshBasicMaterial map={tex.shade} transparent opacity={0.8} depthWrite={false} />
+        </mesh>
+        <mesh ref={swirl} position={[0, 0, 0.01]} scale={[-1, 1, 1]}>
+          <circleGeometry args={[reach, 48]} />
+          <meshBasicMaterial map={tex.spiral} transparent opacity={0.6} depthWrite={false} />
+        </mesh>
+        <mesh position={[0, 0, 0.02]}>
+          <ringGeometry args={[reach * 0.94, reach, 48]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.35} depthWrite={false} />
+        </mesh>
+        <mesh position={[0, 0, 0.03]}>
+          <circleGeometry args={[ITEM_SIZES.twister, 32]} />
+          <meshBasicMaterial color="#1b2333" transparent opacity={0.85} depthWrite={false} />
+        </mesh>
+      </group>
+      <Foam inner={ITEM_SIZES.twister} outer={ITEM_SIZES.twister + 1.2} spin={3} />
+      <group ref={spin}>
+        <mesh geometry={funnelGeo} material={mats.inner} scale={[0.6, 1, 0.6]} />
+        <mesh geometry={funnelGeo} material={mats.outer} />
+      </group>
+      <group ref={debris}>
+        {debrisGeo.map((g, k) => (
+          <mesh key={k} geometry={g} material={paint} />
+        ))}
+      </group>
+      <mesh geometry={stormCloud(10)} material={stone} position={[0, TWISTER_TOP, 0]} />
+    </group>
+  )
+}
+
+const SHIP_GLOW = '#7dffc4'
+const SHIP_SINK_DEPTH = 3
+/** A chunky toy galleon, bow upstream (−x): teal hull, stern castle, gold ram, mast and a crow's nest. */
+const shipHull = (() =>
+  tintMerge([
+    [new RoundedBoxGeometry(5, 1.3, ITEM_SIZES.shipBeam, 3, 0.4).translate(0.25, 0.45, 0), '#3e5f6b'],
+    [new THREE.BoxGeometry(5.1, 0.14, ITEM_SIZES.shipBeam + 0.1).translate(0.25, 1.12, 0), SHIP_GLOW],
+    [new RoundedBoxGeometry(1.4, 1, ITEM_SIZES.shipBeam - 0.2, 2, 0.2).translate(2.05, 1.55, 0), '#35505b'],
+    [new THREE.BoxGeometry(1.5, 0.12, ITEM_SIZES.shipBeam - 0.1).translate(2.05, 2.08, 0), SHIP_GLOW],
+    [new THREE.ConeGeometry(0.5, 1.5, 12).rotateZ(Math.PI / 2).translate(-2.95, 0.5, 0), GOLD],
+    [new THREE.CylinderGeometry(0.13, 0.16, 4.8, 8).translate(-0.3, 3.4, 0), '#4a3b34'],
+    [new THREE.CylinderGeometry(0.5, 0.38, 0.4, 10).translate(-0.3, 5.5, 0), '#4a3b34'],
+    [new THREE.BoxGeometry(0.04, 0.45, 0.7).translate(-0.3, 6.15, 0.35), '#1b1d3a'],
+  ]))()
+/** Portholes and the skull on the sail, unlit so they glow in the storm. */
+const shipGlowGeo = (() => {
+  const holes = [-1.4, -0.2, 1].flatMap((x) =>
+    [-1, 1].map((s) =>
+      tint(new THREE.CircleGeometry(0.2, 12).rotateY(s < 0 ? Math.PI : 0).translate(x, 0.55, s * (ITEM_SIZES.shipBeam / 2 + 0.02)), SHIP_GLOW),
+    ),
+  )
+  const skull = tint(new THREE.CircleGeometry(0.55, 16).rotateY(-Math.PI / 2).translate(-0.42, 3.6, 0), '#ffffff')
+  const eyes = [-0.2, 0.2].map((z) => tint(new THREE.CircleGeometry(0.13, 10).rotateY(-Math.PI / 2).translate(-0.44, 3.7, z), '#1b1d3a'))
+  return mergeParts([...holes, skull, ...eyes])
+})()
+const shipGlowMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+const sailGeo = (() => {
+  const g = new THREE.PlaneGeometry(2.5, 2.7, 6, 6).rotateY(-Math.PI / 2)
+  // Billowing forward, as if the storm blew it upstream.
+  const pos = g.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    const z = pos.getZ(i) / 1.25
+    const y = pos.getY(i) / 1.35
+    pos.setX(i, -0.35 * (1 - z * z) * (1 - 0.5 * y * y))
+  }
+  g.computeVertexNormals()
+  return g.translate(-0.05, 3.5, 0)
+})()
+const sailMat = new THREE.MeshBasicMaterial({ color: '#d4ffe9', transparent: true, opacity: 0.82, side: THREE.DoubleSide })
+
+/**
+ * A ghost ship that rises out of the river at the downstream end of its run with a toll of its bell, sails back
+ * upstream down its lane and sinks at the other end. The lane glows on the water, brightest while a ship is out.
+ */
+function Ship({ def, item }: { def: Def<'ship'>; item: BakedItem }) {
+  const run = shipRun(def)
+  const hull = useRef<THREE.Group>(null)
+  const lane = useRef<THREE.MeshBasicMaterial>(null)
+  const spot = useRef<THREE.MeshBasicMaterial>(null)
+  const sound = useRef({ warn: false, out: false })
+  const mist = useRef(0)
+  useFrame(({ camera }, dt) => {
+    const t = simTime()
+    const st = shipState(def, t)
+    const out = st.along !== null
+    if (hull.current) {
+      hull.current.visible = out && st.rise > 0.01
+      if (st.along !== null) {
+        hull.current.position.set(st.along, -SHIP_SINK_DEPTH * (1 - st.rise) + 0.08 * Math.sin(t * 2.3), def.d)
+        hull.current.rotation.set(0.05 * Math.sin(t * 1.7), 0, 0.25 * (1 - st.rise))
+      }
+    }
+    const blink = st.warn && Math.sin(t * 20) > 0
+    if (lane.current) lane.current.opacity = out ? 0.2 : st.warn ? (blink ? 0.3 : 0.12) : 0.06
+    if (spot.current) spot.current.opacity = st.warn ? (blink ? 0.75 : 0.35) : 0
+    const near = inView(item, camera)
+    if (st.warn && !sound.current.warn && nearRaft(item)) audio.shipBell()
+    if (st.along !== null && !sound.current.out && near) {
+      const at = worldAt(item, def.d)
+      fx.splash(at.x + item.hx * st.along, at.y, at.z + item.hz * st.along, 1.2)
+    }
+    if (st.warn && near) {
+      const at = worldAt(item, def.d)
+      if (Math.random() < 0.3) fx.bubbles(at.x + (item.hx * run) / 2, at.y, at.z + (item.hz * run) / 2, 2, 1.2, 1.5)
+    }
+    // Ghostly mist curls off the stern as it sails.
+    if (st.along !== null && st.rise > 0.5 && near) {
+      mist.current += Math.min(dt, 0.05) * 5
+      const at = worldAt(item, def.d)
+      const back = st.along + 2.8
+      while (mist.current >= 1) {
+        mist.current -= 1
+        fx.fart(at.x + item.hx * back, at.y + 1.2, at.z + item.hz * back, item.hx, item.hz, '#effff8', 0.8)
+      }
+    }
+    sound.current.warn = st.warn
+    sound.current.out = out
+  })
+  return (
     <group>
-      {[0, def.len].flatMap((x) =>
-        [-1, 1].map((s) => <mesh key={`${x}${s}`} geometry={surgeMarkGeo} position={[x, 0, s * (hw + 0.7)]} scale={1.4} material={paint} />),
-      )}
-      <group ref={crest} visible={false}>
-        <mesh geometry={surgeCrestGeo} material={stone} />
+      <mesh position={[0, 0.06, def.d]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[run + ITEM_SIZES.shipLen, ITEM_SIZES.shipBeam]} />
+        <meshBasicMaterial ref={lane} color={SHIP_GLOW} transparent opacity={0.06} depthWrite={false} />
+      </mesh>
+      <mesh position={[run / 2, 0.07, def.d]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[ITEM_SIZES.shipLen / 2, 32]} />
+        <meshBasicMaterial ref={spot} color={SHIP_GLOW} transparent opacity={0} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <group ref={hull} visible={false}>
+        <mesh geometry={shipHull} material={paint} />
+        <mesh geometry={shipGlowGeo} material={shipGlowMat} />
+        <mesh geometry={sailGeo} material={sailMat} />
+        <sprite material={glowSprite(SHIP_GLOW, 0.5)} position={[0, 0.4, 0]} scale={[7, 3, 1]} />
+        <Foam inner={1.6} outer={3.2} spin={0.6} />
       </group>
     </group>
   )
