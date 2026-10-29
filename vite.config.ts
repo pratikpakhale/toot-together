@@ -18,6 +18,8 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,svg,png,webp}', '**/*-latin-[0-9]*.woff2'],
+        // Only the install dialog shows these, so no player needs them offline.
+        globIgnores: ['screenshots/**'],
         maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/ws/, /^\/health/, /^\/ping/, /^\/how-to-play/, /^\/robots\.txt/, /^\/sitemap\.xml/],

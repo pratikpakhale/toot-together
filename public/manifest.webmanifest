@@ -6,14 +6,107 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["fullscreen", "standalone"],
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
   "orientation": "landscape",
   "background_color": "#fde7cf",
   "theme_color": "#5fbdf3",
-  "categories": ["games", "entertainment"],
+  "categories": [
+    "games",
+    "entertainment"
+  ],
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/wide-run.webp",
+      "sizes": "1920x1080",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "Your crew of hippos rafting down Volcano Peak"
+    },
+    {
+      "src": "/screenshots/wide-menu.webp",
+      "sizes": "1920x1080",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "Play solo, on one couch with up to 4 friends, or online"
+    },
+    {
+      "src": "/screenshots/wide-rivers.webp",
+      "sizes": "1920x1080",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "8 rivers to steer through together"
+    },
+    {
+      "src": "/screenshots/wide-frost.webp",
+      "sizes": "1920x1080",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "Slippery ice and snowy pines on Frostbite Falls"
+    },
+    {
+      "src": "/screenshots/wide-kraken.webp",
+      "sizes": "1920x1080",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "Outrun the Kraken's Wake"
+    },
+    {
+      "src": "/screenshots/narrow-run.webp",
+      "sizes": "1688x780",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "Your crew of hippos rafting down Volcano Peak"
+    },
+    {
+      "src": "/screenshots/narrow-menu.webp",
+      "sizes": "1688x780",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "Play solo, on one couch with up to 4 friends, or online"
+    },
+    {
+      "src": "/screenshots/narrow-rivers.webp",
+      "sizes": "1688x780",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "8 rivers to steer through together"
+    },
+    {
+      "src": "/screenshots/narrow-frost.webp",
+      "sizes": "1688x780",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "Slippery ice and snowy pines on Frostbite Falls"
+    },
+    {
+      "src": "/screenshots/narrow-kraken.webp",
+      "sizes": "1688x780",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "Outrun the Kraken's Wake"
+    }
   ]
 }

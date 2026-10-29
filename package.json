@@ -25,6 +25,7 @@
     "icons": "tsx scripts/icons.ts",
     "level-shots": "tsx scripts/level-shots.ts",
     "og": "tsx scripts/og.ts",
+    "screenshots": "tsx scripts/screenshots.ts",
     "trailer": "node trailer/record.mjs",
     "reel": "node trailer/record.mjs --cut reel",
     "trailer:dryrun": "tsx trailer/dryrun.ts"
