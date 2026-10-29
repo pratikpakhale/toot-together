@@ -314,6 +314,11 @@ seatChannel?.addEventListener('message', (e: MessageEvent<{ ask?: string; held?:
   if (e.data.ask && liveTokens.has(e.data.ask)) seatChannel.postMessage({ held: e.data.ask })
 })
 
+const playNow = (play: () => void) => {
+  play()
+  return () => {}
+}
+
 function seatHeldElsewhere(token: string) {
   const channel = seatChannel
   if (!channel) return Promise.resolve(false)
@@ -375,6 +380,7 @@ export class NetSession extends BaseSession implements GameSession {
   private chatTimes: number[] = []
   private chatKey = 0
   private disposed = false
+  private readonly cancelStart: () => void
 
   constructor(
     private name: string,
@@ -385,6 +391,7 @@ export class NetSession extends BaseSession implements GameSession {
     private readonly rafts = 1,
     /** Where a room this session creates goes; a room code names its own. */
     private readonly region: Region = REGIONS[0],
+    whenPlayable = playNow,
   ) {
     super(courseId)
     this.canChat = !spectating
@@ -396,15 +403,17 @@ export class NetSession extends BaseSession implements GameSession {
     window.addEventListener('blur', this.releaseInput)
     document.addEventListener('visibilitychange', this.releaseInput)
     window.addEventListener('online', this.retryNow)
-    const stored = this.token
-    if (!stored) {
-      this.connect()
-      return
-    }
-    void seatHeldElsewhere(stored).then((held) => {
-      if (this.disposed) return
-      if (held) this.forgetStoredSeat()
-      this.connect()
+    this.cancelStart = whenPlayable(() => {
+      const stored = this.token
+      if (!stored) {
+        this.connect()
+        return
+      }
+      void seatHeldElsewhere(stored).then((held) => {
+        if (this.disposed) return
+        if (held) this.forgetStoredSeat()
+        this.connect()
+      })
     })
   }
 
@@ -811,6 +820,7 @@ export class NetSession extends BaseSession implements GameSession {
   /** Every way out of a room is on purpose (a reload or a dropped connection never gets here), so the seat goes at once. */
   dispose() {
     this.disposed = true
+    this.cancelStart()
     if (!this.spectating) saveSeat(null)
     this.setToken(null)
     window.clearTimeout(this.retryTimer)

@@ -15,6 +15,8 @@ const IN_APP_BROWSERS = [
 /** The app whose own browser this is, if any. On iPhone, Instagram's never turns sideways. */
 export const inAppBrowser = IN_APP_BROWSERS.find(([, ua]) => ua.test(navigator.userAgent))?.[0] ?? null
 
+export const uprightApp = isIOS ? inAppBrowser : null
+
 /** This page in Android's default browser. */
 export function systemBrowserUrl() {
   const url = new URL(location.href)
@@ -45,7 +47,23 @@ export const SHORT_SCREEN = '(max-height: 520px)'
 
 export const useShortScreen = () => useMediaQuery(SHORT_SCREEN)
 
-export const usePortraitPhone = () => useMediaQuery('(orientation: portrait) and (pointer: coarse) and (max-width: 540px)')
+const PORTRAIT_PHONE = '(orientation: portrait) and (pointer: coarse) and (max-width: 540px)'
+
+export const usePortraitPhone = () => useMediaQuery(PORTRAIT_PHONE)
+
+export function whenPlayable(play: () => void) {
+  const upright = matchMedia(PORTRAIT_PHONE)
+  if (!uprightApp || !upright.matches) {
+    play()
+    return () => {}
+  }
+  const onChange = () => {
+    upright.removeEventListener('change', onChange)
+    play()
+  }
+  upright.addEventListener('change', onChange)
+  return () => upright.removeEventListener('change', onChange)
+}
 
 type FsDocument = Document & {
   webkitFullscreenEnabled?: boolean

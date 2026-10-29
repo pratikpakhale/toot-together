@@ -1,13 +1,12 @@
 import { type ReactNode, useState } from 'react'
 import { track } from '../analytics'
-import { chromeUrl, inAppBrowser, isIOS, systemBrowserUrl } from '../platform'
+import { chromeUrl, inAppBrowser, systemBrowserUrl, uprightApp } from '../platform'
 import { Icon } from './Icon'
 
 export function RotatePrompt() {
-  const stuck = isIOS ? inAppBrowser : null
   return (
     <div className="safe-pad fixed inset-0 z-40 flex items-center justify-center bg-ink/60 anim-fade backdrop-blur-[2px]">
-      {stuck && <MenuArrow />}
+      {uprightApp && <MenuArrow />}
       <div
         role="dialog"
         aria-modal="true"
@@ -15,7 +14,7 @@ export function RotatePrompt() {
         aria-describedby="rotate-why"
         className="panel w-full max-w-[340px] px-5 py-5 text-center anim-pop"
       >
-        {stuck ? <OpenInSafari app={stuck} /> : <TurnSideways app={inAppBrowser} />}
+        {uprightApp ? <OpenInSafari app={uprightApp} /> : <TurnSideways app={inAppBrowser} />}
       </div>
     </div>
   )

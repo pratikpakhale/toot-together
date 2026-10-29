@@ -3,6 +3,7 @@ import { type Region, regionOfCode } from '../../sim/regions'
 import { RAFT_RESULT } from '../../sim/types'
 import { setPlayerName, track } from '../analytics'
 import { audio } from '../audio/audio'
+import { whenPlayable } from '../platform'
 import { fx } from '../scene/Fx'
 import { useProgress } from '../state/progress'
 import { useApp } from '../state/store'
@@ -187,7 +188,7 @@ const isRoomCode = (code: string) => code.length === ROOM_CODE_LENGTH && regionO
 
 function joinOnline(room: string | null, courseId?: string, rafts = 1, region?: Region) {
   const { settings } = useApp.getState()
-  const session = new NetSession(settings.name, room, courseId, false, rafts, region)
+  const session = new NetSession(settings.name, room, courseId, false, rafts, region, whenPlayable)
   adopt(session)
   enterGame()
   setPlayerName(settings.name)
