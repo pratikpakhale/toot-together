@@ -172,6 +172,41 @@ select region, peak, count(*) rooms, round(avg(mins), 1) avg_mins, round(avg(run
 from ev where ev = 'room_close' group by all order by region, peak;
 ```
 
+**Play with anyone: did strangers find each other?** The primary measure: the share of public rooms that ever held two humans at once. Join it to PostHog's `quick_joined.room_code` for the share of itch players (`?ref=itch`) whose room got there.
+
+```sql
+select region, count(*) rooms, round(avg((peak_humans >= 2)::int) * 100) pct_two_humans, round(avg(runs), 1) avg_runs,
+  round(avg(bot_secs) / 60, 1) avg_bot_mins
+from ev where ev = 'room_close' and public group by all;
+```
+
+**How long quick-joiners float alone.** Per new public room, seconds until the first bot or human arrived; `nobody_came` counts rooms the player left first.
+
+```sql
+with opened as (select room, min(t::timestamptz) t0 from ev where ev = 'join' and how = 'quick' and outcome = 'created' group by room),
+waits as (
+  select o.room, min(epoch(e.t::timestamptz - o.t0)) wait_s
+  from opened o left join ev e on e.room = o.room and e.ev in ('bot_join', 'join') and e.t::timestamptz > o.t0
+  group by o.room
+)
+select count(*) rooms, median(wait_s) median_wait_s, sum(wait_s is null) nobody_came from waits;
+```
+
+**Finished runs per player, by how they got in** (PostHog). Quick vs create vs solo:
+
+```sql
+with starts as (
+  select person_id, properties.room as how from events
+  where {game} and event = 'game_started' and timestamp > now() - interval 7 day and properties.mode = 'online'
+  union all
+  select person_id, 'solo' from events where {game} and event = 'game_started' and timestamp > now() - interval 7 day and properties.mode = 'solo'
+), runs as (
+  select person_id, count() n from events where {game} and event = 'run_finished' and timestamp > now() - interval 7 day group by person_id
+)
+select how, count(distinct s.person_id) players, round(sum(coalesce(r.n, 0)) / count(distinct s.person_id), 2) finished_per_player
+from (select distinct person_id, how from starts) s left join runs r on r.person_id = s.person_id group by how
+```
+
 **Why connections fail.** Sockets that closed without joining, and refusals.
 
 ```sql

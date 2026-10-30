@@ -2,13 +2,15 @@ import { REGION_ID_LENGTH } from './regions'
 import type { Phase, PlayerInput, Results, RosterEntry, SimEvent, Snapshot } from './types'
 
 /** Bumped whenever client and server stop understanding each other; older pages are told to reload. */
-export const PROTOCOL_VERSION = 6
+export const PROTOCOL_VERSION = 7
 
 /** A room code is its server's region id and then this many random letters, like INBEAN. */
 export const ROOM_CODE_RANDOM = 4
 export const ROOM_CODE_LENGTH = REGION_ID_LENGTH + ROOM_CODE_RANDOM
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
 export const MAX_NAME_LENGTH = 14
+/** A new hippo's name is one of these and two digits, like Noodle42. */
+export const FUNNY_NAMES = ['Bubbles', 'Gassy', 'Tooter', 'Pudding', 'Mudpie', 'Biscuit', 'Wobbles', 'Beans', 'Puddle', 'Snorty', 'Noodle', 'Chonk']
 export const MAX_CHAT_LENGTH = 100
 /** Chat flood limit per player: this many lines in any `CHAT_WINDOW_MS`. */
 export const CHAT_LIMIT = 5
@@ -20,17 +22,17 @@ export const LEAVE_CLOSE_CODE = 4000
 export type ClientMsg =
   /**
    * `course` and `rafts` set up a new room (1 raft = co-op, 2–4 = race); `resume` reclaims a seat
-   * after a dropped connection.
+   * after a dropped connection. `public` (without `room`) asks the server for any open public room, or a new one.
    */
-  | { type: 'join'; v: number; name: string; room?: string; course?: string; rafts?: number; resume?: string }
+  | { type: 'join'; v: number; name: string; room?: string; course?: string; rafts?: number; resume?: string; public?: boolean }
   | ({ type: 'input' } & PlayerInput)
   /** Sends your own raft back to its last checkpoint. */
   | { type: 'respawn' }
   /** Back to the pond, optionally on another course. Host only (co-op: anyone may go again on the same course once the run is finished). */
   | { type: 'restart'; course?: string }
   | { type: 'ping'; t: number }
-  /** Hidden spectator mode: without `room` it streams the live room list, with one it watches that room. */
-  | { type: 'watch'; v: number; room?: string }
+  /** Hippocam: without `room` it streams the live room list, with one it watches that room. `key` is the server's HIPPOCAM_KEY. */
+  | { type: 'watch'; v: number; room?: string; key?: string }
   | { type: 'chat'; text: string }
   /** The player changed their name mid-room. */
   | { type: 'rename'; name: string }
@@ -48,11 +50,15 @@ export type ClientMsg =
   /** Host: start the countdown, or the rematch. */
   | { type: 'start' }
 
-export type JoinError = 'not_found' | 'full' | 'busy' | 'rate_limited' | 'expired' | 'outdated'
+/** `denied`: hippocam's key was wrong. `idle`: a public room gave the seat of a hippo that stopped playing to someone else. */
+export type JoinError = 'not_found' | 'full' | 'busy' | 'rate_limited' | 'expired' | 'outdated' | 'denied' | 'idle'
 
 export type ServerMsg =
-  /** `token` lets this client reclaim its seat if the connection drops; `results` is set if the run is already over. */
-  | { type: 'welcome'; id: number; room: string; course: string; token: string; results?: Results }
+  /**
+   * `token` lets this client reclaim its seat if the connection drops; `results` is set if the run is already over;
+   * `public`: a Play with anyone room, open to strangers.
+   */
+  | { type: 'welcome'; id: number; room: string; course: string; token: string; results?: Results; public?: boolean }
   | { type: 'roster'; players: RosterEntry[] }
   /** The room switched course; a fresh simulation (and clock) follows. */
   | { type: 'course'; course: string }
@@ -78,6 +84,8 @@ export interface ChatLine {
 
 export interface RoomSummary {
   code: string
+  /** Made by Play with anyone, so open to strangers (and topped up with bots). */
+  public: boolean
   course: string
   /** 1 = co-op, 2–4 = race. */
   rafts: number
@@ -92,7 +100,8 @@ export interface RoomSummary {
   /** Seconds since the last player left (the room closes after a minute), or null while anyone's in. */
   idle: number | null
   spectators: number
-  players: RosterEntry[]
+  /** Only hippocam is told which hippos are bots; players never are. */
+  players: (RosterEntry & { bot?: boolean })[]
 }
 
 export interface ServerStats {

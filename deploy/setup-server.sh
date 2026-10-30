@@ -49,6 +49,10 @@ install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$APP_DIR" "$APP_DIR/releases"
 install -m 644 "$HERE/toot-together.service" /etc/systemd/system/toot-together.service
 install -d /etc/systemd/system/toot-together.service.d
 printf '[Service]\nEnvironment=REGION=%s\n' "$REGION" >/etc/systemd/system/toot-together.service.d/region.conf
+if [ -n "${HIPPOCAM_KEY:-}" ]; then
+  install -m 600 /dev/null /etc/systemd/system/toot-together.service.d/hippocam.conf
+  printf '[Service]\nEnvironment=HIPPOCAM_KEY=%s\n' "$HIPPOCAM_KEY" >/etc/systemd/system/toot-together.service.d/hippocam.conf
+fi
 {
   cat "$HERE/Caddyfile"
   if [ -n "$REDIRECT_FROM" ]; then cat "$HERE/Caddyfile.redirect"; fi

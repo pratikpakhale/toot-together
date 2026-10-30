@@ -6,13 +6,14 @@ Sent by the page (`src/client/analytics.ts` and its `track(...)` callers; grep t
 
 | Event | When | Properties |
 | --- | --- | --- |
-| `game_started` | A game begins from the menu. | Solo/couch: `mode` (`solo`/`couch`), `course`, `players` (on this device). Online: `mode: 'online'`, `room` (`create`/`join`), `region` (server id), `course`, `rafts` (creates only; 1 co-op, 2–4 race). |
+| `game_started` | A game begins from the menu. | Solo/couch: `mode` (`solo`/`couch`), `course`, `players` (on this device). Online: `mode: 'online'`, `room` (`create`/`join`/`quick`, `quick` being Play with anyone, from 2026-10-30), `region` (server id), `course`, `rafts` (creates only; 1 co-op, 2–4 race). |
+| `quick_joined` | Play with anyone got a seat. From 2026-10-30. | `room_code`, `outcome` (`created`: alone in a new public room; `joined`: others were already in, bots included, since the page can't tell them apart) |
 | `river_started` | Results › Next river. | `mode` (`solo`/`couch`/`online`), `course` |
 | `run_finished` | A co-op or solo run reaches the finish (not races). | `mode`, `course`, `time` (s), `deaths`, `players` (in the run), `medal` (`gold`/`silver`/`bronze`/null), `room_code` and the connection summary (online) |
 | `race_finished` | A race ends. | `course`, `rafts`, `players`, `place` (null: out of time or benched), `room_code`, the connection summary |
 | `run_quit` | A run left before its finish, through the menu (`how: 'menu'`) or by closing the page (`how: 'closed'`). From 2026-10-28. | `how`, `phase` (`pond`: before the start line, `countdown`, `racing`), `mode`, `race`, `course`, `room_code`, `progress` (0–1 down the river), `deaths`, `time` (s since the start), the connection summary (online) |
-| `region_pings` | Once per page, from the main menu: the page times every region to pick the nearest for a new room. Pages that skip the menu (invite links) don't send it. | `ping_<region id>` (ms, median of 3 warm HTTP round trips; null: no answer within 2 s), `fastest` (region id, null if none answered) |
-| `online_error` | The player was sent back to the menu with an error notice. | `code`: `not_found` (no such room: typo or closed), `full`, `busy`, `rate_limited`, `expired` (seat given away), `outdated` (shown only if the reload failed), `unreachable` (the socket closed before joining), `disconnected` (lost mid-game and the 30 s reconnect window ran out). From 2026-10-28, `unreachable`/`disconnected` also carry `close` (WebSocket close code, see below), `opened` (whether the socket ever connected) and `server` (region id). |
+| `region_pings` | Once per page, when the main menu opens (before 2026-10-30: on Create room): the page times every region to pick the nearest for a new room or Play with anyone. Pages that skip the menu (invite links) don't send it. | `ping_<region id>` (ms, median of 3 warm HTTP round trips; null: no answer within 2 s), `fastest` (region id, null if none answered) |
+| `online_error` | The player was sent back to the menu with an error notice. | `code`: `not_found` (no such room: typo or closed), `full`, `busy`, `rate_limited`, `expired` (seat given away), `idle` (a public room freed the seat after 2 min without playing), `outdated` (shown only if the reload failed), `unreachable` (the socket closed before joining), `disconnected` (lost mid-game and the 30 s reconnect window ran out). From 2026-10-28, `unreachable`/`disconnected` also carry `close` (WebSocket close code, see below), `opened` (whether the socket ever connected) and `server` (region id). |
 | `in_app_prompt_shown` | The page asked a player in an app's own browser (Instagram, Facebook, Snapchat, TikTok) to open it in a real one: on arrival (`where: 'menu'`, from 2026-10-30) or over a river with the phone upright (`where: 'game'`). | `app`, `where` |
 | `open_in_browser` | A tap on that prompt's way out. | `via`: `intent` (Android, opens the default browser), `instagram` (iPhone Instagram's `extbrowser` link), `safari` (iPhone, `x-safari-https:`), `copy` (Copy link); `chrome` before 2026-10-30. `app`; `where` from 2026-10-30. |
 | `in_app_prompt_stayed` | The player chose Not now on the arrival prompt and stayed in the app's browser. From 2026-10-30. | `app` |
@@ -32,15 +33,19 @@ One JSON object per line from `server/index.ts`'s `log()`; grep `log('` there fo
 | `ev` | Fields | Notes |
 | --- | --- | --- |
 | `start` / `stop` | `release`, `protocol`, `rooms` / `signal`, `rooms`, `sockets` | Process start and shutdown (deploys, restarts). |
-| `stats` | `sockets`, `rooms`, `players`, `pingMedian`, `pingP90`, `pingMax` (ms; null with nobody on), `rssMb`, `cpu`, `load`, `stealPct`, `tickLateMax` (ms) | Every minute. `players` counts held seats, so concurrency per minute is `max(players)`. The pings are each connected player's latest heartbeat round trip (taken every 5 s). |
+| `stats` | `sockets`, `rooms`, `publicRooms`, `players`, `bots`, `pingMedian`, `pingP90`, `pingMax` (ms; null with nobody on), `rssMb`, `cpu`, `load`, `stealPct`, `tickLateMax` (ms) | Every minute. `players` counts held seats, so concurrency per minute is `max(players)`. The pings are each connected player's latest heartbeat round trip (taken every 5 s). |
 | `conn` | `sid`, `ip`, `ua`, `origin` | Every WebSocket that reached the game server. |
-| `join` | `sid`, `how` (`create`/`join`/`resume`), `room`, `course`, `player` (id in the room), `players` (seats after joining) | `resume` is a reconnect taking its seat back. |
+| `join` | `sid`, `how` (`create`/`join`/`resume`/`quick`), `room`, `course`, `player` (id in the room), `players` (human seats after joining); quick and later joins add `humans` (connected) and `bots`, and quick adds `outcome` (`created`/`joined`) | `resume` is a reconnect taking its seat back. `quick` is Play with anyone (from 2026-10-30). |
+| `bot_join` / `bot_leave` | `room`, `bot` (its id in the room), `name`, `humans` (connected); leave adds `secs` | Bots in public rooms. Players never see which hippos are bots; only these lines and /hippocam say. |
+| `bot_go_again` | `room`, `course` | A bot replayed the river after nobody did on the results (its `run_restart` follows). |
+| `idle_boot` | `room`, `player`, `mins` | A public room freed the seat of a player who stopped playing. |
+| `hippocam_denied` | `sid`, `ip`, `ua`, `origin`, `room` (when one was named), `key` (whether one was sent) | A watch without the right `HIPPOCAM_KEY`. |
 | `reject` | `sid`, `code` (same codes as `online_error`), `why` (the message shown), `room` when one was named, plus the limit hit (`sockets`, `joins`, `creates`, `rooms`, `v`) | The page shows this as an error notice. |
 | `join_timeout` | `sid` | Opened but never asked to join within 10 s. |
 | `close` | `sid`, `code`, `reason`, `secs` (socket lifetime), `room`, `player`, `watching` | Every socket's end. No `room`: it never joined. |
 | `socket_error` | `sid`, `error` | Protocol errors on a socket (e.g. an oversized message). |
 | `watch` | `sid`, `room` (absent: the /hippocam room list) | Spectators. |
-| `room_open` / `room_close` | `room`, `course`, `rafts` / `room`, `course` (last river), `mins` (lifetime), `peak` (most seats at once), `runs` (finished) | A room closes 60 s after its last player's seat is released. |
+| `room_open` / `room_close` | `room`, `course`, `rafts`, `public` / `room`, `course` (last river), `mins` (lifetime), `peak` (most human seats at once), `peak_humans` (most connected humans at once), `runs` (finished), `public`, `bot_secs` (bot-seconds spent in it) | `public`: a Play with anyone room (absent on private ones). | A room closes 60 s after its last player's seat is released. |
 | `room_lost` | `room`, `course`, `players` | A parked room the new release couldn't restore. |
 | `course` | `room`, `from`, `to` | The host picked the next river. |
 | `run_start` / `run_restart` / `run_finish` | `room`, `course`, `race`; start adds `players`, `rafts`; finish adds `time` (s), `deaths` (all rafts), `players`, `rafts` | Start: co-op crossed the start line, or a race's gate opened. |

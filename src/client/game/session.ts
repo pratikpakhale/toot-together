@@ -32,6 +32,7 @@ import {
 } from '../../sim/types'
 import { socketUrl } from '../regions'
 import { SnapshotClock } from './clock'
+import { hippocamKey } from './hippocamKey'
 import type { DeviceId } from './input'
 import { cloneSnapshot, extrapolate, interpolate } from './interp'
 
@@ -53,6 +54,7 @@ export interface SessionInfo {
   status: SessionStatus
   courseId: string
   roomCode: string | null
+  isPublic: boolean
   roster: RosterEntry[]
   chat: ChatEntry[]
   error: {
@@ -124,7 +126,16 @@ abstract class BaseSession {
   private listeners = new Set<() => void>()
 
   constructor(courseId: string) {
-    this.info = { status: 'connecting', courseId: getCourse(courseId).def.id, roomCode: null, roster: [], chat: [], error: null, refused: null }
+    this.info = {
+      status: 'connecting',
+      courseId: getCourse(courseId).def.id,
+      roomCode: null,
+      isPublic: false,
+      roster: [],
+      chat: [],
+      error: null,
+      refused: null,
+    }
   }
 
   get course() {
@@ -392,6 +403,7 @@ export class NetSession extends BaseSession implements GameSession {
     /** Where a room this session creates goes; a room code names its own. */
     private readonly region: Region = REGIONS[0],
     whenPlayable = playNow,
+    private readonly quick = false,
   ) {
     super(courseId)
     this.canChat = !spectating
@@ -439,9 +451,10 @@ export class NetSession extends BaseSession implements GameSession {
       opened = true
       const name = sanitizeName(this.name)
       const v = PROTOCOL_VERSION
-      if (this.spectating) this.send({ type: 'watch', v, room: this.room ?? undefined })
+      if (this.spectating) this.send({ type: 'watch', v, room: this.room ?? undefined, key: hippocamKey() })
       else if (this.token && this.info.roomCode) this.send({ type: 'join', v, name, room: this.info.roomCode, resume: this.token })
       else if (code) this.send({ type: 'join', v, name, room: code })
+      else if (this.quick) this.send({ type: 'join', v, name, public: true })
       else this.send({ type: 'join', v, name, course: this.info.courseId, rafts: this.rafts })
     }
     ws.onmessage = (e) => {
@@ -529,7 +542,7 @@ export class NetSession extends BaseSession implements GameSession {
         this.resumeAfterGap({ lastPhase, results: msg.results ?? null })
         // A resumed seat keeps the name it joined with; catch up on a rename made since.
         if (resumed) this.send({ type: 'rename', name: sanitizeName(this.name) })
-        this.setInfo({ roomCode: msg.room, courseId: msg.course })
+        this.setInfo({ roomCode: msg.room, courseId: msg.course, isPublic: msg.public === true })
         this.startPinging()
         break
       }

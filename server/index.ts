@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { createReadStream, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage } from 'node:http'
 import { freemem, loadavg } from 'node:os'
@@ -31,6 +31,7 @@ import {
 import { REGIONS, regionById } from '../src/sim/regions'
 import { type Refusal, Sim } from '../src/sim/sim'
 import type { Results, RosterEntry, SimEvent } from '../src/sim/types'
+import { BotCrew } from './bots'
 
 const PORT = Number(process.env.PORT ?? 2567)
 const HOST = process.env.HOST
@@ -55,6 +56,8 @@ const MAX_JOINS_PER_SOCKET = 6
 const ROOM_CREATES_PER_IP_PER_MINUTE = 8
 const FAILED_JOINS_PER_IP_PER_MINUTE = 20
 const JOIN_DEADLINE_MS = 10_000
+const IDLE_BOOT_MS = 120_000
+const HIPPOCAM_KEY = process.env.HIPPOCAM_KEY ?? ''
 
 const STATS_EVERY_MS = 1000
 const ROOMS_FILE = process.env.ROOMS_FILE ?? (process.env.STATE_DIRECTORY ? join(process.env.STATE_DIRECTORY, 'rooms.json') : null)
@@ -79,6 +82,14 @@ function cleanChat(raw: unknown) {
   return censor.applyTo(text, profanity.getAllMatches(text, true))
 }
 
+const digest = (text: string) => createHash('sha256').update(text).digest()
+const HIPPOCAM_DIGEST = digest(HIPPOCAM_KEY)
+
+function hippocamAllowed(key: unknown) {
+  if (!HIPPOCAM_KEY) return process.env.NODE_ENV !== 'production'
+  return typeof key === 'string' && timingSafeEqual(digest(key), HIPPOCAM_DIGEST)
+}
+
 function cleanName(raw: unknown) {
   const name = sanitizeName(raw)
   if (!profanity.hasMatch(name)) return name
@@ -95,7 +106,25 @@ interface Client {
   stale: boolean
   awaySince: number | null
   chatTimes: number[]
+  activeAt: number
+  lastAim: number | null
+  lastBurst: number
 }
+
+const newClient = (ws: WebSocket | null, id: number, token: string, now = Date.now()): Client => ({
+  ws,
+  id,
+  token,
+  msgCount: 0,
+  msgWindow: now,
+  lastInputAt: now,
+  stale: false,
+  awaySince: null,
+  chatTimes: [],
+  activeAt: now,
+  lastAim: null,
+  lastBurst: 0,
+})
 
 class Room {
   sim: Sim
@@ -107,7 +136,9 @@ class Room {
   createdAt = Date.now()
   /** For the room's closing log line. */
   peakPlayers = 0
+  peakHumans = 0
   runsFinished = 0
+  readonly bots: BotCrew | null
   private nextId = 1
   private rosterSent = -1
   private pingsSent = ''
@@ -117,8 +148,37 @@ class Room {
     readonly code: string,
     courseId: string,
     rafts = 1,
+    readonly isPublic = false,
   ) {
     this.sim = new Sim(getCourse(courseId), randomSeed(), rafts)
+    const room = this
+    this.bots = isPublic
+      ? new BotCrew(
+          {
+            get sim() {
+              return room.sim
+            },
+            humans: () => this.connectedCount(),
+            freeSeats: () => this.sim.capacity - this.seatsTaken,
+            seatBot: (name) => {
+              const id = this.nextId++
+              this.sim.addNewcomer(id, name)
+              return id
+            },
+            unseatBot: (id) => {
+              this.sim.removePlayer(id)
+              this.broadcastRoster()
+            },
+            say: (id, text) => this.say(id, text),
+            goAgain: () => {
+              if (this.sim.phase !== 'finished') return
+              log('bot_go_again', { room: this.code, course: this.courseId })
+              this.sim.restart()
+            },
+          },
+          (ev, bot) => log(ev, { room: this.code, bot: bot.id, name: bot.name, secs: bot.secs, humans: this.connectedCount() }),
+        )
+      : null
   }
 
   get courseId() {
@@ -129,19 +189,15 @@ class Room {
     return this.clients.size >= this.sim.capacity
   }
 
+  /** Bots hold seats like anyone. */
+  get seatsTaken() {
+    return this.clients.size + (this.bots?.size ?? 0)
+  }
+
   join(ws: WebSocket, name: string): Client | null {
     if (this.full) return null
-    const client: Client = {
-      ws,
-      id: this.nextId++,
-      token: randomBytes(16).toString('hex'),
-      msgCount: 0,
-      msgWindow: Date.now(),
-      lastInputAt: Date.now(),
-      stale: false,
-      awaySince: null,
-      chatTimes: [],
-    }
+    if (this.seatsTaken >= this.sim.capacity) this.bots?.yieldSeat()
+    const client = newClient(ws, this.nextId++, randomBytes(16).toString('hex'))
     this.clients.set(client.id, client)
     this.peakPlayers = Math.max(this.peakPlayers, this.clients.size)
     this.sim.addNewcomer(client.id, name)
@@ -159,7 +215,7 @@ class Room {
     }
     client.ws = ws
     client.awaySince = null
-    client.lastInputAt = Date.now()
+    client.lastInputAt = client.activeAt = Date.now()
     this.sim.setAway(client.id, false)
     this.emptySince = null
     this.welcome(client)
@@ -168,7 +224,15 @@ class Room {
 
   private welcome(client: Client) {
     const results = this.sim.phase === 'finished' ? (this.results ?? undefined) : undefined
-    send(client.ws, { type: 'welcome', id: client.id, room: this.code, course: this.courseId, token: client.token, results })
+    send(client.ws, {
+      type: 'welcome',
+      id: client.id,
+      room: this.code,
+      course: this.courseId,
+      token: client.token,
+      results,
+      public: this.isPublic || undefined,
+    })
     send(client.ws, { type: 'chat', lines: this.chat, history: true })
     this.broadcastRoster()
     send(client.ws, this.snapMsg())
@@ -177,6 +241,7 @@ class Room {
   save() {
     return {
       code: this.code,
+      public: this.isPublic,
       course: this.courseId,
       createdAt: this.createdAt,
       nextId: this.nextId,
@@ -190,7 +255,7 @@ class Room {
   static restore(saved: SavedRoom, savedAt: number): Room | null {
     const sim = isCourseId(saved.course) ? Sim.restore(getCourse(saved.course), saved.sim) : null
     if (!sim) return null
-    const room = new Room(saved.code, saved.course)
+    const room = new Room(saved.code, saved.course, 1, saved.public === true)
     room.sim = sim
     room.createdAt = saved.createdAt
     room.nextId = saved.nextId
@@ -200,7 +265,8 @@ class Room {
     for (const { id, token, awaySince } of saved.seats) {
       // Seats already empty when the server went down keep only what was left of their hold.
       const since = now - (savedAt - (awaySince ?? savedAt))
-      const client: Client = { ws: null, id, token, msgCount: 0, msgWindow: now, lastInputAt: now, stale: false, awaySince: since, chatTimes: [] }
+      const client = newClient(null, id, token, now)
+      client.awaySince = since
       room.clients.set(id, client)
       room.releaseInput(client)
       sim.setAway(id, true)
@@ -233,6 +299,7 @@ class Room {
     const leader = progress.reduce<number>((best, p, i) => (p !== null && p > (progress[best] ?? -1) ? i : best), 0)
     return {
       code: this.code,
+      public: this.isPublic,
       course: this.courseId,
       rafts: sim.rafts.length,
       phase: sim.phase,
@@ -242,7 +309,7 @@ class Room {
       age: Math.round((now - this.createdAt) / 1000),
       idle: this.connectedCount() === 0 && this.emptySince !== null ? Math.round((now - this.emptySince) / 1000) : null,
       spectators: this.spectators.size,
-      players: this.roster(),
+      players: this.roster().map((p) => (this.bots?.has(p.id) ? { ...p, bot: true } : p)),
     }
   }
 
@@ -267,7 +334,7 @@ class Room {
     return earliestJoinedConnected?.id ?? null
   }
 
-  private connectedCount() {
+  connectedCount() {
     let n = 0
     for (const c of this.clients.values()) if (c.ws) n++
     return n
@@ -275,21 +342,29 @@ class Room {
 
   handle(client: Client, msg: ClientMsg) {
     const host = this.hostId() === client.id
+    if (msg.type !== 'input' && msg.type !== 'ping') client.activeAt = Date.now()
     const refuse = (reason: Refusal) => {
       if (reason) send(client.ws, { type: 'refused', reason })
     }
     const hostOnly = (act: () => Refusal) => refuse(host ? act() : 'Only the host can do that.')
     switch (msg.type) {
-      case 'input':
-        client.lastInputAt = Date.now()
+      case 'input': {
+        const now = Date.now()
+        client.lastInputAt = now
         client.stale = false
-        this.sim.setInput(client.id, {
+        const input = {
           aim: typeof msg.aim === 'number' && Number.isFinite(msg.aim) ? msg.aim : null,
           walk: msg.walk === 1 || msg.walk === -1 ? msg.walk : 0,
           fart: msg.fart === true,
           burst: typeof msg.burst === 'number' && Number.isFinite(msg.burst) ? msg.burst : 0,
-        })
+        } as const
+        const aimed = input.aim !== null && (client.lastAim === null || Math.abs(input.aim - client.lastAim) > 0.05)
+        if (input.fart || input.walk !== 0 || aimed || input.burst !== client.lastBurst) client.activeAt = now
+        client.lastAim = input.aim
+        client.lastBurst = input.burst
+        this.sim.setInput(client.id, input)
         break
+      }
       case 'respawn':
         refuse(this.sim.requestRespawn(client.id))
         break
@@ -350,7 +425,13 @@ class Room {
       return
     }
     client.chatTimes.push(now)
-    const line: ChatLine = { id: client.id, name: player.name, seat: player.seat, text }
+    this.say(client.id, text)
+  }
+
+  private say(id: number, text: string) {
+    const player = this.sim.players.get(id)
+    if (!player) return
+    const line: ChatLine = { id, name: player.name, seat: player.seat, text }
     this.chat = [...this.chat, line].slice(-CHAT_HISTORY)
     this.broadcast({ type: 'chat', lines: [line] })
   }
@@ -379,19 +460,36 @@ class Room {
         this.leave(c.id)
         continue
       }
+      if (this.isPublic && c.ws && now - c.activeAt > IDLE_BOOT_MS) {
+        this.bootIdle(c)
+        continue
+      }
       if (c.ws && !c.stale && now - c.lastInputAt > INPUT_STALE_MS) {
         c.stale = true
         this.releaseInput(c)
       }
     }
-    if (this.connectedCount() === 0) return
+    this.bots?.update(now)
+    const humans = this.connectedCount()
+    if (humans === 0) return
+    this.peakHumans = Math.max(this.peakHumans, humans)
     this.sim.host = this.hostId()
     this.sim.step()
     const events = this.sim.drainEvents()
     for (const e of events) this.logEvent(e)
+    this.bots?.onEvents(events, now)
     if (this.sim.rosterVersion !== this.rosterSent) this.broadcastRoster()
     if (events.length) this.broadcast({ type: 'events', events })
     if (this.sim.tick % SNAPSHOT_EVERY === 0) this.broadcast(this.snapMsg())
+  }
+
+  private bootIdle(c: Client) {
+    const ws = c.ws
+    log('idle_boot', { room: this.code, player: c.id, mins: Math.round((Date.now() - c.activeAt) / 60_000) })
+    c.ws = null
+    this.leave(c.id)
+    send(ws, { type: 'error', code: 'idle', message: 'You stopped playing for a while, so your seat went to someone else.' })
+    ws?.close()
   }
 
   private logEvent(e: SimEvent) {
@@ -439,6 +537,7 @@ class Room {
   private roster(): RosterEntry[] {
     const host = this.hostId()
     return this.sim.roster().map((p) => {
+      if (this.bots?.has(p.id)) return { ...p, host: false, away: false, ping: this.bots.ping(p.id) }
       const ws = this.clients.get(p.id)?.ws
       return { ...p, host: p.id === host, away: !ws, ping: ws ? (rtt.get(ws) ?? null) : null }
     })
@@ -446,6 +545,7 @@ class Room {
 
   /** Sends the roster again if anyone's ping changed since it last went out. */
   sendPings() {
+    this.bots?.jitterPings()
     const pings = this.roster()
       .map((p) => p.ping)
       .join()
@@ -476,6 +576,18 @@ function newRoomCode() {
     for (let i = 0; i < ROOM_CODE_RANDOM; i++) code += ROOM_CODE_ALPHABET[Math.floor(Math.random() * ROOM_CODE_ALPHABET.length)]
     if (!rooms.has(code)) return code
   }
+}
+
+function findPublicRoom() {
+  let best: Room | null = null
+  let bestScore = -1
+  for (const room of rooms.values()) {
+    if (!room.isPublic || room.seatsTaken >= room.sim.capacity) continue
+    const lobby = room.sim.phase === 'pond' || room.sim.phase === 'finished'
+    const score = room.connectedCount() * 2 + (lobby ? 1 : 0)
+    if (score > bestScore) [best, bestScore] = [room, score]
+  }
+  return best
 }
 
 function send(ws: WebSocket | null, msg: ServerMsg) {
@@ -672,6 +784,19 @@ wss.on('connection', (ws, req) => {
       }
       if (msg.type === 'watch') {
         const code = normalizeRoomCode(msg.room)
+        if (!hippocamAllowed(msg.key)) {
+          failedJoins.hit(ip)
+          log('hippocam_denied', {
+            sid,
+            ip,
+            ua: req.headers['user-agent'],
+            origin: req.headers.origin,
+            room: code || undefined,
+            key: typeof msg.key === 'string' && msg.key !== '',
+          })
+          refuse('denied', 'Wrong hippocam key.', { room: code || undefined })
+          return
+        }
         if (!code) {
           watching = true
           log('watch', { sid })
@@ -691,6 +816,8 @@ wss.on('connection', (ws, req) => {
       }
       const code = normalizeRoomCode(msg.room)
       const resume = typeof msg.resume === 'string' ? msg.resume : null
+      const quick = !code && msg.public === true
+      if (quick) room = findPublicRoom()
       if (code) {
         room = rooms.get(code) ?? null
         if (!room) {
@@ -707,7 +834,7 @@ wss.on('connection', (ws, req) => {
           failJoin('full', `Room ${code} already has ${room.sim.capacity} hippos.`, code)
           return
         }
-      } else {
+      } else if (!room) {
         if (rooms.size >= MAX_ROOMS) {
           refuse('busy', 'The server is packed right now. Try again in a few minutes.', { rooms: rooms.size })
           return
@@ -716,15 +843,27 @@ wss.on('connection', (ws, req) => {
           refuse('rate_limited', 'Slow down! Too many rooms created. Try again in a minute.', { creates: true })
           return
         }
-        const course = isCourseId(msg.course) ? msg.course : DEFAULT_COURSE
-        const rafts = Number.isInteger(msg.rafts) ? Math.min(MAX_RAFTS, Math.max(1, Number(msg.rafts))) : 1
-        room = new Room(newRoomCode(), course, rafts)
+        const course = quick ? DEFAULT_COURSE : isCourseId(msg.course) ? msg.course : DEFAULT_COURSE
+        const rafts = !quick && Number.isInteger(msg.rafts) ? Math.min(MAX_RAFTS, Math.max(1, Number(msg.rafts))) : 1
+        room = new Room(newRoomCode(), course, rafts, quick)
         rooms.set(room.code, room)
-        log('room_open', { room: room.code, course, rafts })
+        log('room_open', { room: room.code, course, rafts, public: quick || undefined })
       }
+      const created = room.clients.size === 0
       client = room.join(ws, cleanName(msg.name))
       if (!client) failJoin('full', 'That raft is full.', room.code)
-      else log('join', { sid, how: code ? 'join' : 'create', room: room.code, course: room.courseId, player: client.id, players: room.clients.size })
+      else
+        log('join', {
+          sid,
+          how: quick ? 'quick' : code ? 'join' : 'create',
+          outcome: quick ? (created ? 'created' : 'joined') : undefined,
+          room: room.code,
+          course: room.courseId,
+          player: client.id,
+          players: room.clients.size,
+          humans: room.connectedCount(),
+          bots: room.bots?.size,
+        })
       return
     }
 
@@ -803,7 +942,10 @@ function gameLoop() {
           course: room.courseId,
           mins: Math.round((Date.now() - room.createdAt) / 60_000),
           peak: room.peakPlayers,
+          peak_humans: room.peakHumans,
           runs: room.runsFinished,
+          public: room.isPublic || undefined,
+          bot_secs: room.bots ? Math.round(room.bots.botMs / 1000) : undefined,
         })
       }
     }
@@ -885,8 +1027,12 @@ setInterval(() => {
   let players = 0
   // Each connected player's latest heartbeat round trip, to see how far this region is from the people on it.
   const pings: number[] = []
+  let bots = 0
+  let publicRooms = 0
   for (const room of rooms.values()) {
     players += room.clients.size
+    bots += room.bots?.size ?? 0
+    if (room.isPublic) publicRooms++
     for (const c of room.clients.values()) {
       const ms = c.ws ? rtt.get(c.ws) : undefined
       if (ms !== undefined) pings.push(ms)
@@ -898,7 +1044,9 @@ setInterval(() => {
   log('stats', {
     sockets,
     rooms: rooms.size,
+    publicRooms,
     players,
+    bots,
     pingMedian: ping(0.5),
     pingP90: ping(0.9),
     pingMax: ping(1),
@@ -920,6 +1068,7 @@ server.listen(PORT, HOST, () => {
 
 function parkRooms() {
   if (!ROOMS_FILE || rooms.size === 0) return
+  for (const room of rooms.values()) room.bots?.removeAll()
   const tmp = `${ROOMS_FILE}.tmp`
   writeFileSync(tmp, JSON.stringify({ savedAt: Date.now(), rooms: [...rooms.values()].map((r) => r.save()) }))
   renameSync(tmp, ROOMS_FILE)

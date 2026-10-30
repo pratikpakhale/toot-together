@@ -31,6 +31,7 @@ PH=.agents/skills/analyze-toot-together/scripts/ph.mjs   # from the repo root; s
 
 - **Filter to the game.** The PostHog project holds other apps too. Put `{game}` in every `where`; `ph.mjs` turns it into the hostname filter.
 - **Bots.** About a third of "visitors" are link previews and crawlers: desktop, no clicks, no `game_started`, gone in 0 s. Leave them out of conversion rates (`RECIPES.md` has the filter) and say so.
+- **Raft bots are not those bots.** From 2026-10-30, public rooms (Play with anyone) seat server-side bots. They never touch PostHog. In the server log they're `bot_join`/`bot_leave`, `stats.bots` and `room_close.bot_secs`, and `players`/`peak` count humans only. A PostHog `quick_joined` with `outcome: 'joined'` may have joined only bots; use `room_close.peak_humans` for real company.
 - **River starts are two events.** `game_started` fires when a game begins from the menu (solo, couch, or creating/joining a room); `river_started` fires on Results › Next river. Replays (Play again, Restart) fire neither. Starts per river = both events.
 - **`run_quit` exists from 2026-10-28.** Before that, a quit is only visible as a start with no finish.
 - **People vs devices.** A PostHog person is one browser. One player on a phone and a laptop is two people.

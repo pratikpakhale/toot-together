@@ -4,7 +4,7 @@ import { RAFT_RESULT } from '../../sim/types'
 import { setPlayerName, track } from '../analytics'
 import { audio } from '../audio/audio'
 import { whenPlayable } from '../platform'
-import { measureRegions } from '../regions'
+import { fastestRegion, measureRegions, useRegionPings } from '../regions'
 import { fx } from '../scene/Fx'
 import { isUnlocked, playable, useProgress } from '../state/progress'
 import { useApp } from '../state/store'
@@ -78,6 +78,8 @@ const ERROR_TITLES: Partial<Record<NonNullable<SessionInfo['error']>['code'], st
   busy: 'Server is busy',
   rate_limited: 'Slow down!',
   expired: 'Seat expired',
+  idle: 'Seat freed',
+  denied: 'Locked',
   unreachable: "Can't reach the server",
   outdated: 'New version!',
 }
@@ -188,24 +190,33 @@ export function joinRoom(code: string) {
 
 const isRoomCode = (code: string) => code.length === ROOM_CODE_LENGTH && regionOfCode(code) !== null
 
-function joinOnline(room: string | null, courseId?: string, rafts = 1, region?: Region) {
+const PING_WAIT_MS = 1500
+
+export async function quickJoin() {
+  const measuring = measureRegions()
+  if (measuring) await Promise.race([measuring, new Promise((done) => setTimeout(done, PING_WAIT_MS))])
+  joinOnline(null, undefined, 1, fastestRegion(useRegionPings.getState()), true)
+}
+
+function joinOnline(room: string | null, courseId?: string, rafts = 1, region?: Region, quick = false) {
   const { settings } = useApp.getState()
-  const session = new NetSession(settings.name, room, courseId, false, rafts, region, whenPlayable)
+  const session = new NetSession(settings.name, room, courseId, false, rafts, region, whenPlayable, quick)
   adopt(session)
   enterGame()
   setPlayerName(settings.name)
   track('game_started', {
     mode: 'online',
-    room: room ? 'join' : 'create',
+    room: room ? 'join' : quick ? 'quick' : 'create',
     region: (room ? regionOfCode(room) : region)?.id,
     course: session.info.courseId,
-    ...(room ? {} : { rafts }),
+    ...(room || quick ? {} : { rafts }),
   })
   const stop = session.subscribe(() => {
-    if (session.info.roomCode) {
-      setRoomInUrl(session.info.roomCode)
-      stop()
-    }
+    const { roomCode, roster } = session.info
+    if (!roomCode || !roster.length) return
+    setRoomInUrl(roomCode)
+    if (quick) track('quick_joined', { room_code: roomCode, outcome: roster.length > 1 ? 'joined' : 'created' })
+    stop()
   })
 }
 

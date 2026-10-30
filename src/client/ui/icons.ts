@@ -428,6 +428,34 @@ export const ICONS = {
   people:
     `<circle cx="44" cy="20" r="9" fill="#ff9a3c" ${O}/><path d="M35 33c3-2 6-3 9-3 9 0 15 7 15 17H41" fill="#ff9a3c" ${O}/>` +
     `<circle cx="22" cy="22" r="10" fill="#4aa8ff" ${O}/><path d="M5 52c0-11 8-18 17-18s17 7 17 18z" fill="#4aa8ff" ${O}/>`,
+
+  gear:
+    `<g fill="${INK}">${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => `<rect x="26" y="3" width="12" height="16" rx="3" transform="rotate(${a} 32 32)"/>`).join('')}</g>` +
+    `<circle cx="32" cy="32" r="19" fill="#ffcf3f" ${O}/><circle cx="32" cy="32" r="7" fill="#fff8ec" ${O}/>` +
+    shine(24, 22, 4, 2, -35, 0.7),
+
+  help:
+    `<circle cx="32" cy="32" r="26" fill="#6fcaff" ${O}/>` +
+    `<path d="M23 25a9 9 0 1 1 13 8c-3 2-4 3-4 7" fill="none" stroke="${INK}" stroke-width="10"/><path d="M23 25a9 9 0 1 1 13 8c-3 2-4 3-4 7" fill="none" stroke="#fff" stroke-width="4"/>` +
+    `<circle cx="32" cy="50" r="5" fill="#fff" ${O3}/>` +
+    shine(17, 21, 5, 2.5, -40, 0.6),
+
+  pencil:
+    `<g transform="rotate(45 32 32)"><rect x="24" y="4" width="16" height="40" rx="3" fill="#ffcf3f" ${O}/>` +
+    `<path d="M24 12h16" stroke="${INK}" stroke-width="3"/><path d="M24 44h16l-8 15z" fill="#fde7cf" ${O}/><path d="M29.5 54l2.5 5 2.5-5z" fill="${INK}"/></g>`,
+
+  dice:
+    `<rect x="7" y="7" width="50" height="50" rx="12" fill="#fff8ec" ${O}/>` +
+    [
+      [20, 20],
+      [44, 20],
+      [32, 32],
+      [20, 44],
+      [44, 44],
+    ]
+      .map(([cx, cy]) => `<circle cx="${cx}" cy="${cy}" r="4.5" fill="${INK}"/>`)
+      .join('') +
+    shine(16, 14, 4, 2, -20, 0.9),
 } satisfies Record<string, string>
 
 export type IconName = keyof typeof ICONS

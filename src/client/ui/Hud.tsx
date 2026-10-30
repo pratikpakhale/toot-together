@@ -12,6 +12,7 @@ import { useApp } from '../state/store'
 import { ChatButton } from './Chat'
 import { formatTime } from './format'
 import { Icon } from './Icon'
+import { LookingForCrew } from './LookingForCrew'
 import { setTagContent } from './NameTags'
 import { ClosingChip, Countdown, MiniStandings, PlaceChip, RaceLobby, TeamBadge, usePhase, useRace, useSeatToast, WatchBar } from './Race'
 
@@ -315,6 +316,9 @@ export function Hud() {
       </div>
 
       {!race && phase === 'pond' && !session.spectating && <PondHint devices={session.localPlayers.map((p) => p.device)} localIds={localIds} />}
+      {online && info?.isPublic && info.roomCode && !session.spectating && (
+        <LookingForCrew roster={roster} phase={phase} code={info.roomCode} myId={localIds[0] ?? null} />
+      )}
       {lobby && <RaceLobby session={session} short={short} />}
       {race && <Countdown />}
       {race && <WatchBar session={session} short={short} />}

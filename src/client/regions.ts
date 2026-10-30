@@ -33,16 +33,16 @@ async function pingRegion(region: Region) {
   return Math.round(warm[warm.length >> 1])
 }
 
-let measured = false
+let measuring: Promise<void> | null = null
 
 /**
  * Times every region once per page; with a single region there's nothing to choose, so nothing is sent. Analytics gets
- * the results as `ping_<id>` (null: no answer), to see which players each region serves well.
+ * the results as `ping_<id>` (null: no answer), to see which players each region serves well. Resolves once all have
+ * answered or timed out.
  */
 export function measureRegions() {
-  if (measured || REGIONS.length < 2) return
-  measured = true
-  void Promise.all(
+  if (REGIONS.length < 2) return null
+  measuring ??= Promise.all(
     REGIONS.map((r) =>
       pingRegion(r).then((ms) => {
         useRegionPings.setState({ [r.id]: ms })
@@ -53,6 +53,7 @@ export function measureRegions() {
     const answered = pings.some(([, ms]) => ms !== null)
     track('region_pings', { ...Object.fromEntries(pings), fastest: answered ? fastestRegion(useRegionPings.getState()).id : null })
   })
+  return measuring
 }
 
 /** The region with the shortest round trip; the first one while nothing has answered. */

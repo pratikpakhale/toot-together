@@ -9,6 +9,7 @@ import { useApp } from './state/store'
 import { ChatDock } from './ui/Chat'
 import { CrewsPanel } from './ui/Crews'
 import { FeedbackPanel } from './ui/Feedback'
+import { FriendsPanel } from './ui/FriendsPanel'
 import { HowToPlay } from './ui/HowToPlay'
 import { Hud } from './ui/Hud'
 import { InstallPrompt } from './ui/InstallPrompt'
@@ -146,6 +147,7 @@ export function App() {
       {overlay === 'levels' && <LevelSelect />}
       {overlay === 'crews' && <CrewsPanel />}
       {overlay === 'feedback' && <FeedbackPanel />}
+      {overlay === 'friends' && <FriendsPanel />}
       <div id="flash" className="pointer-events-none fixed inset-0 bg-white opacity-0" />
       <Connecting />
       <Notice />

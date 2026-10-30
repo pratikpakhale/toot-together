@@ -6,6 +6,7 @@ export function Modal({
   onClose,
   width = 520,
   shortWidth = width,
+  shortTop = false,
 }: {
   children: ReactNode
   /** Stays pinned below the scrolling content instead of scrolling with it. */
@@ -13,10 +14,11 @@ export function Modal({
   onClose?: () => void
   width?: number
   shortWidth?: number
+  shortTop?: boolean
 }) {
   return (
     <div
-      className="safe-pad fixed inset-0 z-30 flex items-center justify-center bg-ink/45 anim-fade backdrop-blur-[2px] short:[--pad:0.5rem]"
+      className={`safe-pad fixed inset-0 z-30 flex items-center justify-center bg-ink/45 anim-fade backdrop-blur-[2px] short:[--pad:0.5rem] ${shortTop ? 'short:items-start' : ''}`}
       onPointerDown={(e) => e.target === e.currentTarget && onClose?.()}
     >
       <div

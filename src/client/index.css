@@ -363,6 +363,18 @@ img {
 .anim-fade {
   animation: fade-in 250ms ease both;
 }
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(-0.5deg);
+  }
+}
+.anim-bob {
+  animation: bob 2.4s ease-in-out infinite;
+}
 
 /* Stickers are slapped on (speeding up into the glass, then a dead stop) and peeled off when --life runs out. */
 @keyframes sticker-on {
@@ -523,6 +535,7 @@ img {
   .anim-rise,
   .anim-wobble,
   .anim-float,
+  .anim-bob,
   .anim-fade,
   .chat-life,
   .chat-wheel,

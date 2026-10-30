@@ -5,7 +5,7 @@ import { renamePlayer } from '../game/controller'
 import { useApp } from '../state/store'
 import { Modal } from './Modal'
 
-export function NameInput({ className }: { className: string }) {
+function NameInput({ className }: { className: string }) {
   const name = useApp((s) => s.settings.name)
   const update = useApp((s) => s.updateSettings)
   const before = useRef(name)

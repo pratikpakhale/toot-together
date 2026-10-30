@@ -20,9 +20,9 @@ export async function freePort() {
   return port
 }
 
-export function startServer(port: number, roomsFile = '') {
+export function startServer(port: number, roomsFile = '', env: Record<string, string> = {}) {
   const proc = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
-    env: { ...process.env, PORT: String(port), ROOMS_FILE: roomsFile },
+    env: { ...process.env, PORT: String(port), ROOMS_FILE: roomsFile, ...env },
   })
   servers.push(proc)
   const log: string[] = []

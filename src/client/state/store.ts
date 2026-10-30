@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { FUNNY_NAMES } from '../../sim/protocol'
 import type { Results } from '../../sim/types'
 import type { GameSession, SessionInfo } from '../game/session'
 import type { IconName } from '../ui/icons'
@@ -6,7 +7,7 @@ import type { FinishOutcome } from './progress'
 
 type Screen = 'menu' | 'local-lobby' | 'game' | 'hippocam'
 /** `crews`: the host's crew tools in a race room. */
-type Overlay = null | 'pause' | 'settings' | 'howto' | 'results' | 'levels' | 'crews' | 'feedback'
+type Overlay = null | 'pause' | 'settings' | 'howto' | 'results' | 'levels' | 'crews' | 'feedback' | 'friends'
 /** `online`: a co-op room; `race`: a room set to race, where the host picks how many rafts. */
 type LevelMode = 'solo' | 'online' | 'race'
 /**
@@ -40,13 +41,13 @@ export interface Toast {
   ms: number
 }
 
-const FUNNY_NAMES = ['Bubbles', 'Gassy', 'Tooter', 'Pudding', 'Mudpie', 'Biscuit', 'Wobbles', 'Beans', 'Puddle', 'Snorty', 'Noodle', 'Chonk']
+export const randomName = () => `${FUNNY_NAMES[Math.floor(Math.random() * FUNNY_NAMES.length)]}${Math.floor(Math.random() * 90 + 10)}`
 
 const SETTINGS_KEY = 'toot-together:settings'
 
 function loadSettings(): Settings {
   const fallback: Settings = {
-    name: `${FUNNY_NAMES[Math.floor(Math.random() * FUNNY_NAMES.length)]}${Math.floor(Math.random() * 90 + 10)}`,
+    name: randomName(),
     master: 0.9,
     music: 0.5,
     sfx: 0.9,

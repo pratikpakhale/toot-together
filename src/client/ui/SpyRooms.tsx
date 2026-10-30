@@ -6,6 +6,7 @@ import { REGIONS, type Region } from '../../sim/regions'
 import { audio } from '../audio/audio'
 import { showMenu, watchRoom } from '../game/controller'
 import { seatColor, TEAMS } from '../game/frame'
+import { hippocamKey, setHippocamKey } from '../game/hippocamKey'
 import { socketUrl } from '../regions'
 import { formatTime } from './format'
 import { Icon } from './Icon'
@@ -14,9 +15,10 @@ import { TeamBadge } from './Race'
 type Feed =
   | { status: 'connecting' }
   | { status: 'error'; message: string }
+  | { status: 'denied' }
   | { status: 'live'; rooms: RoomSummary[]; server: ServerStats; stale: boolean }
 
-function useRoomFeed(region: Region): Feed {
+function useRoomFeed(region: Region, key: string): Feed {
   const [feed, setFeed] = useState<Feed>({ status: 'connecting' })
   // react-doctor-disable-next-line react-doctor/effect-needs-cleanup -- the cleanup closes the socket and clears the retry timer
   useEffect(() => {
@@ -25,13 +27,13 @@ function useRoomFeed(region: Region): Feed {
     let stopped = false
     const connect = () => {
       ws = new WebSocket(socketUrl(region))
-      ws.onopen = () => ws.send(JSON.stringify({ type: 'watch', v: PROTOCOL_VERSION }))
+      ws.onopen = () => ws.send(JSON.stringify({ type: 'watch', v: PROTOCOL_VERSION, key }))
       ws.onmessage = (e) => {
         const msg = JSON.parse(String(e.data)) as ServerMsg
         if (msg.type === 'rooms') setFeed({ status: 'live', rooms: msg.rooms, server: msg.server, stale: false })
         else if (msg.type === 'error') {
           stopped = true
-          setFeed({ status: 'error', message: msg.message })
+          setFeed(msg.code === 'denied' ? { status: 'denied' } : { status: 'error', message: msg.message })
         }
       }
       ws.onclose = () => {
@@ -46,7 +48,7 @@ function useRoomFeed(region: Region): Feed {
       window.clearTimeout(retry)
       ws.close()
     }
-  }, [region])
+  }, [region, key])
   return feed
 }
 
@@ -68,6 +70,7 @@ function leave() {
 
 export function SpyRooms() {
   const [region, setRegion] = useState(REGIONS[0])
+  const [key, setKey] = useState(hippocamKey)
 
   return (
     <div className="safe-area pointer-events-none flex flex-col gap-4 overflow-y-auto overscroll-contain p-4 sm:p-8">
@@ -98,16 +101,26 @@ export function SpyRooms() {
         </button>
       </div>
 
-      <RegionRooms key={region.id} region={region} />
+      <RegionRooms
+        key={`${region.id}:${key}`}
+        region={region}
+        hippocamKey={key}
+        onKey={(next) => {
+          setHippocamKey(next)
+          setKey(next)
+        }}
+      />
     </div>
   )
 }
 
 /** One server's rooms, live. */
-function RegionRooms({ region }: { region: Region }) {
-  const feed = useRoomFeed(region)
+function RegionRooms({ region, hippocamKey: key, onKey }: { region: Region; hippocamKey: string; onKey: (key: string) => void }) {
+  const feed = useRoomFeed(region, key)
   return (
     <>
+      {feed.status === 'denied' && <KeyForm wrong={key !== ''} onKey={onKey} />}
+
       {feed.status === 'connecting' && <div className="panel pointer-events-auto self-start px-5 py-3 font-display text-xl">Tuning in…</div>}
 
       {feed.status === 'error' && (
@@ -137,12 +150,44 @@ function RegionRooms({ region }: { region: Region }) {
   )
 }
 
+function KeyForm({ wrong, onKey }: { wrong: boolean; onKey: (key: string) => void }) {
+  const [draft, setDraft] = useState('')
+  return (
+    <form
+      className="panel pointer-events-auto flex w-full max-w-md flex-col gap-3 self-center p-6"
+      onSubmit={(e) => {
+        e.preventDefault()
+        audio.click()
+        onKey(draft.trim())
+      }}
+    >
+      <div className="font-display flex items-center gap-2 text-2xl">
+        <Icon name="lock" size="1.2em" /> {wrong ? 'That key didn’t work' : 'Hippocam is locked'}
+      </div>
+      <input
+        className="field"
+        type="password"
+        placeholder="Hippocam key"
+        aria-label="Hippocam key"
+        autoComplete="current-password"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+      />
+      <button className="btn btn-green text-xl" type="submit" disabled={!draft.trim()}>
+        Unlock
+      </button>
+    </form>
+  )
+}
+
 function ServerBar({ server, rooms, stale }: { server: ServerStats; rooms: RoomSummary[]; stale: boolean }) {
-  const players = rooms.reduce((n, r) => n + r.players.filter((p) => !p.away).length, 0)
+  const players = rooms.reduce((n, r) => n + r.players.filter((p) => !p.away && !p.bot).length, 0)
+  const bots = rooms.reduce((n, r) => n + r.players.filter((p) => p.bot).length, 0)
   const watchers = rooms.reduce((n, r) => n + r.spectators, 0)
   const items: [string, string][] = [
     ['Rooms', String(rooms.length)],
     ['Players', String(players)],
+    ['Bots', String(bots)],
     ['Spectators', String(watchers)],
     ['Sockets', String(server.sockets)],
     ['CPU', `${Math.round(server.cpu * 100)}%`],
@@ -177,6 +222,11 @@ function RoomCard({ room }: { room: RoomSummary }) {
     <div className="panel pointer-events-auto flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
         <span className="font-display text-3xl tracking-[0.2em]">{room.code}</span>
+        {room.public && (
+          <span className="flex items-center gap-1 rounded-full border-2 border-ink bg-sun px-2 py-0.5 text-xs font-extrabold">
+            <Icon name="people" size="1.3em" /> PUBLIC
+          </span>
+        )}
         <span className={`ml-auto rounded-full border-2 border-ink px-2.5 py-0.5 text-xs font-extrabold ${phaseColor}`}>{phase}</span>
       </div>
       <div className="font-display -mt-2 text-lg text-ink/70">
@@ -232,6 +282,7 @@ function RoomCard({ room }: { room: RoomSummary }) {
                 {p.name}
               </span>
               {p.host && <Icon name="crown" size={18} label="Host" />}
+              {p.bot && <span className="rounded-full border-2 border-ink bg-ink px-1.5 text-[11px] font-extrabold text-white">BOT</span>}
               <span className="ml-auto text-xs font-extrabold tabular-nums text-ink/55">
                 {p.away ? 'away' : p.ping == null ? '…' : `${p.ping}ms`}
               </span>

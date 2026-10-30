@@ -74,11 +74,11 @@ function lobbyAction(roster: RosterEntry[], rafts: number, myId: number | undefi
 const canShare = () => isTouch && typeof navigator.share === 'function'
 
 /** The room's link: the share sheet on phones, the clipboard elsewhere. */
-async function shareInvite(code: string) {
+export async function shareInvite(code: string, text = `Race me down the river! Room ${code}.`) {
   const app = useApp.getState()
   const url = inviteLink(code)
   try {
-    if (canShare()) await navigator.share({ title: 'Toot Together', text: `Race me down the river! Room ${code}.`, url })
+    if (canShare()) await navigator.share({ title: 'Toot Together', text, url })
     else {
       await navigator.clipboard.writeText(url)
       app.pushToast({ text: 'INVITE LINK COPIED', icon: 'link', tone: 'info' }, 1600)
