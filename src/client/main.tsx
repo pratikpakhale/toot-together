@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { initAnalytics, track } from './analytics'
 import { isHippocamRoute, isLabRoute } from './game/controller'
-import { installPlatformGuards } from './platform'
+import { cameFromApp, installPlatformGuards } from './platform'
 import { ErrorBoundary, FatalScreen, hasWebGL } from './ui/Fatal'
 import { keepUpToDate } from './updates'
 
@@ -17,6 +17,9 @@ const LabPage = lazy(() => import('./lab/LabPage'))
 installPlatformGuards()
 if (!isHippocamRoute()) initAnalytics()
 keepUpToDate()
+
+const fromApp = cameFromApp()
+if (fromApp) track('open_in_browser_arrived', { app: fromApp })
 
 const webgl = hasWebGL()
 if (!webgl) track('webgl_missing')

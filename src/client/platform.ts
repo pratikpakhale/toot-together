@@ -17,14 +17,37 @@ export const inAppBrowser = IN_APP_BROWSERS.find(([, ua]) => ua.test(navigator.u
 
 export const uprightApp = isIOS ? inAppBrowser : null
 
-/** This page in Android's default browser. */
-export function systemBrowserUrl() {
+type EscapeVia = 'intent' | 'instagram' | 'safari'
+
+/**
+ * A link that opens this page in the phone's own browser, from inside an app's. Android hands an `intent://` link to
+ * the default browser. On iPhone, Instagram only lets pages out through its own `extbrowser` link, and the other
+ * apps let `x-safari-https:` through after asking. Neither is documented, so the app's menu stays the fallback.
+ */
+export function escapeLink(): { href: string; via: EscapeVia } {
   const url = new URL(location.href)
-  return `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=https;S.browser_fallback_url=${encodeURIComponent(url.href)};end`
+  if (!isIOS) {
+    const fallback = encodeURIComponent(url.href)
+    return { href: `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=https;S.browser_fallback_url=${fallback};end`, via: 'intent' }
+  }
+  if (inAppBrowser === 'Instagram') return { href: `instagram://extbrowser/?url=${encodeURIComponent(url.href)}`, via: 'instagram' }
+  return { href: `x-safari-${url.href}`, via: 'safari' }
 }
 
-/** This page in Chrome on iPhone, if it's installed. iPhone apps block links into Safari. */
-export const chromeUrl = () => location.href.replace(/^https:/, 'googlechromes:')
+const FROM_PARAM = 'from'
+
+/**
+ * Tags the page's link with the app it's open in, so whichever way the player gets out (our button, the app's menu,
+ * a copied link) the real browser knows. Returns that app once the page is open outside it, and drops the tag.
+ */
+export function cameFromApp() {
+  const url = new URL(location.href)
+  const from = inAppBrowser ? null : url.searchParams.get(FROM_PARAM)
+  if (inAppBrowser) url.searchParams.set(FROM_PARAM, inAppBrowser)
+  else url.searchParams.delete(FROM_PARAM)
+  if (url.href !== location.href) history.replaceState(history.state, '', url)
+  return from
+}
 
 const FULLSCREEN_DISPLAY = '(display-mode: fullscreen)'
 

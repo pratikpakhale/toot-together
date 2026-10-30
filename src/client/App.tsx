@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { audio, unlockOnGesture } from './audio/audio'
 import { followDeepLink, isHippocamRoute, joinRoom, roomFromUrl, showHippocam, showMenu, takeDeepLinkFromUrl } from './game/controller'
 import { frame, isRace } from './game/frame'
 import { input } from './game/input'
-import { enterFullscreen, isIOS, isTouch, keepAwake, usePortraitPhone } from './platform'
+import { enterFullscreen, inAppBrowser, isIOS, isTouch, keepAwake, usePortraitPhone } from './platform'
 import { GameScene } from './scene/GameScene'
 import { useApp } from './state/store'
 import { ChatDock } from './ui/Chat'
@@ -20,7 +20,7 @@ import { Connecting, Notice } from './ui/Notice'
 import { PauseMenu } from './ui/PauseMenu'
 import { pressPrimary } from './ui/Race'
 import { Results } from './ui/Results'
-import { RotatePrompt } from './ui/RotatePrompt'
+import { InAppPrompt, RotatePrompt } from './ui/RotatePrompt'
 import { Settings } from './ui/Settings'
 import { SpyRooms } from './ui/SpyRooms'
 import { Toasts } from './ui/Toasts'
@@ -53,6 +53,8 @@ export function App() {
   const session = useApp((s) => s.session)
   const sideways = usePortraitPhone() && screen === 'game'
   const benched = useApp((s) => s.sessionInfo?.roster.find((p) => p.id === s.session?.localPlayers[0]?.id)?.raft === null)
+  // Asked once per visit: whoever stays is asked again only if the river finds the phone upright.
+  const [stayInApp, setStayInApp] = useState(false)
 
   useEffect(boot, [])
 
@@ -148,6 +150,7 @@ export function App() {
       <Connecting />
       <Notice />
       {screen === 'menu' && <InstallPrompt />}
+      {screen === 'menu' && isTouch && inAppBrowser && !stayInApp && <InAppPrompt app={inAppBrowser} onStay={() => setStayInApp(true)} />}
     </>
   )
 }
