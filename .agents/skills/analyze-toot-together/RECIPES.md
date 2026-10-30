@@ -64,6 +64,23 @@ group by person_id order by first_in_window
 
 Then, for those people, `select person_id, min(timestamp) from events where {game} and person_id in (…) group by person_id` tells new from returning.
 
+**Getting players out of Instagram's and Facebook's browsers.** Prompts shown, taps by route, Not now, and pages that arrived in a real browser. Arrivals are new people (another browser), so compare counts, not people. Before 2026-10-30 the prompt only showed in-game and nothing counted arrivals.
+
+```sql
+select properties.app app, properties.$os os,
+  countIf(event = 'in_app_prompt_shown' and properties.where = 'menu') shown_on_arrival,
+  countIf(event = 'in_app_prompt_shown' and properties.where = 'game') shown_in_game,
+  countIf(event = 'open_in_browser' and properties.via != 'copy') tapped_open,
+  countIf(event = 'open_in_browser' and properties.via = 'copy') copied,
+  countIf(event = 'in_app_prompt_stayed') stayed,
+  countIf(event = 'open_in_browser_arrived') arrived
+from events where {game} and timestamp > now() - interval 7 day
+  and event in ('in_app_prompt_shown', 'open_in_browser', 'in_app_prompt_stayed', 'open_in_browser_arrived')
+group by app, os order by app, os
+```
+
+`os` on `open_in_browser_arrived` is the real browser's, which matches the phone. For whether in-app players still play, split the funnel recipe by `match(properties.$raw_user_agent, 'Instagram|FBAN|FBAV|FB_IAB')` and `properties.$os`.
+
 **Online errors.**
 
 ```sql
