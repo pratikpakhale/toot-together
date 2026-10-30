@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { audio, unlockOnGesture } from './audio/audio'
-import { isHippocamRoute, joinRoom, roomFromUrl, showHippocam, showMenu } from './game/controller'
+import { followDeepLink, isHippocamRoute, joinRoom, roomFromUrl, showHippocam, showMenu, takeDeepLinkFromUrl } from './game/controller'
 import { frame, isRace } from './game/frame'
 import { input } from './game/input'
 import { enterFullscreen, isIOS, isTouch, keepAwake, usePortraitPhone } from './platform'
@@ -39,8 +39,11 @@ function boot() {
     return
   }
   showMenu()
+  const link = takeDeepLinkFromUrl()
   const room = roomFromUrl()
+  // An invite link wins over a page's Play link.
   if (room) joinRoom(room)
+  else if (link) followDeepLink(link)
 }
 
 export function App() {

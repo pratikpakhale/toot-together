@@ -107,10 +107,10 @@ export function LevelCards({ onPick, compact = false }: { onPick: (id: string) =
 export function LevelSelect() {
   const mode = useApp((s) => s.levelMode)
   const setOverlay = useApp((s) => s.setOverlay)
-  const [rafts, setRafts] = useState(1)
+  const [rafts, setRafts] = useState(mode === 'race' ? 2 : 1)
   const [server, setServer] = useState<Region | null>(null)
   const close = () => setOverlay(null)
-  const online = mode === 'online'
+  const online = mode !== 'solo'
   const pick = (n: number) => () => {
     audio.click()
     setRafts(n)

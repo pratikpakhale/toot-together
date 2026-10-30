@@ -35,7 +35,7 @@ body,
   touch-action: none;
 }
 
-/* The plain pages from scripts/pages.ts (/how-to-play, the 404) scroll and let you select text. */
+/* The plain pages from scripts/pages.ts (/how-to-play, the landing pages, the 404) scroll and let you select text. */
 html.page,
 html.page body {
   height: auto;
@@ -45,6 +45,12 @@ html.page body {
   -webkit-touch-callout: default;
   overscroll-behavior: auto;
   touch-action: auto;
+}
+
+/* The game's white focus ring would vanish on the pages' paper background. */
+html.page :is(a, .btn, .level-card):focus-visible {
+  outline: 4px solid var(--color-ink);
+  outline-offset: 3px;
 }
 
 button,

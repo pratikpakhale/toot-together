@@ -18,11 +18,12 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,svg,png,webp}', '**/*-latin-[0-9]*.woff2'],
-        // Only the install dialog shows these, so no player needs them offline.
-        globIgnores: ['screenshots/**'],
+        // Only the install dialog and the site's pages show these, so no player needs them offline.
+        globIgnores: ['screenshots/**', 'river-shots/**'],
         maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/ws/, /^\/health/, /^\/ping/, /^\/how-to-play/, /^\/robots\.txt/, /^\/sitemap\.xml/],
+        // Only the game's own addresses; every other page (scripts/pages.ts) comes from the network as itself.
+        navigateFallbackAllowlist: [/^\/(hippocam|lab)?(\?|$)/],
         runtimeCaching: [{ urlPattern: /\/assets\/.+\.woff2$/, handler: 'CacheFirst', options: { cacheName: 'fonts' } }],
       },
     }),
