@@ -6,7 +6,7 @@
     <meta name="format-detection" content="telephone=no" />
     <!-- Painted before the CSS bundle arrives, so a home-screen launch never flashes white. -->
     <style>html{background:#fde7cf}</style>
-    <title>Toot Together: a co-op hippo raft party game</title>
+    <title>Toot Together: a free co-op hippo raft party game</title>
     <meta name="description" content="Up to four hippos, one inflatable raft, and only one way to steer it. A free co-op party game for your browser: play solo, on the couch, or online with friends." />
     <meta name="theme-color" content="#5fbdf3" />
     <link rel="canonical" href="https://toottogether.fun/" />
@@ -39,11 +39,13 @@
         "@graph": [
           {
             "@type": "WebSite",
+            "@id": "https://toottogether.fun/#website",
             "name": "Toot Together",
             "url": "https://toottogether.fun/"
           },
           {
             "@type": "VideoGame",
+            "@id": "https://toottogether.fun/#game",
             "name": "Toot Together",
             "url": "https://toottogether.fun/",
             "image": "https://toottogether.fun/og.jpg",
@@ -58,16 +60,28 @@
             "isAccessibleForFree": true,
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
             "author": { "@type": "Person", "name": "Pratik Pakhale" },
-            "license": "https://opensource.org/licenses/MIT"
+            "license": "https://opensource.org/licenses/MIT",
+            "sameAs": ["https://github.com/pratikpakhale/toot-together"]
           }
         ]
       }
     </script>
   </head>
   <body>
+    <!-- For screen readers and search engines; the canvas is the page everyone sees. -->
     <header class="sr-only">
-      <h1>Toot Together: a co-op hippo raft party game</h1>
-      <p>Up to four hippos share one inflatable raft, and the only way to move it is to toot. A free party game for your browser: play solo, on the couch, or online with friends. <a href="/how-to-play">How to play</a></p>
+      <h1>Toot Together: a free co-op hippo raft party game</h1>
+      <p>Up to four hippos share one inflatable raft, and the only way to move it is to toot. Each hippo pushes the raft away from its own butt, so the crew has to agree on where to go. A free party game for your browser on phone and laptop, with no download and no sign-up: play solo, on the couch with up to four on one screen, online with friends by sending a link, or race up to four rafts and 16 players down eight rivers.</p>
+      <nav aria-label="About the game">
+        <ul>
+          <li><a href="/how-to-play">How to play</a></li>
+          <li><a href="/online-co-op-with-friends">Play online with friends</a></li>
+          <li><a href="/couch-co-op">Couch co-op on one screen</a></li>
+          <li><a href="/raft-race-game">Raft race for up to 16</a></li>
+          <li><a href="/games-to-play-with-friends-on-phone">Play with friends on your phone</a></li>
+          <li><a href="/rivers">All eight rivers</a></li>
+        </ul>
+      </nav>
     </header>
     <div id="root"></div>
     <noscript>Toot Together needs JavaScript to run.</noscript>

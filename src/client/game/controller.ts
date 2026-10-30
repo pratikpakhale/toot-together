@@ -4,10 +4,12 @@ import { RAFT_RESULT } from '../../sim/types'
 import { setPlayerName, track } from '../analytics'
 import { audio } from '../audio/audio'
 import { whenPlayable } from '../platform'
+import { measureRegions } from '../regions'
 import { fx } from '../scene/Fx'
-import { useProgress } from '../state/progress'
+import { isUnlocked, playable, useProgress } from '../state/progress'
 import { useApp } from '../state/store'
 import { reloadForUpdate, reloadingForUpdate } from '../updates'
+import { type DeepLink, takeDeepLink } from './deepLink'
 import { frame, isRace, modeOf, myRaft } from './frame'
 import type { DeviceId } from './input'
 import { type GameSession, LocalSession, NetSession, netSummary, type SessionInfo } from './session'
@@ -306,6 +308,26 @@ function setRoomInUrl(code: string | null) {
 export function roomFromUrl(): string | null {
   const code = normalizeRoomCode(new URL(location.href).searchParams.get('room'))
   return isRoomCode(code) ? code : null
+}
+
+/** The link from one of the site's pages in the address (see deepLink.ts), taken out so a reload lands on the menu. */
+export function takeDeepLinkFromUrl() {
+  const { link, rest } = takeDeepLink(new URL(location.href))
+  if (link) history.replaceState(history.state, '', rest)
+  return link
+}
+
+/** A river plays straight away if it's open, or shows the river picker with its lock if not; `play` opens that step of the menu. */
+export function followDeepLink({ river, play }: DeepLink) {
+  const app = useApp.getState()
+  const { records } = useProgress.getState()
+  if (river) selectLevel(playable(records, river))
+  if (play === 'couch') app.setScreen('local-lobby')
+  else if (play === 'online' || play === 'race') {
+    measureRegions()
+    app.openLevels(play)
+  } else if (river && !play && isUnlocked(records, river)) startSolo(river)
+  else app.openLevels('solo')
 }
 
 /** Always the game's own page, so a link copied while watching on /hippocam joins instead of watching. */

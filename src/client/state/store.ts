@@ -7,7 +7,8 @@ import type { FinishOutcome } from './progress'
 type Screen = 'menu' | 'local-lobby' | 'game' | 'hippocam'
 /** `crews`: the host's crew tools in a race room. */
 type Overlay = null | 'pause' | 'settings' | 'howto' | 'results' | 'levels' | 'crews' | 'feedback'
-type LevelMode = 'solo' | 'online'
+/** `online`: a co-op room; `race`: a room set to race, where the host picks how many rafts. */
+type LevelMode = 'solo' | 'online' | 'race'
 /**
  * `aim`: the wheel while Q or the chat button is held (moving from where the press began picks a line, letting
  * go says it); `wheel`: the wheel left open by a quick tap of Q or a click; `type`: the text box; `people`: the
