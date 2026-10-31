@@ -219,11 +219,11 @@ const VOLCANO_PEAK: CourseDef = {
     { len: 26, turn: -35, width: 11, items: [{ kind: 'pickup', at: 13, d: 0, item: 'chili' }] },
 
     { len: 28, checkpoint: true, width: 10 },
-    { len: 26, left: 'open', right: 'open', width: 8.5, flow: 2.6, items: [{ kind: 'mace', at: 13, amp: 3.4, period: 2.8 }] },
+    { len: 26, left: 'open', right: 'open', width: 10, flow: 2.6, items: [{ kind: 'mace', at: 13, amp: 3.4, period: 3.4 }] },
     { len: 30, turn: 55, left: 'open', right: 'open', width: 9, items: [{ kind: 'mine', at: 15, d: 1.6 }] },
     { len: 22, drop: 6, left: 'open', right: 'open', flow: 3.6, width: 9 },
     { len: 22, turn: -45, left: 'open', right: 'open', width: 10, items: [{ kind: 'piston', at: 11, d: 0, period: 2.8, r: 1.3 }] },
-    { len: 22, width: 13, flow: 2, items: [{ kind: 'spinner', at: 11, arm: 3.2, speed: 1.9, arms: 3 }] },
+    { len: 22, width: 16, flow: 2, items: [{ kind: 'spinner', at: 11, arm: 3.2, speed: 1.5, arms: 3 }] },
     { len: 18, width: 12, items: [{ kind: 'mace', at: 9, amp: 4, period: 2.5 }] },
     { len: 10, finish: true, width: 16, flow: 1.2 },
     { len: 26, width: 20, flow: 0.15, shelf: 10 },
