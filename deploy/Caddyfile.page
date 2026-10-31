@@ -1,0 +1,7 @@
+# The page lives at {$PAGE_URL}: anyone (or any crawler) who opens a page here goes there, keeping path and query.
+# Only the game's own endpoints stay: the WebSocket, /health and /ping.
+(page) {
+	@page not path /ws /health /ping
+	redir @page {$PAGE_URL}{uri} permanent
+}
+

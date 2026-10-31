@@ -38,7 +38,7 @@ Any Node host that supports WebSockets will run it (a VPS, Render, Railway, …)
 The repo ships everything for a small VM: Caddy in front for HTTPS and the WebSocket proxy, and the Node server running as the `toot-together` systemd service.
 
 1. Point a domain's A record at a fresh Ubuntu 24.04 VM, and open TCP 80 and 443 in your cloud provider's firewall.
-2. Add the box to `regions.json`, then copy `deploy/` to the box and run `sudo bash setup-server.sh <region id> <domain> [other domains…]` there. It opens 80/443 in the VM firewall and adds swap, then installs Node 24, pnpm and Caddy. Any other domains (say `www.<domain>`, or one the game moved from) permanently redirect to `<domain>`. It is safe to re-run.
+2. Add the box to `regions.json`, then copy `deploy/` to the box and run `sudo bash setup-server.sh <region id> <domain> [other domains…]` there. It opens 80/443 in the VM firewall and adds swap, then installs Node 24, pnpm and Caddy. Any other domains (say `www.<domain>`, or one the game moved from) permanently redirect to `<domain>`. If the page lives on its own host (as with `scripts/deploy.sh web`), run it with `PAGE_URL=https://<page domain>` in its environment, and the box redirects page visits there, keeping only the WebSocket, `/health` and `/ping`. It is safe to re-run.
 3. Copy `.env.example` to `.env.local` and fill in `DEPLOY_HOST_<region id>` for each box. `VITE_POSTHOG_KEY` is optional: without it, analytics stay off.
 
 ```bash

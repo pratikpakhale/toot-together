@@ -53,10 +53,15 @@ if [ -n "${HIPPOCAM_KEY:-}" ]; then
   install -m 600 /dev/null /etc/systemd/system/toot-together.service.d/hippocam.conf
   printf '[Service]\nEnvironment=HIPPOCAM_KEY=%s\n' "$HIPPOCAM_KEY" >/etc/systemd/system/toot-together.service.d/hippocam.conf
 fi
+# With PAGE_URL (the page on its own host, say https://toottogether.fun), this box only serves the game's endpoints
+# and sends page visits there. Without it, the box serves the page too.
+PAGE_URL=${PAGE_URL:-}
+PAGE_URL=${PAGE_URL%/}
 {
+  if [ -n "$PAGE_URL" ]; then cat "$HERE/Caddyfile.page"; else printf '(page) {\n}\n\n'; fi
   cat "$HERE/Caddyfile"
   if [ -n "$REDIRECT_FROM" ]; then cat "$HERE/Caddyfile.redirect"; fi
-} | sed -e "s|{\$DOMAIN}|$DOMAIN|g" -e "s|{\$REDIRECT_FROM}|$REDIRECT_FROM|g" >/etc/caddy/Caddyfile
+} | sed -e "s|{\$DOMAIN}|$DOMAIN|g" -e "s|{\$REDIRECT_FROM}|$REDIRECT_FROM|g" -e "s|{\$PAGE_URL}|$PAGE_URL|g" >/etc/caddy/Caddyfile
 # As Caddy's own user: validating opens the log files, and ones it created as root Caddy couldn't write to.
 runuser -u caddy -- caddy validate --config /etc/caddy/Caddyfile
 systemctl daemon-reload
@@ -66,4 +71,4 @@ systemctl reload-or-restart caddy
 echo "$DEPLOY_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart toot-together" >/etc/sudoers.d/toot-together
 chmod 440 /etc/sudoers.d/toot-together
 
-echo "Provisioned region $REGION for https://$DOMAIN${REDIRECT_FROM:+ (redirecting $REDIRECT_FROM)}"
+echo "Provisioned region $REGION for https://$DOMAIN${REDIRECT_FROM:+ (redirecting $REDIRECT_FROM)}${PAGE_URL:+, page at $PAGE_URL}"
